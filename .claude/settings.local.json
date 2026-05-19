@@ -32,7 +32,8 @@
       "WebFetch(domain:open-geography-portalx-ons.hub.arcgis.com)",
       "WebFetch(domain:www.arcgis.com)",
       "WebFetch(domain:github.com)",
-      "Bash(node scripts/merge-boundaries.cjs)"
+      "Bash(node scripts/merge-boundaries.cjs)",
+      "Bash(git add *)"
     ]
   }
 }
