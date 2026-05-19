@@ -1,0 +1,42 @@
+{
+  "name": "my-custom-election-simulator",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "build-data": "tsx scripts/build-data.ts",
+    "build-boundaries": "node scripts/merge-boundaries.mjs"
+  },
+  "dependencies": {
+    "@types/leaflet": "^1.9.21",
+    "d3": "^7.9.0",
+    "html-to-image": "^1.11.13",
+    "leaflet": "^1.9.4",
+    "papaparse": "^5.4.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-leaflet": "^4.2.1",
+    "topojson-client": "^3.1.0",
+    "topojson-server": "^3.0.1",
+    "topojson-simplify": "^3.0.3",
+    "zustand": "^5.0.0"
+  },
+  "devDependencies": {
+    "@types/d3": "^7.4.3",
+    "@types/papaparse": "^5.3.14",
+    "@types/react": "^18.3.1",
+    "@types/react-dom": "^18.3.1",
+    "@types/topojson-client": "^3.1.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "autoprefixer": "^10.4.20",
+    "mapshaper": "^0.7.18",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.2",
+    "vite": "^6.0.5"
+  }
+}

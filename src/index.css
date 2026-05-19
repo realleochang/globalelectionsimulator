@@ -1,0 +1,771 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html, body, #root {
+    height: 100%;
+    overflow: hidden;
+  }
+  body {
+    background: #f5f4f0;
+    color: #1a1a1a;
+    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+}
+
+/* ── Compact party slider (3px track, 12px thumb) ───────────────────── */
+.party-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+  outline: none;
+}
+.party-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--party-color, #7a7870) 0%,
+    var(--party-color, #7a7870) var(--pct, 0%),
+    #e0ddd7 var(--pct, 0%),
+    #e0ddd7 100%
+  );
+}
+.party-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -4.5px;
+  height: 12px;
+  width: 12px;
+  border-radius: 50%;
+  background: #c8a020;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.22);
+  cursor: grab;
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out;
+}
+.party-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.2);
+  box-shadow: 0 2px 6px rgba(0,0,0,0.24);
+}
+.party-slider:active::-webkit-slider-thumb {
+  cursor: grabbing;
+  transform: scale(1.05);
+}
+.party-slider::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: #e0ddd7;
+}
+.party-slider::-moz-range-progress {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--party-color, #7a7870);
+}
+.party-slider::-moz-range-thumb {
+  height: 10px;
+  width: 10px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  background: #c8a020;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.22);
+  cursor: grab;
+}
+.party-slider:disabled {
+  opacity: 0.30;
+  cursor: not-allowed;
+}
+.party-slider:disabled::-webkit-slider-thumb {
+  cursor: not-allowed;
+}
+
+/* ── Eyebrow / section label ─────────────────────────────────────────── */
+.eyebrow {
+  font-family: 'DM Mono', ui-monospace, monospace;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: #7a7870;
+}
+
+/* ── Side panel slide-in / slide-out transitions ─────────────────────── */
+.panel-slide {
+  animation: slideIn 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+.panel-exit {
+  animation: slideOut 260ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes slideOut {
+  from { transform: translateX(0);    opacity: 1; }
+  to   { transform: translateX(100%); opacity: 0; }
+}
+
+/* ── Thin scrollbar for panels ───────────────────────────────────────── */
+.thin-scroll::-webkit-scrollbar { width: 3px; }
+.thin-scroll::-webkit-scrollbar-track { background: transparent; }
+.thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.10); border-radius: 2px; }
+
+/* ── Leaflet overrides ───────────────────────────────────────────────── */
+.leaflet-container { background: #f0eeea; font-family: inherit; }
+.leaflet-control-attribution {
+  font-size: 9px !important;
+  background: rgba(245,244,240,0.80) !important;
+  color: #7a7870 !important;
+}
+.leaflet-control-attribution a { color: #7a7870 !important; }
+.leaflet-control-zoom {
+  border: 1px solid rgba(0,0,0,0.09) !important;
+  border-radius: 4px !important;
+  overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,0.08) !important;
+}
+.leaflet-control-zoom a {
+  background: #fff !important;
+  color: #4a4844 !important;
+  font-size: 16px !important;
+  line-height: 26px !important;
+  width: 28px !important;
+  height: 28px !important;
+}
+.leaflet-control-zoom a:hover { background: #ebe9e5 !important; color: #1a1a1a !important; }
+.leaflet-interactive { cursor: pointer !important; }
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Candidate Tile  (.cand-col)
+   Spec variables: --vh-text-xs/sm/md, --muted, --vh-border, --bar-track
+   Per-tile dynamic: --cand-color, --cand-color-alpha (set inline from JS)
+═══════════════════════════════════════════════════════════════════════ */
+:root {
+  --vh-font: "TT Norms Pro","Avenir Next",-apple-system,BlinkMacSystemFont,"Segoe UI","DM Sans",sans-serif;
+  --vh-text-xs: 0.75rem;
+  --vh-text-sm: 0.875rem;
+  --vh-text-md: 1rem;
+  --muted:      #7a7870;
+  --vh-border:  rgba(0,0,0,0.09);
+  --bar-track:  #e8e5e0;
+}
+
+/* ── Container ───────────────────────────────────────────────────────── */
+.cand-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 10px 8px 8px;
+  min-width: 90px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--vh-border);
+  position: relative;
+  cursor: default;
+  user-select: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+
+/* Leading party (most seats, no majority yet) */
+.cand-col.is-leader {
+  border-color: var(--cand-color);
+  box-shadow: 0 0 0 1px var(--cand-color);
+}
+
+/* Winner (majority — 326+ seats) */
+.cand-col.is-winner {
+  border-color: var(--cand-color);
+  box-shadow: 0 0 0 1.5px var(--cand-color), 0 3px 12px rgba(0,0,0,0.09);
+  overflow: hidden;
+}
+
+.cand-col.is-winner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.26) 50%,
+    transparent 70%
+  );
+  animation: shimmerSweep 2.2s ease-in-out infinite;
+  pointer-events: none;
+  z-index: 2;
+}
+
+@keyframes shimmerSweep {
+  0%   { transform: translateX(-200%); }
+  100% { transform: translateX(200%);  }
+}
+
+/* ── Avatar bubble ───────────────────────────────────────────────────── */
+[id^="cand-photo-"] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  cursor: pointer;
+  margin-bottom: 5px;
+}
+
+.cand-circle-frame {
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  overflow: hidden;
+  position: relative;
+  border: 2.5px solid var(--cand-color);
+  background: var(--cand-color-alpha, rgba(128,128,128,0.13));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cand-circle-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 50%;
+  animation: photoFadeIn 0.25s ease both;
+}
+
+.cand-col-landscape .ls-circle img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 50%;
+  animation: photoFadeIn 0.25s ease both;
+}
+
+@keyframes photoFadeIn {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1);    }
+}
+
+.cand-initials {
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--cand-color);
+  letter-spacing: -0.5px;
+  line-height: 1;
+  user-select: none;
+  font-family: "DM Mono", monospace;
+}
+
+/* ── Winner tick badge ───────────────────────────────────────────────── */
+.called-tick {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  z-index: 4;
+  display: inline-flex;
+  filter: drop-shadow(0 1px 3px rgba(0,0,0,0.18));
+  pointer-events: none;
+  animation: tickPop 0.55s cubic-bezier(0.34,1.56,0.64,1) both;
+}
+
+@keyframes tickPop {
+  from { transform: scale(0); opacity: 0; }
+  to   { transform: scale(1); opacity: 1; }
+}
+
+/* ── Labels ──────────────────────────────────────────────────────────── */
+.cand-party-abbrev {
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+  line-height: 1;
+  margin-bottom: 1px;
+}
+
+.cand-leader-name {
+  font-size: 9px;
+  font-weight: 500;
+  color: var(--muted);
+  text-align: center;
+  max-width: 82px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  line-height: 1;
+  margin-bottom: 3px;
+}
+
+.cand-leader-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  margin-bottom: 3px;
+  cursor: pointer;
+}
+.cand-leader-wrap:hover .cand-leader-select,
+.cand-leader-wrap:hover .leader-chevron { color: #1a1a1a; }
+
+.cand-leader-select {
+  font-size: 9px;
+  font-family: "DM Mono", monospace;
+  background: transparent;
+  border: 0;
+  color: var(--muted);
+  cursor: pointer;
+  max-width: 76px;
+  text-align: center;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  margin-bottom: 0;
+  line-height: 1;
+}
+.cand-leader-select:hover { color: #1a1a1a; }
+
+.leader-chevron {
+  color: var(--muted);
+  flex-shrink: 0;
+  pointer-events: none;
+  transition: color 0.1s;
+}
+
+/* ── Seat count ──────────────────────────────────────────────────────── */
+.cand-seats {
+  font-size: 24px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--cand-color);
+  font-family: "DM Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+  margin-bottom: 0;
+}
+
+/* ── Party full name ─────────────────────────────────────────────────── */
+.cand-party-name {
+  font-size: 9.5px;
+  font-weight: 500;
+  color: #4a4844;
+  text-align: center;
+  max-width: 82px;
+  line-height: 1.2;
+  margin-bottom: 3px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── Percentage (.cand-pct > .pct-number + .pct-delta) ───────────────── */
+.cand-pct {
+  display: flex;
+  align-items: baseline;
+  gap: 3px;
+  line-height: 1;
+}
+
+.pct-number {
+  font-size: var(--vh-text-sm);
+  font-weight: 700;
+  font-family: "DM Mono", monospace;
+  color: var(--cand-color);
+  letter-spacing: -0.3px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Change badge — fades in from above, lingers, then fades out */
+.pct-delta {
+  font-size: 9px;
+  font-family: "DM Mono", monospace;
+  font-weight: 600;
+  letter-spacing: -0.2px;
+  white-space: nowrap;
+  opacity: 0;
+  animation: pctDeltaFade 2.8s ease-out forwards;
+  pointer-events: none;
+}
+
+@keyframes pctDeltaFade {
+  0%   { opacity: 0; transform: translateY(-4px); }
+  12%  { opacity: 1; transform: translateY(0);    }
+  70%  { opacity: 1; transform: translateY(0);    }
+  100% { opacity: 0; transform: translateY(-3px); }
+}
+
+/* ── Vote count ──────────────────────────────────────────────────────── */
+.cand-votes {
+  font-size: var(--vh-text-xs);
+  font-family: "DM Mono", monospace;
+  color: var(--muted);
+  text-align: center;
+  margin-top: 1px;
+  margin-bottom: 1px;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.cand-votes-full    { display: inline; }
+.cand-votes-compact { display: none;   }
+
+@media (max-width: 640px) {
+  .cand-votes-full    { display: none;   }
+  .cand-votes-compact { display: inline; }
+}
+
+/* ── Progress bar ────────────────────────────────────────────────────── */
+.cand-bar-track {
+  margin-top: 4px;
+  height: 4px;
+  background: var(--bar-track, #e8e5e0);
+  border-radius: 2px;
+  width: 72px;
+  overflow: hidden;
+}
+
+.cand-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--cand-color);
+  transition: width 0.4s ease;
+  min-width: 2px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Landscape (minimized) candidate tile
+═══════════════════════════════════════════════════════════════════════ */
+.cand-col-landscape {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-shrink: 0;
+  gap: 8px;
+  padding: 6px 10px 6px 8px;
+  min-width: 158px;
+  height: 52px;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid var(--vh-border);
+  position: relative;
+  cursor: default;
+  user-select: none;
+  overflow: hidden;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.cand-col-landscape.is-leader {
+  border-color: var(--cand-color);
+  box-shadow: 0 0 0 1px var(--cand-color);
+}
+.cand-col-landscape.is-winner {
+  border-color: var(--cand-color);
+  box-shadow: 0 0 0 1.5px var(--cand-color), 0 3px 12px rgba(0,0,0,0.09);
+}
+
+/* Photo wrap — horizontal, no bottom margin */
+.cand-col-landscape .ls-photo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  flex-shrink: 0;
+}
+.cand-col-landscape .ls-circle {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2.5px solid var(--cand-color);
+  background: var(--cand-color-alpha, rgba(128,128,128,0.13));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.cand-col-landscape .ls-initials {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--cand-color);
+  font-family: "DM Mono", monospace;
+  line-height: 1;
+  user-select: none;
+}
+
+/* Info column inside landscape tile */
+.ls-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
+}
+.ls-top-row {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  line-height: 1;
+}
+.ls-party-name {
+  font-size: 10px;
+  font-weight: 500;
+  color: #4a4844;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ls-seats {
+  font-size: 18px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--cand-color);
+  font-family: "DM Mono", monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -1px;
+}
+.ls-bottom-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  line-height: 1;
+}
+.ls-leader-wrap {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  cursor: pointer;
+}
+.ls-leader-wrap:hover .ls-leader,
+.ls-leader-wrap:hover .leader-chevron { color: #1a1a1a; }
+
+.ls-leader {
+  font-size: 8.5px;
+  font-family: "DM Mono", monospace;
+  color: var(--muted);
+  max-width: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: 0;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+  padding: 0;
+  cursor: pointer;
+}
+.ls-leader:hover { color: #1a1a1a; }
+.ls-pct {
+  font-size: 10px !important;
+}
+.ls-votes {
+  font-size: 9px;
+  font-family: "DM Mono", monospace;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.ls-bar {
+  width: 46px !important;
+  margin-top: 0 !important;
+  flex-shrink: 0;
+}
+
+/* ── Northern Ireland group box ─────────────────────────────────────── */
+/*
+   Flex-row layout: [vertical label | tiles]
+   The label adds only width, not height — so the group stays the same
+   height as the tiles it contains, matching the surrounding cards.
+*/
+.ni-group {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  flex-shrink: 0;
+  gap: 5px;
+  padding: 4px 5px;
+  border: 1.5px solid rgba(0,0,0,0.12);
+  border-radius: 8px;
+  background: rgba(0,0,0,0.018);
+}
+
+/* Vertical label rotated bottom-to-top */
+.ni-group-label {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  font-family: "DM Mono", monospace;
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.10em;
+  text-transform: uppercase;
+  color: #9a9690;
+  white-space: nowrap;
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ni-group-tiles {
+  display: flex;
+  gap: 6px;
+  align-items: inherit;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════
+   Dark mode — metallic midnight-blue theme
+   Applied when <html class="dark"> is set.
+   Non-layered rules beat @layer utilities automatically (no !important needed
+   except where Leaflet's own !important rules must be overridden).
+═══════════════════════════════════════════════════════════════════════ */
+
+html.dark {
+  color-scheme: dark;
+  /* CSS variable overrides for cand-tile internals */
+  --muted:     #55708a;
+  --vh-border: rgba(80, 140, 220, 0.15);
+  --bar-track: rgba(80, 140, 220, 0.13);
+}
+
+html.dark body {
+  background: #080e1c;
+  color: #d8e8f5;
+}
+
+/* ── Backgrounds ─────────────────────────────────────────────────── */
+html.dark .bg-canvas   { background-color: #080e1c; }
+
+html.dark .bg-white,
+html.dark .bg-card,
+html.dark .bg-surface  { background-color: #0f1a2e; }
+
+html.dark .bg-surface2 { background-color: #0b1422; }
+
+html.dark .bg-muted-bg { background-color: #0b1422; }
+
+html.dark .bg-hover    { background-color: rgba(80,140,220,0.08); }
+html.dark .bg-active   { background-color: rgba(80,140,220,0.15); }
+
+/* Active button (bg-ink/8 in light) */
+html.dark .bg-ink\/8   { background-color: rgba(216,232,245,0.09); }
+
+/* Branding stamp — stays dark in dark mode */
+html.dark .bg-ink\/60  { background-color: rgba(0,0,0,0.68); }
+
+/* Arbitrary muted-bg used inside panels */
+html.dark .bg-\[\#f8f7f4\] { background-color: #0b1422; }
+
+/* ── Text ────────────────────────────────────────────────────────── */
+html.dark .text-ink   { color: #d8e8f5; }
+html.dark .text-ink-2 { color: #8aa2c0; }
+html.dark .text-ink-3 { color: #55708a; }
+
+/* ── Borders ─────────────────────────────────────────────────────── */
+html.dark .border-default { border-color: rgba(80,140,220,0.15); }
+html.dark .border-subtle  { border-color: rgba(80,140,220,0.08); }
+html.dark .border-strong  { border-color: rgba(80,140,220,0.26); }
+
+/* ── Hover utilities ─────────────────────────────────────────────── */
+html.dark .hover\:bg-hover:hover  { background-color: rgba(80,140,220,0.08); }
+html.dark .hover\:text-ink:hover  { color: #d8e8f5; }
+
+/* ── Candidate tiles ─────────────────────────────────────────────── */
+html.dark .cand-col,
+html.dark .cand-col-landscape {
+  background: #0f1a2e;
+}
+html.dark .cand-party-name,
+html.dark .ls-party-name,
+html.dark .ls-party-name { color: #8aa2c0; }
+html.dark .cand-leader-select,
+html.dark .cand-leader-select:hover,
+html.dark .ls-leader,
+html.dark .ls-leader:hover { color: #55708a; }
+html.dark .cand-leader-wrap:hover .cand-leader-select,
+html.dark .cand-leader-wrap:hover .leader-chevron,
+html.dark .ls-leader-wrap:hover .ls-leader,
+html.dark .ls-leader-wrap:hover .leader-chevron { color: #d8e8f5; }
+
+/* ── NI group box ────────────────────────────────────────────────── */
+html.dark .ni-group {
+  border-color: rgba(80,140,220,0.20);
+  background: rgba(80,140,220,0.04);
+}
+html.dark .ni-group-label { color: #55708a; }
+
+/* ── Party slider ────────────────────────────────────────────────── */
+html.dark .party-slider::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--party-color, #55708a) 0%,
+    var(--party-color, #55708a) var(--pct, 0%),
+    rgba(80,140,220,0.13) var(--pct, 0%),
+    rgba(80,140,220,0.13) 100%
+  );
+}
+html.dark .party-slider::-webkit-slider-thumb {
+  border-color: #0f1a2e;
+}
+html.dark .party-slider::-moz-range-track { background: rgba(80,140,220,0.13); }
+
+/* ── Thin scrollbar ──────────────────────────────────────────────── */
+html.dark .thin-scroll::-webkit-scrollbar-thumb { background: rgba(80,140,220,0.16); }
+
+/* ── Leaflet map ─────────────────────────────────────────────────── */
+html.dark .leaflet-container { background: #0b1422; }
+html.dark .leaflet-control-attribution {
+  background: rgba(8,14,28,0.85) !important;
+  color: #55708a !important;
+}
+html.dark .leaflet-control-attribution a { color: #55708a !important; }
+html.dark .leaflet-control-zoom {
+  border-color: rgba(80,140,220,0.18) !important;
+}
+html.dark .leaflet-control-zoom a {
+  background: #0f1a2e !important;
+  color: #8aa2c0 !important;
+}
+html.dark .leaflet-control-zoom a:hover {
+  background: rgba(80,140,220,0.15) !important;
+  color: #d8e8f5 !important;
+}
+
+/* ── Map tooltip dark mode ───────────────────────────────────────────── */
+.map-tooltip {
+  --tt-ink:    #1a1a1a;
+  --tt-ink2:   #4a4844;
+  --tt-ink3:   #7a7870;
+  --tt-sub-bg: #faf9f7;
+  --tt-bar:    #e8e5e0;
+}
+html.dark .map-tooltip {
+  --tt-ink:    #d8e8f5;
+  --tt-ink2:   #8aa2c0;
+  --tt-ink3:   #55708a;
+  --tt-sub-bg: #0b1422;
+  --tt-bar:    rgba(80,140,220,0.13);
+}
+html.dark .map-tooltip-card {
+  background-color: #0f1a2e;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3), 0 0 0 1px rgba(80,140,220,0.20) !important;
+}
+
+/* Winner shimmer in dark mode uses a blue-tinted sheen */
+html.dark .cand-col.is-winner::after {
+  background: linear-gradient(
+    105deg,
+    transparent 30%,
+    rgba(120, 180, 255, 0.18) 50%,
+    transparent 70%
+  );
+}
