@@ -1,0 +1,39 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm create *)",
+      "Bash(npx create-vite@latest . --template react-ts)",
+      "Bash(npx create-vite@latest . --template react-ts --yes)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "WebFetch(domain:researchbriefings.files.parliament.uk)",
+      "WebSearch",
+      "WebFetch(domain:commonslibrary.parliament.uk)",
+      "Bash(node -e ' *)",
+      "WebFetch(domain:electionresults.parliament.uk)",
+      "Bash(npx tsc *)",
+      "Bash(npx vite *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/)",
+      "Bash(node -e \"const d=require\\('./public/constituencies.json'\\); console.log\\('Count:', d.length\\); const total=d.reduce\\(\\(s,c\\)=>s+c.validVotes,0\\); console.log\\('Total valid votes:', total\\); const w=new Set\\(d.map\\(c=>c.winner2024\\)\\); console.log\\('Winner parties:', [...w].sort\\(\\).join\\(', '\\)\\); const seats={}; d.forEach\\(c=>{seats[c.winner2024]=\\(seats[c.winner2024]||0\\)+1}\\); console.log\\(JSON.stringify\\(seats,null,2\\)\\);\")",
+      "Bash(node -e \"require\\('html-to-image'\\)\")",
+      "Bash(dir \"C:\\\\Users\\\\leoc4\\\\Downloads\\\\2024_constituencies___england__south_.geojson\")",
+      "Bash(node -e \"require\\('leaflet'\\); require\\('react-leaflet'\\); console.log\\('OK'\\)\")",
+      "Bash(node scripts/merge-boundaries.mjs)",
+      "Bash(node -e \"const m = require\\('mapshaper'\\); console.log\\(typeof m.runCommands, typeof m.applyCommands, Object.keys\\(m\\).slice\\(0,10\\)\\)\")",
+      "Bash(node --input-type=module -e ' *)",
+      "Bash(curl -s \"https://en.wikipedia.org/api/rest_v1/page/summary/Gavin_Robinson_\\(politician\\)\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('title:', d.get\\('title'\\)\\); print\\('thumb:', d.get\\('thumbnail',{}\\).get\\('source','NO THUMBNAIL'\\)\\)\")",
+      "PowerShell($r1 = Invoke-RestMethod \"https://en.wikipedia.org/api/rest_v1/page/summary/Gavin_Robinson_\\(politician\\)\"; \"title: $\\($r1.title\\)\"; \"thumb: $\\($r1.thumbnail.source\\)\")",
+      "Bash(powershell *)",
+      "Bash(node scripts/merge-boundaries.js)",
+      "Bash(node \"C:\\\\Users\\\\leoc4\\\\projects\\\\my-custom-election-simulator\\\\scripts\\\\merge-boundaries.cjs\")",
+      "WebFetch(domain:services1.arcgis.com)",
+      "WebFetch(domain:geoportal.statistics.gov.uk)",
+      "WebFetch(domain:open-geography-portalx-ons.hub.arcgis.com)",
+      "WebFetch(domain:www.arcgis.com)",
+      "WebFetch(domain:github.com)",
+      "Bash(node scripts/merge-boundaries.cjs)",
+      "Bash(git add *)"
+    ]
+  }
+}
