@@ -141,19 +141,19 @@ export default function HomePage() {
           <div className="mt-5 h-px w-16 bg-gold/50" />
 
           {/* Partnership strip */}
-          <div className="mt-6 flex flex-col items-center gap-2">
-            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.22em] text-ink-3">Partnership</span>
+          <div className="mt-6 flex flex-col items-stretch gap-2 w-fit mx-auto">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.22em] text-ink-3 text-center">Partnership</span>
             <a
               href="https://poliwave.com"
               target="_blank"
               rel="noopener noreferrer"
-              className="rounded-2xl border border-default hover:border-ink-3 transition-colors bg-white px-4 py-2"
+              className="rounded-2xl border border-default hover:border-ink-3 transition-colors bg-white p-4 flex justify-center"
               title="Poliwave"
             >
               <img
                 src={`${import.meta.env.BASE_URL}poliwave.svg`}
                 alt="Poliwave"
-                className="h-8 w-auto block"
+                className="h-12 w-auto block"
                 style={{ imageRendering: 'crisp-edges' }}
               />
             </a>
