@@ -168,67 +168,49 @@ export default function App() {
         {/* Globe logo */}
         <svg width="34" height="34" viewBox="0 0 32 32" className="shrink-0" aria-hidden="true">
           <defs>
-            <clipPath id="logo-clip">
-              <circle cx="16" cy="16" r="14" />
-            </clipPath>
-            <radialGradient id="logo-shine" cx="38%" cy="32%" r="62%">
-              <stop offset="0%" stopColor="white" stopOpacity="0.38" />
-              <stop offset="100%" stopColor="black" stopOpacity="0.22" />
+            <clipPath id="logo-clip"><circle cx="16" cy="16" r="14" /></clipPath>
+            <radialGradient id="logo-shine" cx="32%" cy="24%" r="52%">
+              <stop offset="0%"   stopColor="white" stopOpacity="0.80" />
+              <stop offset="45%"  stopColor="white" stopOpacity="0.12" />
+              <stop offset="100%" stopColor="white" stopOpacity="0"    />
+            </radialGradient>
+            <radialGradient id="logo-depth" cx="70%" cy="72%" r="55%">
+              <stop offset="0%"   stopColor="rgba(20,60,120,0.18)" />
+              <stop offset="100%" stopColor="rgba(20,60,120,0)"    />
             </radialGradient>
           </defs>
-          {/*
-            Painter's algorithm — each layer is a spherical cap bounded below
-            by the FRONT (bottom) arc of its latitude line, so color bands
-            follow the true elliptical curve, not a flat horizontal cut.
-
-            Latitude dividers (cx=16, all clipped to circle r=14):
-              L1  y=7.6   rx=11.2 ry=2.8   left=(4.8,7.6)   right=(27.2,7.6)
-              L2  y=13.2  rx=13.7 ry=3.4   left=(2.3,13.2)  right=(29.7,13.2)
-              L3  y=18.8  rx=13.7 ry=3.4   left=(2.3,18.8)  right=(29.7,18.8)
-              L4  y=24.4  rx=11.2 ry=2.8   left=(4.8,24.4)  right=(27.2,24.4)
-
-            Each cap path:
-              1. CW along the front (bottom) arc of the latitude ellipse, left→right
-              2. CCW circle arc back over the top to the left endpoint
-              large-arc=0 when endpoints are above centre (L1,L2),
-              large-arc=1 when below centre (L3,L4)
-          */}
-          <g clipPath="url(#logo-clip)">
-            {/* Conservative blue — base fill */}
-            <circle cx="16" cy="16" r="14" fill="#0087DC" />
-            {/* LibDem amber — cap above L4 */}
-            <path d="M4.8 24.4 A11.2 2.8 0 0 1 27.2 24.4 A14 14 0 1 0 4.8 24.4Z" fill="#FAA61A" />
-            {/* Labour red — cap above L3 */}
-            <path d="M2.3 18.8 A13.7 3.4 0 0 1 29.7 18.8 A14 14 0 1 0 2.3 18.8Z" fill="#E4003B" />
-            {/* Green — cap above L2 */}
-            <path d="M2.3 13.2 A13.7 3.4 0 0 1 29.7 13.2 A14 14 0 0 0 2.3 13.2Z" fill="#02A95B" />
-            {/* Reform teal — cap above L1 */}
-            <path d="M4.8 7.6 A11.2 2.8 0 0 1 27.2 7.6 A14 14 0 0 0 4.8 7.6Z" fill="#12B6CF" />
+          <circle cx="16" cy="16" r="14" fill="rgba(180,215,255,0.09)" clipPath="url(#logo-clip)" />
+          {/* Back latitude arcs — dashed, seen through glass */}
+          <g clipPath="url(#logo-clip)" fill="none" strokeLinecap="round">
+            <path d="M4.8 7.6 A11.2 2.8 0 0 0 27.2 7.6"   stroke="#12B6CF" strokeWidth="1.05" strokeOpacity="0.42" strokeDasharray="2 2" />
+            <path d="M2.3 13.2 A13.7 3.4 0 0 0 29.7 13.2"  stroke="#02A95B" strokeWidth="1.05" strokeOpacity="0.42" strokeDasharray="2 2" />
+            <path d="M2 16 A14 3.6 0 0 0 30 16"            stroke="#E4003B" strokeWidth="1.05" strokeOpacity="0.42" strokeDasharray="2 2" />
+            <path d="M2.3 18.8 A13.7 3.4 0 0 0 29.7 18.8"  stroke="#FAA61A" strokeWidth="1.05" strokeOpacity="0.42" strokeDasharray="2 2" />
+            <path d="M4.8 24.4 A11.2 2.8 0 0 0 27.2 24.4"  stroke="#0087DC" strokeWidth="1.05" strokeOpacity="0.42" strokeDasharray="2 2" />
           </g>
-          {/* Latitude front arcs — solid (visible face) */}
-          <g clipPath="url(#logo-clip)" stroke="white" strokeWidth="0.7" strokeOpacity="0.55" fill="none">
-            <path d="M4.8 7.6  A11.2 2.8 0 0 1 27.2 7.6" />
-            <path d="M2.3 13.2 A13.7 3.4 0 0 1 29.7 13.2" />
-            <path d="M2.3 18.8 A13.7 3.4 0 0 1 29.7 18.8" />
-            <path d="M4.8 24.4 A11.2 2.8 0 0 1 27.2 24.4" />
-          </g>
-          {/* Latitude back arcs — dashed (hidden face) */}
-          <g clipPath="url(#logo-clip)" stroke="white" strokeWidth="0.6" strokeOpacity="0.22" strokeDasharray="1.5 1.5" fill="none">
-            <path d="M4.8 7.6  A11.2 2.8 0 0 0 27.2 7.6" />
-            <path d="M2.3 13.2 A13.7 3.4 0 0 0 29.7 13.2" />
-            <path d="M2.3 18.8 A13.7 3.4 0 0 0 29.7 18.8" />
-            <path d="M4.8 24.4 A11.2 2.8 0 0 0 27.2 24.4" />
-          </g>
-          {/* Longitude meridians */}
-          <g clipPath="url(#logo-clip)" stroke="white" strokeWidth="0.65" strokeOpacity="0.30" fill="none">
-            <line x1="16" y1="2" x2="16" y2="30" />
+          {/* Back meridians — dashed */}
+          <g clipPath="url(#logo-clip)" fill="none" stroke="rgba(80,140,210,0.22)" strokeWidth="0.6" strokeDasharray="2 2" strokeLinecap="round">
             <ellipse cx="16" cy="16" rx="8" ry="14" />
             <ellipse cx="16" cy="16" rx="4" ry="14" />
           </g>
-          {/* Sphere shading overlay */}
+          {/* Front latitude arcs — solid */}
+          <g clipPath="url(#logo-clip)" fill="none" strokeLinecap="round">
+            <path d="M4.8 7.6 A11.2 2.8 0 0 1 27.2 7.6"   stroke="#12B6CF" strokeWidth="1.30" strokeOpacity="0.90" />
+            <path d="M2.3 13.2 A13.7 3.4 0 0 1 29.7 13.2"  stroke="#02A95B" strokeWidth="1.30" strokeOpacity="0.90" />
+            <path d="M2 16 A14 3.6 0 0 1 30 16"            stroke="#E4003B" strokeWidth="1.30" strokeOpacity="0.90" />
+            <path d="M2.3 18.8 A13.7 3.4 0 0 1 29.7 18.8"  stroke="#FAA61A" strokeWidth="1.30" strokeOpacity="0.90" />
+            <path d="M4.8 24.4 A11.2 2.8 0 0 1 27.2 24.4"  stroke="#0087DC" strokeWidth="1.30" strokeOpacity="0.90" />
+          </g>
+          {/* Front meridians — solid */}
+          <g clipPath="url(#logo-clip)" fill="none" stroke="rgba(80,140,210,0.32)" strokeLinecap="round">
+            <line x1="16" y1="2" x2="16" y2="30" strokeWidth="0.70" />
+            <ellipse cx="16" cy="16" rx="8" ry="14" strokeWidth="0.65" />
+            <ellipse cx="16" cy="16" rx="4" ry="14" strokeWidth="0.55" />
+          </g>
+          <circle cx="16" cy="16" r="14" fill="url(#logo-depth)" />
           <circle cx="16" cy="16" r="14" fill="url(#logo-shine)" />
-          {/* Outer ring */}
-          <circle cx="16" cy="16" r="14" fill="none" stroke="rgba(0,0,0,0.28)" strokeWidth="1" />
+          <circle cx="16" cy="16" r="14" fill="none" stroke="rgba(140,195,255,0.55)" strokeWidth="1.1" />
+          <circle cx="16" cy="16" r="13.4" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="0.5" />
         </svg>
 
         {/* Title — hidden on small screens */}
