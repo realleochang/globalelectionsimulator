@@ -439,7 +439,7 @@ function CanadaCard() {
 
 function GermanyCard() {
   return (
-    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default">
+    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default opacity-50">
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: '2/1' }}>
         <img src={`${import.meta.env.BASE_URL}germany-flag.png`} alt="Germany flag" className="absolute inset-0 w-full h-full object-cover block" />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.22))' }} />
@@ -475,7 +475,7 @@ function GermanyCard() {
 
 function AustraliaCard() {
   return (
-    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default">
+    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default opacity-50">
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: '2/1' }}>
         <img src={`${import.meta.env.BASE_URL}australia-flag.png`} alt="Australia flag" className="absolute inset-0 w-full h-full object-cover block" />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.22))' }} />
@@ -583,7 +583,7 @@ function ComingSoonCard({ country, election, institution, flagSrc, bgGradient, a
   parties: { color: string; abbr: string }[];
 }) {
   return (
-    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default">
+    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default opacity-50">
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: '2/1', background: flagSrc ? undefined : bgGradient }}>
         {flagSrc && <img src={flagSrc} alt={`${country} flag`} className="absolute inset-0 w-full h-full object-cover block" />}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.22))' }} />
