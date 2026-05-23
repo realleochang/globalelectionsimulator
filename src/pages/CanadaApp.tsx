@@ -778,10 +778,10 @@ function MapTooltip({ tooltip, containerW, containerH }: {
 }
 
 // ── Canada Parliament geometry ────────────────────────────────────────────────
-const CA_TOTAL    = 338;
-const CA_MAJORITY = 170;
+const CA_TOTAL    = 343;
+const CA_MAJORITY = 172;
 // 7 rows, 13 px step — each row has ~7.2 px arc per seat (dot ⌀ 5 px → ~2 px gap, no overlap)
-const CA_HEMI_ROWS   = [31, 37, 43, 48, 54, 60, 65] as const; // sum = 338
+const CA_HEMI_ROWS   = [31, 37, 43, 49, 55, 61, 67] as const; // sum = 343
 const CA_HEMI_RADII  = CA_HEMI_ROWS.map((_, i) => 72 + i * 13); // [72,85,98,111,124,137,150]
 const CA_HEMI_CX     = 260;
 const CA_HEMI_CY     = 255;
@@ -944,7 +944,7 @@ function computeCaDistortion(
     .map(p => ({
       party: p,
       seats: seats[p] ?? 0,
-      seatShare: ((seats[p] ?? 0) / 338) * 100,
+      seatShare: ((seats[p] ?? 0) / 343) * 100,
       voteShare: totalVotes > 0 ? ((votes[p] ?? 0) / totalVotes) * 100 : 0,
     }))
     .filter(r => r.seats > 0 || r.voteShare > 0.5)
@@ -1701,12 +1701,12 @@ function CaSimulationPanel({
         {simRunning && (
           <div>
             <div className="flex justify-between text-[9.5px] font-mono text-ink-3 mb-1">
-              <span>{simProgress} / 338 declared</span>
-              <span>{Math.round((simProgress / 338) * 100)}%</span>
+              <span>{simProgress} / 343 declared</span>
+              <span>{Math.round((simProgress / 343) * 100)}%</span>
             </div>
             <div className="w-full h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bar-track)' }}>
               <div className="h-full rounded-full bg-emerald-500 transition-all duration-500"
-                style={{ width: `${(simProgress / 338) * 100}%` }} />
+                style={{ width: `${(simProgress / 343) * 100}%` }} />
             </div>
           </div>
         )}
