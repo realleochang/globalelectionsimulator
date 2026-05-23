@@ -238,25 +238,36 @@ export function MapView({ bubbleMapMode = false, dark = false }: { bubbleMapMode
         const TH_EST = 120 + tooltip.parties.length * 46;
         const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
         const top  = Math.max(6, Math.min(tooltip.y - 20, ch - TH_EST - 8));
+        const tt = {
+          bg:     dark ? 'rgba(18,24,44,0.96)'       : 'rgba(255,255,255,0.97)',
+          border: dark ? 'rgba(255,255,255,0.09)'    : 'rgba(0,0,0,0.08)',
+          shadow: dark ? '0 6px 28px rgba(0,0,0,0.5)' : '0 6px 28px rgba(0,0,0,0.12)',
+          title:  dark ? 'rgba(255,255,255,0.92)'    : 'rgba(0,0,0,0.85)',
+          sub:    dark ? 'rgba(255,255,255,0.42)'    : 'rgba(0,0,0,0.42)',
+          body:   dark ? 'rgba(255,255,255,0.85)'    : 'rgba(0,0,0,0.78)',
+          muted:  dark ? 'rgba(255,255,255,0.38)'    : 'rgba(0,0,0,0.40)',
+          dim:    dark ? 'rgba(255,255,255,0.28)'    : 'rgba(0,0,0,0.35)',
+          divider:dark ? 'rgba(255,255,255,0.06)'    : 'rgba(0,0,0,0.07)',
+        };
         return (
           <div
             className="absolute pointer-events-none z-[1000]"
             style={{ left, top, width: TW }}
           >
             <div style={{
-              background: 'rgba(18,24,44,0.96)',
+              background: tt.bg,
               borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.09)',
-              boxShadow: '0 6px 28px rgba(0,0,0,0.5)',
+              border: `1px solid ${tt.border}`,
+              boxShadow: tt.shadow,
               backdropFilter: 'blur(10px)',
               overflow: 'hidden',
             }}>
               {/* Header */}
               <div style={{ padding: '12px 16px 10px' }}>
-                <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.2 }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: tt.title, lineHeight: 1.2 }}>
                   {tooltip.name}
                 </div>
-                <div style={{ fontSize: 10.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.42)', marginTop: 3 }}>
+                <div style={{ fontSize: 10.5, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 3 }}>
                   {tooltip.region}
                 </div>
               </div>
@@ -270,10 +281,10 @@ export function MapView({ bubbleMapMode = false, dark = false }: { bubbleMapMode
                   return (
                     <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: i < tooltip.parties.length - 1 ? 7 : 0 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                      <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: isWinner ? 600 : 400, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: isWinner ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {name}
                       </span>
-                      <span style={{ fontSize: 10.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.38)', marginRight: 6 }}>
+                      <span style={{ fontSize: 10.5, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, marginRight: 6 }}>
                         {votes.toLocaleString()}
                       </span>
                       <span style={{ fontSize: 13, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color, minWidth: 44, textAlign: 'right' }}>
@@ -282,18 +293,18 @@ export function MapView({ bubbleMapMode = false, dark = false }: { bubbleMapMode
                     </div>
                   );
                 }) : (
-                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.32)', fontStyle: 'italic', margin: '4px 0 4px' }}>
+                  <p style={{ fontSize: 11, color: tt.dim, fontStyle: 'italic', margin: '4px 0 4px' }}>
                     No results loaded
                   </p>
                 )}
               </div>
 
               {/* Footer */}
-              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '7px 16px', display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.28)' }}>
+              <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '7px 16px', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.dim }}>
                   {tooltip.validVotes.toLocaleString()} votes cast
                 </span>
-                <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.28)' }}>
+                <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.dim }}>
                   {tooltip.electorate.toLocaleString()} electorate
                 </span>
               </div>

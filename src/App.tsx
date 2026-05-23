@@ -18,7 +18,7 @@ import type { Constituency } from './types';
 export default function App() {
   const navigate = useNavigate();
   // ── Dark mode ─────────────────────────────────────────────────────
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const [contributorsOpen, setContributorsOpen] = useState(false);
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);

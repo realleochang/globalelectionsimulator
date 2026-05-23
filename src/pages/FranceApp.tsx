@@ -813,21 +813,30 @@ function FranceMapView({
         const cw = containerRef.current?.clientWidth ?? 9999;
         const TW = 220;
         const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
+        const tt = {
+          bg:    dark ? 'rgba(18,24,44,0.96)'        : 'rgba(255,255,255,0.97)',
+          border:dark ? 'rgba(255,255,255,0.09)'     : 'rgba(0,0,0,0.08)',
+          shadow:dark ? '0 6px 28px rgba(0,0,0,0.5)': '0 6px 28px rgba(0,0,0,0.12)',
+          title: dark ? 'rgba(255,255,255,0.92)'     : 'rgba(0,0,0,0.85)',
+          sub:   dark ? 'rgba(255,255,255,0.40)'     : 'rgba(0,0,0,0.42)',
+          body:  dark ? 'rgba(255,255,255,0.85)'     : 'rgba(0,0,0,0.78)',
+          muted: dark ? 'rgba(255,255,255,0.35)'     : 'rgba(0,0,0,0.40)',
+        };
         return (
           <div
             className="absolute pointer-events-none z-[1000]"
             style={{ left, top: Math.max(6, tooltip.y - 20), width: TW }}
           >
             <div style={{
-              background: 'rgba(18,24,44,0.96)',
+              background: tt.bg,
               borderRadius: 10,
-              border: '1px solid rgba(255,255,255,0.09)',
-              boxShadow: '0 6px 28px rgba(0,0,0,0.5)',
+              border: `1px solid ${tt.border}`,
+              boxShadow: tt.shadow,
               backdropFilter: 'blur(10px)',
               padding: '12px 14px',
             }}>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.2 }}>{tooltip.nom}</div>
-              <div style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.40)', marginTop: 3 }}>Département {tooltip.code}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: tt.title, lineHeight: 1.2 }}>{tooltip.nom}</div>
+              <div style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 3 }}>Département {tooltip.code}</div>
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {sorted.map(([id, votes], i) => {
                   const info = getCandInfo(id);
@@ -835,10 +844,10 @@ function FranceMapView({
                   return (
                     <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                       <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: info.color }} />
-                      <span style={{ flex: 1, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <span style={{ flex: 1, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                         {getLastName(info.name)}
                       </span>
-                      <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.35)', marginRight: 4 }}>
+                      <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, marginRight: 4 }}>
                         {votes.toLocaleString()}
                       </span>
                       <span style={{ fontSize: 12, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: info.color }}>
@@ -2332,7 +2341,7 @@ function FrSummaryPanel({ deptResults, getCandInfo, roundLabel, onClose }: FrSum
 // ── Main France App ───────────────────────────────────────────────────────────
 export default function FranceApp() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const [contributorsOpen, setContributorsOpen] = useState(false);
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [selectedDept, setSelectedDept] = useState<DeptInfo | null>(null);

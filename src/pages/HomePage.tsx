@@ -83,7 +83,7 @@ function GlobeLogo({ size = 34 }: { size?: number }) {
 
 
 export default function HomePage() {
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const navigate = useNavigate();
   const [visitCount, setVisitCount] = useState<number | null>(null);
   useEffect(() => {

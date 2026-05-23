@@ -1300,7 +1300,7 @@ interface TooltipState {
   reportingPct?: number;
 }
 
-function MapTooltip({ tooltip, containerW, containerH }: { tooltip: TooltipState; containerW: number; containerH: number }) {
+function MapTooltip({ tooltip, containerW, containerH, dark = true }: { tooltip: TooltipState; containerW: number; containerH: number; dark?: boolean }) {
   const ev = (EV[tooltip.fips] ?? 0) +
     (SPLIT_STATES[tooltip.fips]?.reduce((s, cd) => s + (EV[cd.key] ?? 0), 0) ?? 0);
   const total = Object.values(tooltip.results).reduce((s, v) => s + v, 0);
@@ -1319,23 +1319,36 @@ function MapTooltip({ tooltip, containerW, containerH }: { tooltip: TooltipState
   if (top < 8) top = 8;
   if (top + h > containerH - 8) top = containerH - h - 8;
 
+  const tt = {
+    bg:     dark ? 'rgba(18,24,44,0.96)'        : 'rgba(255,255,255,0.97)',
+    border: dark ? 'rgba(255,255,255,0.09)'     : 'rgba(0,0,0,0.08)',
+    shadow: dark ? '0 6px 28px rgba(0,0,0,0.5)': '0 6px 28px rgba(0,0,0,0.12)',
+    title:  dark ? 'rgba(255,255,255,0.92)'     : 'rgba(0,0,0,0.85)',
+    sub:    dark ? 'rgba(255,255,255,0.40)'     : 'rgba(0,0,0,0.42)',
+    body:   dark ? 'rgba(255,255,255,0.58)'     : 'rgba(0,0,0,0.65)',
+    dim:    dark ? 'rgba(255,255,255,0.28)'     : 'rgba(0,0,0,0.35)',
+    pct:    dark ? 'rgba(255,255,255,0.88)'     : 'rgba(0,0,0,0.80)',
+    divider:dark ? 'rgba(255,255,255,0.06)'     : 'rgba(0,0,0,0.07)',
+    nodataColor: dark ? 'rgba(255,255,255,0.32)' : 'rgba(0,0,0,0.32)',
+  };
+
   return (
     <div
       className="absolute pointer-events-none z-[500]"
       style={{ left, top, minWidth: w }}
     >
       <div style={{
-        background: 'rgba(18,24,44,0.96)',
+        background: tt.bg,
         borderRadius: 10,
-        border: '1px solid rgba(255,255,255,0.09)',
-        boxShadow: '0 6px 28px rgba(0,0,0,0.5)',
+        border: `1px solid ${tt.border}`,
+        boxShadow: tt.shadow,
         backdropFilter: 'blur(10px)',
         padding: '12px 14px',
       }}>
-        <div style={{ fontSize: 14, fontFamily: '"Barlow Condensed",sans-serif', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.01em', color: 'rgba(255,255,255,0.92)', lineHeight: 1.1 }}>
+        <div style={{ fontSize: 14, fontFamily: '"Barlow Condensed",sans-serif', fontWeight: 900, textTransform: 'uppercase', letterSpacing: '-0.01em', color: tt.title, lineHeight: 1.1 }}>
           {tooltip.name}
         </div>
-        <div style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.40)', marginTop: 3 }}>
+        <div style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 3 }}>
           {ev} electoral vote{ev !== 1 ? 's' : ''}{tooltip.reportingPct !== undefined ? <> · <span style={{ color: '#c8a020', fontWeight: 700 }}>{tooltip.reportingPct}% reporting</span></> : ''}
         </div>
         {sorted.length > 0 && (
@@ -1347,23 +1360,23 @@ function MapTooltip({ tooltip, containerW, containerH }: { tooltip: TooltipState
               return (
                 <div key={pid} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                   <div style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: party?.color ?? '#888' }} />
-                  <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.58)', flex: 1 }}>{party?.name ?? pid}</span>
+                  <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', color: tt.body, flex: 1 }}>{party?.name ?? pid}</span>
                   {rawVotes !== null && (
-                    <span style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.28)', marginRight: 4 }}>{rawVotes.toLocaleString()}</span>
+                    <span style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, marginRight: 4 }}>{rawVotes.toLocaleString()}</span>
                   )}
-                  <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: 'rgba(255,255,255,0.88)' }}>{pct.toFixed(1)}%</span>
+                  <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: tt.pct }}>{pct.toFixed(1)}%</span>
                 </div>
               );
             })}
           </div>
         )}
         {sorted.length > 0 && tooltip.stateVotes > 0 && (
-          <div style={{ marginTop: 8, paddingTop: 7, borderTop: '1px solid rgba(255,255,255,0.06)', fontSize: 9, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.25)' }}>
+          <div style={{ marginTop: 8, paddingTop: 7, borderTop: `1px solid ${tt.divider}`, fontSize: 9, fontFamily: '"JetBrains Mono",monospace', color: tt.dim }}>
             {tooltip.stateVotes.toLocaleString()} votes cast
           </div>
         )}
         {sorted.length === 0 && (
-          <div style={{ marginTop: 6, fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.32)', fontStyle: 'italic' }}>No data</div>
+          <div style={{ marginTop: 6, fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.nodataColor, fontStyle: 'italic' }}>No data</div>
         )}
       </div>
     </div>
@@ -1941,7 +1954,7 @@ function UsaSummaryPanel({ currentResults, exiting = false, onClose }: {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function USAApp() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
   const [currentResults, setCurrentResults] = useState<Record<string, Record<string, number>>>({});
   const [stateReporting, setStateReporting] = useState<Record<string, number>>({});
@@ -2531,6 +2544,7 @@ export default function USAApp() {
                     tooltip={tooltip}
                     containerW={containerRef.current.clientWidth}
                     containerH={containerRef.current.clientHeight}
+                    dark={dark}
                   />
                 )}
 
