@@ -5,7 +5,7 @@ export type PartyId =
   | 'IND' | 'SPK' | 'OTH'
   // Extended / minor parties
   | 'WPB' | 'ALB' | 'SDP' | 'HER' | 'RCL' | 'YRK' | 'CPA'
-  | 'UKIP' | 'FOR' | 'RES' | 'YOUR';
+  | 'UKIP' | 'FOR' | 'RES';
 
 export type Party = {
   id: PartyId;
@@ -47,7 +47,6 @@ export const PARTIES: Record<PartyId, Party> = {
   UKIP: { id: 'UKIP', name: 'UKIP',                          color: '#702FA0', defaultLeader: 'Neil Hamilton',      alternativeLeaders: [], isExtended: true },
   FOR:  { id: 'FOR',  name: 'For Britain',                   color: '#003087', defaultLeader: 'Anne Marie Waters',  alternativeLeaders: [], isExtended: true },
   RES:  { id: 'RES',  name: 'Restore Britain',               color: '#002366', defaultLeader: 'Rupert Lowe',        alternativeLeaders: [], isExtended: true },
-  YOUR: { id: 'YOUR', name: 'Your Party',                    color: '#E8830A', defaultLeader: 'Your Leader',        alternativeLeaders: [], isExtended: true },
 };
 
 export const ORIGINAL_PARTY_IDS = new Set<PartyId>([
@@ -57,7 +56,7 @@ export const ORIGINAL_PARTY_IDS = new Set<PartyId>([
 ]);
 
 export const EXTENDED_PARTY_IDS = new Set<PartyId>([
-  'WPB','ALB','SDP','HER','RCL','YRK','CPA','UKIP','FOR','RES','YOUR',
+  'WPB','ALB','SDP','HER','RCL','YRK','CPA','UKIP','FOR','RES',
 ]);
 
 export const VALID_PARTY_IDS = new Set<PartyId>(Object.keys(PARTIES) as PartyId[]);

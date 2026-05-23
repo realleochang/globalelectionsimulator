@@ -519,7 +519,7 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
   font-weight: 900;
   line-height: 1;
   color: var(--cand-color);
-  font-family: "JetBrains Mono", monospace;
+  font-family: "DM Mono", "JetBrains Mono", monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -1px;
   margin-bottom: 0;
@@ -550,7 +550,7 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
 .pct-number {
   font-size: var(--vh-text-sm);
   font-weight: 700;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "DM Mono", "JetBrains Mono", monospace;
   color: var(--cand-color);
   letter-spacing: -0.3px;
   font-variant-numeric: tabular-nums;
@@ -559,7 +559,7 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
 /* Change badge — fades in from above, lingers, then fades out */
 .pct-delta {
   font-size: 9px;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "DM Mono", "JetBrains Mono", monospace;
   font-weight: 600;
   letter-spacing: -0.2px;
   white-space: nowrap;
@@ -578,7 +578,7 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
 /* ── Vote count ──────────────────────────────────────────────────────── */
 .cand-votes {
   font-size: var(--vh-text-xs);
-  font-family: "JetBrains Mono", monospace;
+  font-family: "DM Mono", "JetBrains Mono", monospace;
   color: var(--muted);
   text-align: center;
   margin-top: 1px;

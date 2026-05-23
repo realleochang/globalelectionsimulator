@@ -1874,7 +1874,7 @@ function Fr2022RefPanel({ dept, results, label, onClose, getCandInfo: getCandInf
   };
 
   return (
-    <aside className="w-52 shrink-0 bg-[#f8f7f4] border-l border-default flex flex-col overflow-hidden panel-slide">
+    <aside className="w-52 shrink-0 bg-surface border-l border-default flex flex-col overflow-hidden panel-slide">
       <div className="px-3 pt-3 pb-2.5 border-b border-default flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <h2 className="text-[12px] font-bold text-ink leading-tight truncate">{dept.nom}</h2>
@@ -2657,7 +2657,7 @@ export default function FranceApp() {
         <button onClick={() => navigate('/')} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer shrink-0 pl-4" title="Home">
           <GlobeLogo />
           <div className="hidden sm:flex flex-col justify-center mr-2 leading-none">
-            <span className="font-title text-[13px] font-bold tracking-[-0.02em] text-ink leading-none">
+            <span className="font-display font-black uppercase tracking-[0.04em] text-[14px] text-ink leading-none">
               Global Election Simulator
             </span>
             <span className="text-[7.5px] font-mono uppercase tracking-[0.13em] text-ink-3 leading-none mt-[3px]">
@@ -2757,32 +2757,20 @@ export default function FranceApp() {
 
         {/* Right controls */}
         <div className="shrink-0 flex items-center gap-2.5 pr-4">
-          <a
-            href="https://x.com/realleochang"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-default text-ink-3 hover:border-ink-3 hover:text-ink transition-colors"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.259 5.66zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-            <span className="text-[8.5px] font-mono font-black uppercase tracking-[0.18em] leading-none">@realleochang</span>
-          </a>
-
           {/* Contributors dropdown */}
           <div className="relative">
             <button
               onClick={() => setContributorsOpen(o => !o)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[8.5px] font-mono font-black uppercase tracking-[0.18em] leading-none transition-colors ${
+              className={`w-7 h-7 flex items-center justify-center rounded-[4px] border transition-colors ${
                 contributorsOpen
                   ? 'border-ink-3 text-ink bg-hover'
                   : 'border-default text-ink-3 hover:border-ink-3 hover:text-ink'
               }`}
+              title="Contributors"
             >
               <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm10-9a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm1.5 7.5c.5-.25.5-.75.5-1s-.5-3-3-3.5a2.5 2.5 0 0 1 2.5 4.5z" fillRule="evenodd" clipRule="evenodd"/>
               </svg>
-              <span className="hidden sm:inline">Contributors</span>
             </button>
 
             {contributorsOpen && (
@@ -2798,6 +2786,13 @@ export default function FranceApp() {
                     <div className="text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-ink leading-none">Contributors</div>
                   </div>
                   <div className="px-3.5 py-2.5 space-y-2">
+                    {/* Creator */}
+                    <a href="https://x.com/realleochang" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="shrink-0 text-ink-3" aria-hidden="true">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.259 5.66zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                      <span className="text-[11px] font-mono font-semibold text-ink">@realleochang</span>
+                    </a>
                     {[
                       { handle: 'lyudmilla_' },
                     ].map(c => (

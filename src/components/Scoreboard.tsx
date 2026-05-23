@@ -5,6 +5,10 @@ import type { PartyId } from '../data/parties';
 import { fetchWikiPhoto } from '../lib/wikiPhotos';
 const MAJORITY = 326;
 
+const LOCAL_LEADER_PHOTOS: Record<string, string> = {
+  'Zack Polanski': '/leaders/zack-polanski.webp',
+};
+
 // Sorting tiers: 0 mainland → 1 NI → 2 IND → 3 OTH → 4 SPK (always last)
 const NI_PARTIES = new Set<PartyId>(['DUP','SF','SDLP','UUP','ALL','TUV']);
 function partyGroup(id: PartyId): 0 | 1 | 2 | 3 | 4 {
@@ -141,6 +145,7 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
     // ── Wikipedia profile photo ────────────────────────────────────────
     const [photoUrl, setPhotoUrl] = useState<string | null>(null);
     useEffect(() => {
+      if (LOCAL_LEADER_PHOTOS[leader]) { setPhotoUrl(LOCAL_LEADER_PHOTOS[leader]); return; }
       const wikiTitle = LEADER_WIKI_TITLES[leader];
       if (!wikiTitle || isDash) { setPhotoUrl(null); return; }
       let cancelled = false;

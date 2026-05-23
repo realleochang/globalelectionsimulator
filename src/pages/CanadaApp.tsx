@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+﻿import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, GeoJSON, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -92,11 +92,6 @@ function CaLeaderPhotoCircle({ partyId, leader, size = 52 }: {
     </div>
   );
 }
-
-// 2026 national polling targets (% of national vote)
-const POLL_2026: Record<string, number> = {
-  LIB: 45.8, CON: 33.8, NDP: 9.0, BQ: 6.0, GRN: 2.8, PPC: 1.6, OTH: 1.4,
-};
 
 interface RidingData {
   id: string;
@@ -241,11 +236,12 @@ function fmtVotes(n: number): string {
 }
 
 // ── Scoreboard ────────────────────────────────────────────────────────────────
-function CanadaScoreboard({ tally, votePcts, rawVotes, activePreset }: {
+function CanadaScoreboard({ tally, votePcts, rawVotes, activePreset, hiddenParties }: {
   tally:     Record<string, number>;
   votePcts:  Record<string, number>;
   rawVotes:  Record<string, number>;
   activePreset: string | null;
+  hiddenParties?: Set<string>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -268,6 +264,10 @@ function CanadaScoreboard({ tally, votePcts, rawVotes, activePreset }: {
     return [...nonOth, oth];
   }, [tally]);
 
+  const visibleParties = hiddenParties && hiddenParties.size > 0
+    ? sortedParties.filter(p => !hiddenParties.has(p.id))
+    : sortedParties;
+
   const topSeatPartyId = sortedParties.find(p => (tally[p.id] ?? 0) > 0)?.id ?? null;
   const topSeats       = topSeatPartyId ? (tally[topSeatPartyId] ?? 0) : 0;
   const hasMajority    = topSeats >= CA_MAJORITY;
@@ -276,7 +276,7 @@ function CanadaScoreboard({ tally, votePcts, rawVotes, activePreset }: {
     <div className="shrink-0 border-b border-default bg-canvas">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 items-stretch pt-2 pb-2 mx-auto w-fit">
-          {sortedParties.map(p => {
+          {visibleParties.map(p => {
             const leader = (activePreset !== '2025' && CA_LEADERS_2026[p.id])
               ? CA_LEADERS_2026[p.id]!
               : CA_LEADERS[p.id];
@@ -382,8 +382,9 @@ interface RidingPanelProps {
   activePreset: string | null;
   onClose: () => void;
   onResultsChange?: (id: string, newResults: Record<string, number>) => void;
+  onReportingCommit?: (id: string, pct: number) => void;
 }
-function RidingPanel({ name_en, name_fr, province, id, results, results2025, validVotes, activePreset, onClose, onResultsChange }: RidingPanelProps) {
+function RidingPanel({ name_en, name_fr, province, id, results, results2025, validVotes, activePreset, onClose, onResultsChange, onReportingCommit }: RidingPanelProps) {
   const total = validVotes ?? 0;
 
   // Slider + lock state
@@ -392,6 +393,9 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
   const [projected, setProjected] = useState(false);
   const [editingParty, setEditingParty] = useState<string | null>(null);
   const [editValue, setEditValue] = useState('');
+  const [reporting, setReporting] = useState('');
+  const reportingNum = parseFloat(reporting) || 0;
+  const showReporting = activePreset === 'blank' || activePreset === 'sim';
 
   useEffect(() => {
     if (total === 0) { setSliderPcts({}); return; }
@@ -416,8 +420,8 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
     if (activePreset === 'blank') setProjected(true);
   }, [id, results, total, activePreset]);
 
-  // Reset locks when riding changes
-  useEffect(() => { setLocked(new Set()); }, [id]);
+  // Reset locks and reporting when riding changes
+  useEffect(() => { setLocked(new Set()); setReporting(''); }, [id]);
 
   const toggleLock = useCallback((pid: string) => {
     setLocked(prev => { const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n; });
@@ -462,8 +466,9 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
       if (pct > 1e-9) newResults[p] = Math.round((pct / 100) * total);
     }
     onResultsChange(id, newResults);
+    onReportingCommit?.(id, parseFloat(reporting) || 0);
     setProjected(true);
-  }, [sliderPcts, id, total, onResultsChange]);
+  }, [sliderPcts, id, total, onResultsChange, onReportingCommit, reporting]);
 
   const commitEdit = useCallback((pid: string, raw: string) => {
     const num = parseFloat(raw);
@@ -498,7 +503,7 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
   );
 
   return (
-    <div className="w-[280px] shrink-0 border-l border-default bg-canvas flex flex-col overflow-y-auto z-10">
+    <div className="w-[280px] shrink-0 border-l border-default bg-surface flex flex-col overflow-y-auto z-10">
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-default">
         <span className="text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3">District</span>
         <button onClick={onClose} className="w-5 h-5 flex items-center justify-center rounded text-ink-3 hover:text-ink hover:bg-hover transition-colors">
@@ -551,13 +556,35 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
               </span>
             </button>
           )}
+
+          {/* % Reporting slider — blank map and live sim */}
+          {showReporting && (
+            <div className="mb-3 pb-3 border-b border-default">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-[10px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3">% Reporting</div>
+                <span className="text-[12px] font-mono font-semibold tabular-nums text-ink">
+                  {Math.round(reportingNum)}%
+                </span>
+              </div>
+              <input
+                type="range" min={0} max={100} step={1}
+                value={reportingNum}
+                onChange={e => { setReporting(e.target.value); setProjected(false); }}
+                className="ca-party-slider w-full"
+                style={{ '--party-color': '#c8a020', '--pct': `${reportingNum}%` } as React.CSSProperties}
+              />
+            </div>
+          )}
+
           <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 mb-3">
             {activePreset === '2025' ? '2025 Result' : activePreset === '2026' ? '2026 Projection' : activePreset === 'sim' ? 'Simulation' : 'Manual Entry'}
           </div>
+          {(activePreset !== 'blank' || reportingNum > 0) ? (
           <div className="space-y-3.5">
             {sliderParties.map(p => {
               const pct = sliderPcts[p.id] ?? 0;
-              const votes = Math.round((pct / 100) * total);
+              const reportingFactor = (showReporting && activePreset === 'blank') ? reportingNum / 100 : 1;
+              const votes = Math.round((pct / 100) * total * reportingFactor);
               const isLocked = locked.has(p.id);
               const isProjectedLock = activePreset === 'blank' && projected;
               return (
@@ -626,6 +653,11 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
               );
             })}
           </div>
+          ) : (
+            <div className="py-4 text-center">
+              <div className="text-[10px] font-mono text-ink-3 italic">Slide % Reporting above to unlock</div>
+            </div>
+          )}
           <div className="text-[7.5px] font-mono text-ink-3/50 mt-2.5 pt-2 border-t border-default">
             {total.toLocaleString()} votes
           </div>
@@ -730,7 +762,9 @@ function MapTooltip({ tooltip, containerW, containerH }: {
             </div>
           )}
           <div style={{ fontSize: 10.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.42)', marginTop: 3 }}>
-            {isSim ? `${tooltip.province} · ${reportingLabel}` : tooltip.province}
+            {isSim ? (
+              <>{tooltip.province} · <span style={{ color: '#c8a020', fontWeight: 700 }}>{reportingLabel}</span></>
+            ) : tooltip.province}
           </div>
         </div>
 
@@ -845,31 +879,23 @@ function randNormalCa(): number {
 
 const QC_PROVINCES = new Set(['Quebec', 'Québec']);
 
-// 2021 federal election national vote shares (used as UNS baseline)
-const CANADA_2021_NATIONAL: Record<string, number> = {
-  LIB: 0.3262, CON: 0.3374, NDP: 0.1782,
-  BQ: 0.0764, GRN: 0.0233, PPC: 0.0494, OTH: 0.0091,
-};
-
 function generateCaResultUNS(
   riding: RidingData,
   targetPcts: Record<string, number>,
-  national2021: Record<string, number>,
-  national2025: Record<string, number>,
+  national2026: Record<string, number>,
 ): Record<string, number> {
-  // Multiplicatively scale 2025 riding results to approximate 2021 distribution,
-  // then apply additive swing from the 2021 national baseline.
-  // This preserves NDP's geographic concentration (strong ridings stay strong).
+  // Start from 2026 per-riding polling data; fall back to 2025 if missing
+  const csvData = DATA_CA_2026[riding.id];
   const result: Record<string, number> = {};
-  for (const [pid, votes2025] of Object.entries(riding.results2025)) {
-    const nat21 = national2021[pid] ?? 0;
-    const nat25 = national2025[pid];
-    result[pid] = (nat25 != null && nat25 > 0) ? votes2025 * (nat21 / nat25) : votes2025;
+  if (csvData) {
+    for (const [pid, frac] of Object.entries(csvData)) result[pid] = Math.round(frac * riding.validVotes);
+  } else {
+    Object.assign(result, riding.results2025);
   }
+  // Apply additive swing from 2026 national baseline to target
   for (const [pid, targetPct] of Object.entries(targetPcts)) {
-    // BQ only runs in Quebec — never apply swing to non-Quebec ridings
     if (pid === 'BQ' && !QC_PROVINCES.has(riding.province)) continue;
-    const baseline = national2021[pid] ?? 0;
+    const baseline = national2026[pid] ?? 0;
     const swing = targetPct / 100 - baseline;
     result[pid] = Math.max(0, (result[pid] ?? 0) + swing * riding.validVotes);
   }
@@ -1067,7 +1093,7 @@ function CaBreakdownDrawer({
   ];
 
   return (
-    <aside className={`w-80 shrink-0 bg-canvas border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+    <aside className={`w-80 shrink-0 bg-surface border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-default shrink-0">
         <h2 className="text-[15px] font-semibold text-ink">Race breakdown</h2>
         <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-hover text-ink-3 hover:text-ink text-lg">×</button>
@@ -1525,6 +1551,7 @@ function CaSimulationPanel({
   setSimRunning,
   setSimProgress,
   stopSim,
+  hiddenParties,
 }: {
   exiting?: boolean;
   ridingData: RidingData[];
@@ -1537,6 +1564,7 @@ function CaSimulationPanel({
   setSimRunning: (v: boolean) => void;
   setSimProgress: React.Dispatch<React.SetStateAction<number>>;
   stopSim: () => void;
+  hiddenParties?: Set<string>;
 }) {
   const [inputs, setInputs] = useState<Record<string, string>>(
     () => Object.fromEntries(CA_SIM_INPUT_PARTIES.map(p => [p.id, '']))
@@ -1554,28 +1582,28 @@ function CaSimulationPanel({
   const partySum = CA_SIM_INPUT_PARTIES.reduce((s, p) => s + parseNum(inputs[p.id] ?? ''), 0);
   const isValid = partySum <= 100.05;
 
-  const computeNationalBaselines = useCallback((): Record<string, number> => {
+  const buildAllResults = useCallback((): Record<string, Record<string, number>> => {
+    // Compute 2026 national baseline from DATA_CA_2026 × validVotes
     const totals: Record<string, number> = {};
     let totalVotes = 0;
     for (const r of ridingData) {
-      for (const [pid, votes] of Object.entries(r.results2025)) {
-        totals[pid] = (totals[pid] ?? 0) + votes;
-        totalVotes += votes;
+      const d = DATA_CA_2026[r.id];
+      if (!d) continue;
+      for (const [pid, frac] of Object.entries(d)) {
+        const v = frac * r.validVotes;
+        totals[pid] = (totals[pid] ?? 0) + v;
+        totalVotes += v;
       }
     }
-    const bl: Record<string, number> = {};
-    for (const [pid, votes] of Object.entries(totals)) bl[pid] = totalVotes > 0 ? votes / totalVotes : 0;
-    return bl;
-  }, [ridingData]);
+    const national2026: Record<string, number> = {};
+    for (const [pid, v] of Object.entries(totals)) national2026[pid] = totalVotes > 0 ? v / totalVotes : 0;
 
-  const buildAllResults = useCallback((): Record<string, Record<string, number>> => {
-    const national2025 = computeNationalBaselines();
     const targetPcts: Record<string, number> = {};
     for (const p of CA_SIM_INPUT_PARTIES) targetPcts[p.id] = parseNum(inputs[p.id] ?? '');
     const all: Record<string, Record<string, number>> = {};
-    for (const r of ridingData) all[r.id] = generateCaResultUNS(r, targetPcts, CANADA_2021_NATIONAL, national2025);
+    for (const r of ridingData) all[r.id] = generateCaResultUNS(r, targetPcts, national2026);
     return all;
-  }, [ridingData, inputs, computeNationalBaselines]);
+  }, [ridingData, inputs]);
 
   const handleRun = useCallback(() => {
     if (simRunning) { stopSim(); return; }
@@ -1658,7 +1686,7 @@ function CaSimulationPanel({
           <div className="text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 mb-2.5">
             National vote share
           </div>
-          {CA_SIM_INPUT_PARTIES.map(p => (
+          {CA_SIM_INPUT_PARTIES.filter(p => !hiddenParties?.has(p.id)).map(p => (
             <CaPartyInputRow key={p.id} party={p} value={inputs[p.id] ?? ''}
               onChange={v => setInputs(prev => ({ ...prev, [p.id]: v }))}
               disabled={simRunning}
@@ -1670,7 +1698,7 @@ function CaSimulationPanel({
 
         <div className="mx-3.5 mt-1 mb-3 rounded-[6px] border border-default bg-[#f8f7f4] px-3 py-2.5 font-mono space-y-0.5">
           <div className="text-[8.5px] font-bold uppercase tracking-[0.12em] text-ink-3 mb-1.5">Allocation</div>
-          {CA_SIM_INPUT_PARTIES.map(p => {
+          {CA_SIM_INPUT_PARTIES.filter(p => !hiddenParties?.has(p.id)).map(p => {
             const val = parseNum(inputs[p.id] ?? '');
             return val > 0 ? (
               <div key={p.id} className="flex justify-between text-[10px] text-ink-3">
@@ -1731,6 +1759,352 @@ function CaSimulationPanel({
 }
 
 // ── Main app ──────────────────────────────────────────────────────────────────
+const DATA_CA_2026: Record<string, Record<string, number>> = {
+  '10001':{CON:0.2928,GRN:0.0222,LIB:0.5568,NDP:0.117,OTH:0.0044,PPC:0.0069},
+  '10002':{CON:0.1999,GRN:0.0211,LIB:0.6433,NDP:0.1273,OTH:0.0026,PPC:0.0058},
+  '10003':{CON:0.4707,GRN:0.017,LIB:0.4295,NDP:0.0691,OTH:0.0051,PPC:0.0087},
+  '10004':{CON:0.3367,GRN:0.0204,LIB:0.48,NDP:0.1495,OTH:0.0047,PPC:0.0087},
+  '10005':{CON:0.4334,GRN:0.0173,LIB:0.4184,NDP:0.1045,OTH:0.0176,PPC:0.0088},
+  '10006':{CON:0.189,GRN:0.0302,LIB:0.5489,NDP:0.2253,PPC:0.0067},
+  '10007':{CON:0.4042,GRN:0.0183,LIB:0.4616,NDP:0.1021,OTH:0.0049,PPC:0.009},
+  '11001':{CON:0.3161,GRN:0.0291,LIB:0.5626,NDP:0.0646,OTH:0.0208,PPC:0.0069},
+  '11002':{CON:0.2313,GRN:0.0324,LIB:0.6157,NDP:0.1094,OTH:0.0048,PPC:0.0064},
+  '11003':{CON:0.3642,GRN:0.0447,LIB:0.502,NDP:0.076,OTH:0.0049,PPC:0.0083},
+  '11004':{CON:0.3047,GRN:0.0694,LIB:0.5489,NDP:0.065,OTH:0.0048,PPC:0.0072},
+  '12001':{CON:0.3908,GRN:0.0271,LIB:0.4809,NDP:0.0894,OTH:0.0039,PPC:0.0079},
+  '12002':{CON:0.3617,GRN:0.0293,LIB:0.4956,NDP:0.1012,OTH:0.0043,PPC:0.0079},
+  '12003':{CON:0.366,GRN:0.0229,LIB:0.514,NDP:0.0854,OTH:0.0044,PPC:0.0073},
+  '12004':{CON:0.3881,GRN:0.0318,LIB:0.4698,NDP:0.0974,OTH:0.005,PPC:0.008},
+  '12005':{CON:0.1706,GRN:0.0358,LIB:0.6255,NDP:0.161,OTH:0.0004,PPC:0.0067},
+  '12006':{CON:0.1231,GRN:0.0452,LIB:0.5165,NDP:0.3052,OTH:0.0039,PPC:0.0062},
+  '12007':{CON:0.2109,GRN:0.0307,LIB:0.614,NDP:0.1332,OTH:0.0047,PPC:0.0065},
+  '12008':{CON:0.2739,GRN:0.0341,LIB:0.582,NDP:0.0978,OTH:0.0049,PPC:0.0073},
+  '12009':{CON:0.2641,GRN:0.0271,LIB:0.5947,NDP:0.1025,OTH:0.0049,PPC:0.0068},
+  '12010':{CON:0.3222,GRN:0.0421,LIB:0.4983,NDP:0.1181,OTH:0.0098,PPC:0.0096},
+  '12011':{CON:0.2942,GRN:0.024,LIB:0.4861,NDP:0.1273,OTH:0.0601,PPC:0.0083},
+  '13001':{CON:0.199,GRN:0.0389,LIB:0.631,NDP:0.1184,OTH:0.0046,PPC:0.0081},
+  '13002':{CON:0.2826,GRN:0.0442,LIB:0.5835,NDP:0.0761,OTH:0.0066,PPC:0.007},
+  '13003':{CON:0.2635,GRN:0.0584,LIB:0.5914,NDP:0.0675,OTH:0.0127,PPC:0.0065},
+  '13004':{CON:0.4651,GRN:0.0398,LIB:0.3957,NDP:0.085,OTH:0.005,PPC:0.0094},
+  '13005':{CON:0.3273,GRN:0.0324,LIB:0.5369,NDP:0.0886,OTH:0.0049,PPC:0.0099},
+  '13006':{CON:0.4088,GRN:0.0434,LIB:0.4569,NDP:0.0769,OTH:0.0049,PPC:0.0091},
+  '13007':{CON:0.2477,GRN:0.0445,LIB:0.592,NDP:0.1042,OTH:0.0047,PPC:0.007},
+  '13008':{CON:0.3119,GRN:0.0356,LIB:0.5662,NDP:0.0785,OTH:0.0009,PPC:0.0069},
+  '13009':{CON:0.4569,GRN:0.0345,LIB:0.4047,NDP:0.0883,OTH:0.0055,PPC:0.0102},
+  '13010':{CON:0.5245,GRN:0.0386,LIB:0.3595,NDP:0.0632,OTH:0.0052,PPC:0.0091},
+  '24001':{BQ:0.3278,CON:0.1984,GRN:0.0176,LIB:0.4112,NDP:0.0348,OTH:0.0026,PPC:0.0076},
+  '24002':{BQ:0.4772,CON:0.1719,GRN:0.0185,LIB:0.2727,NDP:0.0408,OTH:0.0121,PPC:0.0067},
+  '24003':{BQ:0.1489,CON:0.1223,GRN:0.0484,LIB:0.5721,NDP:0.0962,OTH:0.0057,PPC:0.0065},
+  '24004':{BQ:0.1903,CON:0.1828,GRN:0.025,LIB:0.5449,NDP:0.0474,OTH:0.0026,PPC:0.0069},
+  '24005':{BQ:0.2217,CON:0.2239,GRN:0.019,LIB:0.4884,NDP:0.0371,OTH:0.0028,PPC:0.0071},
+  '24006':{BQ:0.1374,CON:0.5864,GRN:0.0125,LIB:0.2101,NDP:0.0286,OTH:0.0029,PPC:0.0221},
+  '24007':{BQ:0.4325,CON:0.1724,GRN:0.0179,LIB:0.3325,NDP:0.0357,OTH:0.0028,PPC:0.0062},
+  '24008':{BQ:0.2801,CON:0.2751,GRN:0.0207,LIB:0.3696,NDP:0.0483,PPC:0.0063},
+  '24009':{BQ:0.4608,CON:0.1957,GRN:0.0193,LIB:0.2844,NDP:0.0312,OTH:0.0028,PPC:0.0058},
+  '24010':{BQ:0.18,CON:0.4581,GRN:0.0182,LIB:0.2941,NDP:0.0365,OTH:0.0028,PPC:0.0102},
+  '24011':{BQ:0.4663,CON:0.1144,GRN:0.0207,LIB:0.3426,NDP:0.0478,OTH:0.0027,PPC:0.0055},
+  '24012':{BQ:0.3274,CON:0.1451,GRN:0.0137,LIB:0.2393,NDP:0.265,OTH:0.0026,PPC:0.0068},
+  '24013':{BQ:0.1571,CON:0.1376,GRN:0.0298,LIB:0.575,NDP:0.0814,OTH:0.0115,PPC:0.0076},
+  '24014':{BQ:0.2726,CON:0.1681,GRN:0.0216,LIB:0.4954,NDP:0.0334,OTH:0.0028,PPC:0.0061},
+  '24015':{BQ:0.1248,CON:0.1624,GRN:0.0203,LIB:0.6348,NDP:0.0491,OTH:0.0027,PPC:0.0059},
+  '24016':{BQ:0.1817,CON:0.3886,GRN:0.0178,LIB:0.3579,NDP:0.039,OTH:0.0065,PPC:0.0086},
+  '24017':{BQ:0.2819,CON:0.1939,GRN:0.0177,LIB:0.4648,NDP:0.0329,OTH:0.0028,PPC:0.0059},
+  '24018':{BQ:0.3075,CON:0.314,GRN:0.0144,LIB:0.3245,NDP:0.0303,OTH:0.0029,PPC:0.0065},
+  '24019':{BQ:0.2556,CON:0.1947,GRN:0.0241,LIB:0.4693,NDP:0.046,OTH:0.0028,PPC:0.0074},
+  '24020':{BQ:0.1963,CON:0.4282,GRN:0.0164,LIB:0.3196,NDP:0.0292,OTH:0.0031,PPC:0.0072},
+  '24021':{BQ:0.4204,CON:0.2238,GRN:0.0158,LIB:0.275,NDP:0.0266,OTH:0.0314,PPC:0.007},
+  '24022':{BQ:0.1171,CON:0.1825,GRN:0.0223,LIB:0.6065,NDP:0.0565,OTH:0.0082,PPC:0.0069},
+  '24023':{BQ:0.4174,CON:0.2028,GRN:0.0152,LIB:0.2916,NDP:0.0623,OTH:0.0027,PPC:0.008},
+  '24024':{BQ:0.4436,CON:0.1056,GRN:0.0154,LIB:0.3891,NDP:0.0271,OTH:0.0139,PPC:0.0053},
+  '24025':{BQ:0.1533,CON:0.1708,GRN:0.0178,LIB:0.6091,NDP:0.0399,OTH:0.0022,PPC:0.0068},
+  '24026':{BQ:0.2522,CON:0.0861,GRN:0.034,LIB:0.4539,NDP:0.164,OTH:0.0048,PPC:0.0049},
+  '24027':{BQ:0.12,CON:0.1886,GRN:0.0163,LIB:0.6159,NDP:0.0503,OTH:0.0027,PPC:0.0063},
+  '24028':{BQ:0.112,CON:0.1461,GRN:0.0286,LIB:0.63,NDP:0.0736,OTH:0.0039,PPC:0.0058},
+  '24029':{BQ:0.4799,CON:0.1326,GRN:0.0238,LIB:0.3195,NDP:0.0359,OTH:0.0027,PPC:0.0056},
+  '24030':{BQ:0.397,CON:0.2776,GRN:0.0138,LIB:0.2728,NDP:0.0289,OTH:0.0029,PPC:0.0069},
+  '24031':{BQ:0.4166,CON:0.1104,GRN:0.0246,LIB:0.382,NDP:0.0584,OTH:0.0029,PPC:0.0051},
+  '24032':{BQ:0.3385,CON:0.1519,GRN:0.0148,LIB:0.4521,NDP:0.0348,OTH:0.0028,PPC:0.0051},
+  '24033':{BQ:0.4526,CON:0.2215,GRN:0.0184,LIB:0.2703,NDP:0.0269,OTH:0.0028,PPC:0.0074},
+  '24034':{BQ:0.029,CON:0.2111,GRN:0.02,LIB:0.6884,NDP:0.042,OTH:0.0027,PPC:0.0068},
+  '24035':{BQ:0.1985,CON:0.1165,GRN:0.031,LIB:0.5049,NDP:0.132,OTH:0.0117,PPC:0.0053},
+  '24036':{BQ:0.4398,CON:0.1311,GRN:0.0224,LIB:0.3598,NDP:0.037,OTH:0.0028,PPC:0.0069},
+  '24037':{BQ:0.1365,CON:0.0712,GRN:0.0395,LIB:0.4964,NDP:0.2335,OTH:0.0184,PPC:0.0046},
+  '24038':{BQ:0.1342,CON:0.2835,GRN:0.0239,LIB:0.4953,NDP:0.0502,OTH:0.0026,PPC:0.0103},
+  '24039':{BQ:0.3533,CON:0.1601,GRN:0.0218,LIB:0.4217,NDP:0.034,OTH:0.0028,PPC:0.0063},
+  '24040':{BQ:0.189,CON:0.4428,GRN:0.0171,LIB:0.3039,NDP:0.035,OTH:0.0028,PPC:0.0093},
+  '24041':{BQ:0.2487,CON:0.1466,GRN:0.0253,LIB:0.4882,NDP:0.0747,OTH:0.0097,PPC:0.0067},
+  '24042':{BQ:0.3711,CON:0.1198,GRN:0.0287,LIB:0.4026,NDP:0.0694,OTH:0.0025,PPC:0.0059},
+  '24043':{BQ:0.2,CON:0.1748,GRN:0.0257,LIB:0.5531,NDP:0.0374,OTH:0.0026,PPC:0.0064},
+  '24044':{BQ:0.1827,CON:0.4128,GRN:0.0154,LIB:0.3415,NDP:0.0361,OTH:0.0028,PPC:0.0086},
+  '24045':{BQ:0.2186,CON:0.1767,GRN:0.0257,LIB:0.5159,NDP:0.0535,OTH:0.0026,PPC:0.007},
+  '24046':{BQ:0.1596,CON:0.5532,GRN:0.0169,LIB:0.2274,NDP:0.0293,OTH:0.0037,PPC:0.0099},
+  '24047':{BQ:0.3903,CON:0.2007,GRN:0.02,LIB:0.3426,NDP:0.0377,OTH:0.0028,PPC:0.0059},
+  '24048':{BQ:0.0249,CON:0.3515,GRN:0.041,LIB:0.4996,NDP:0.0679,OTH:0.0041,PPC:0.0109},
+  '24049':{BQ:0.3391,CON:0.1175,GRN:0.0173,LIB:0.4795,NDP:0.0389,OTH:0.0028,PPC:0.0049},
+  '24050':{BQ:0.4454,CON:0.2028,GRN:0.0254,LIB:0.2708,NDP:0.0446,OTH:0.0026,PPC:0.0084},
+  '24051':{BQ:0.3292,CON:0.3194,GRN:0.0148,LIB:0.3024,NDP:0.025,OTH:0.0029,PPC:0.0062},
+  '24052':{BQ:0.0411,CON:0.1707,GRN:0.0324,LIB:0.6389,NDP:0.0967,OTH:0.0141,PPC:0.0061},
+  '24053':{BQ:0.1044,CON:0.1009,GRN:0.1171,LIB:0.5274,NDP:0.1421,OTH:0.0024,PPC:0.0057},
+  '24054':{BQ:0.1395,CON:0.0784,GRN:0.0534,LIB:0.4764,NDP:0.2082,OTH:0.0375,PPC:0.0065},
+  '24055':{BQ:0.4438,CON:0.1003,GRN:0.0201,LIB:0.3919,NDP:0.0357,OTH:0.0027,PPC:0.0055},
+  '24056':{BQ:0.0454,CON:0.267,GRN:0.0339,LIB:0.5956,NDP:0.0435,OTH:0.0062,PPC:0.0084},
+  '24057':{BQ:0.0959,CON:0.2472,GRN:0.018,LIB:0.5594,NDP:0.0687,OTH:0.0027,PPC:0.0082},
+  '24058':{BQ:0.175,CON:0.4649,GRN:0.0167,LIB:0.3066,NDP:0.026,OTH:0.0029,PPC:0.0078},
+  '24059':{BQ:0.2669,CON:0.1287,GRN:0.0516,LIB:0.3878,NDP:0.1335,OTH:0.0221,PPC:0.0093},
+  '24060':{BQ:0.4086,CON:0.1318,GRN:0.0154,LIB:0.3942,NDP:0.0392,OTH:0.0055,PPC:0.0052},
+  '24061':{BQ:0.2638,CON:0.3213,GRN:0.0221,LIB:0.338,NDP:0.0302,OTH:0.0154,PPC:0.0092},
+  '24062':{BQ:0.4456,CON:0.1156,GRN:0.0103,LIB:0.3599,NDP:0.0275,OTH:0.036,PPC:0.0051},
+  '24063':{BQ:0.3209,CON:0.1539,GRN:0.0176,LIB:0.4683,NDP:0.0319,OTH:0.0025,PPC:0.0049},
+  '24064':{BQ:0.4197,CON:0.1833,GRN:0.0207,LIB:0.318,NDP:0.048,OTH:0.0026,PPC:0.0076},
+  '24065':{BQ:0.1859,CON:0.0566,GRN:0.0393,LIB:0.3323,NDP:0.378,OTH:0.0029,PPC:0.0049},
+  '24066':{BQ:0.4307,CON:0.1595,GRN:0.0194,LIB:0.3469,NDP:0.0351,OTH:0.0028,PPC:0.0055},
+  '24067':{BQ:0.434,CON:0.144,GRN:0.0223,LIB:0.3533,NDP:0.0376,OTH:0.0028,PPC:0.0059},
+  '24068':{BQ:0.0498,CON:0.2544,GRN:0.0216,LIB:0.6032,NDP:0.0614,OTH:0.0024,PPC:0.0073},
+  '24069':{BQ:0.0622,CON:0.1779,GRN:0.0192,LIB:0.6499,NDP:0.0808,OTH:0.0026,PPC:0.0074},
+  '24070':{BQ:0.2049,CON:0.2223,GRN:0.0166,LIB:0.5157,NDP:0.0302,OTH:0.004,PPC:0.0062},
+  '24071':{BQ:0.3852,CON:0.1558,GRN:0.0188,LIB:0.3964,NDP:0.0341,OTH:0.0027,PPC:0.007},
+  '24072':{BQ:0.2544,CON:0.1119,GRN:0.0295,LIB:0.5191,NDP:0.0764,OTH:0.0027,PPC:0.006},
+  '24073':{BQ:0.385,CON:0.1474,GRN:0.0157,LIB:0.4051,NDP:0.0383,OTH:0.0028,PPC:0.0056},
+  '24074':{BQ:0.3096,CON:0.1628,GRN:0.0201,LIB:0.4631,NDP:0.0355,OTH:0.0027,PPC:0.0061},
+  '24075':{BQ:0.2698,CON:0.2476,GRN:0.0142,LIB:0.4248,NDP:0.0349,OTH:0.0031,PPC:0.0057},
+  '24076':{BQ:0.1413,CON:0.2042,GRN:0.0189,LIB:0.5927,NDP:0.0337,OTH:0.0027,PPC:0.0064},
+  '24077':{BQ:0.0824,CON:0.164,GRN:0.0276,LIB:0.6355,NDP:0.0797,OTH:0.0044,PPC:0.0063},
+  '24078':{BQ:0.1565,CON:0.2122,GRN:0.0269,LIB:0.5239,NDP:0.0692,OTH:0.0025,PPC:0.0088},
+  '35001':{CON:0.3091,GRN:0.0143,LIB:0.5897,NDP:0.0614,OTH:0.0144,PPC:0.0111},
+  '35002':{CON:0.4571,GRN:0.0141,LIB:0.4061,NDP:0.0791,OTH:0.0287,PPC:0.0149},
+  '35003':{CON:0.4389,GRN:0.039,LIB:0.4622,NDP:0.0411,OTH:0.007,PPC:0.0117},
+  '35004':{CON:0.4803,GRN:0.0184,LIB:0.4089,NDP:0.0709,OTH:0.0069,PPC:0.0146},
+  '35005':{CON:0.425,GRN:0.0198,LIB:0.4621,NDP:0.0577,OTH:0.0212,PPC:0.0141},
+  '35006':{CON:0.3559,GRN:0.0183,LIB:0.5294,NDP:0.077,OTH:0.0068,PPC:0.0126},
+  '35007':{CON:0.1661,GRN:0.0209,LIB:0.6684,NDP:0.127,OTH:0.0074,PPC:0.0102},
+  '35008':{CON:0.4065,GRN:0.013,LIB:0.4864,NDP:0.0648,OTH:0.016,PPC:0.0132},
+  '35009':{CON:0.3875,GRN:0.0172,LIB:0.5179,NDP:0.063,OTH:0.0026,PPC:0.0119},
+  '35010':{CON:0.3629,GRN:0.0176,LIB:0.5253,NDP:0.0625,OTH:0.0175,PPC:0.0143},
+  '35011':{CON:0.3776,GRN:0.0076,LIB:0.5418,NDP:0.0482,OTH:0.003,PPC:0.0218},
+  '35012':{CON:0.3882,GRN:0.0128,LIB:0.524,NDP:0.0541,OTH:0.0069,PPC:0.014},
+  '35013':{CON:0.39,GRN:0.0111,LIB:0.5307,NDP:0.0474,OTH:0.0086,PPC:0.0122},
+  '35014':{CON:0.4115,GRN:0.0112,LIB:0.5151,NDP:0.0464,OTH:0.0023,PPC:0.0134},
+  '35015':{CON:0.4337,GRN:0.0239,LIB:0.4438,NDP:0.0791,OTH:0.0072,PPC:0.0123},
+  '35016':{CON:0.436,GRN:0.0329,LIB:0.4305,NDP:0.0732,OTH:0.012,PPC:0.0153},
+  '35017':{CON:0.3267,GRN:0.0123,LIB:0.5963,NDP:0.0511,OTH:0.0025,PPC:0.0111},
+  '35018':{CON:0.3562,GRN:0.0119,LIB:0.5594,NDP:0.0533,OTH:0.0068,PPC:0.0124},
+  '35019':{CON:0.3956,GRN:0.0227,LIB:0.4944,NDP:0.0729,OTH:0.0014,PPC:0.013},
+  '35020':{CON:0.373,GRN:0.011,LIB:0.5437,NDP:0.0418,OTH:0.0192,PPC:0.0113},
+  '35021':{CON:0.4827,GRN:0.0161,LIB:0.3924,NDP:0.0866,OTH:0.007,PPC:0.015},
+  '35022':{CON:0.1487,GRN:0.0301,LIB:0.5259,NDP:0.2771,OTH:0.0076,PPC:0.0106},
+  '35023':{CON:0.3414,GRN:0.0142,LIB:0.5673,NDP:0.0585,OTH:0.0074,PPC:0.0111},
+  '35024':{CON:0.2558,GRN:0.0155,LIB:0.6514,NDP:0.0559,OTH:0.0105,PPC:0.0109},
+  '35025':{CON:0.5061,GRN:0.0285,LIB:0.3804,NDP:0.0627,OTH:0.0054,PPC:0.0168},
+  '35026':{CON:0.3922,GRN:0.0118,LIB:0.5295,NDP:0.0479,OTH:0.007,PPC:0.0115},
+  '35027':{CON:0.4047,GRN:0.0205,LIB:0.4556,NDP:0.0959,OTH:0.0067,PPC:0.0166},
+  '35028':{CON:0.4757,GRN:0.0115,LIB:0.3945,NDP:0.0968,OTH:0.0069,PPC:0.0145},
+  '35029':{CON:0.3442,GRN:0.0184,LIB:0.5594,NDP:0.0558,OTH:0.0065,PPC:0.0157},
+  '35030':{CON:0.3064,GRN:0.0154,LIB:0.6032,NDP:0.0594,OTH:0.0035,PPC:0.0121},
+  '35031':{CON:0.3315,GRN:0.0146,LIB:0.5643,NDP:0.0714,OTH:0.0036,PPC:0.0146},
+  '35032':{CON:0.439,GRN:0.0141,LIB:0.4681,NDP:0.0593,OTH:0.007,PPC:0.0125},
+  '35033':{CON:0.2309,GRN:0.1227,LIB:0.5608,NDP:0.0683,OTH:0.0059,PPC:0.0114},
+  '35034':{CON:0.4853,GRN:0.0162,LIB:0.3991,NDP:0.0753,OTH:0.0108,PPC:0.0132},
+  '35035':{CON:0.469,GRN:0.0157,LIB:0.4176,NDP:0.0759,OTH:0.0069,PPC:0.0149},
+  '35036':{CON:0.1902,GRN:0.0308,LIB:0.3295,NDP:0.4256,OTH:0.0106,PPC:0.0132},
+  '35037':{CON:0.3944,GRN:0.0144,LIB:0.4931,NDP:0.0773,OTH:0.0068,PPC:0.0139},
+  '35038':{CON:0.313,GRN:0.0149,LIB:0.454,NDP:0.201,OTH:0.0035,PPC:0.0137},
+  '35039':{CON:0.2862,GRN:0.0171,LIB:0.5818,NDP:0.1016,OTH:0.0024,PPC:0.0108},
+  '35040':{CON:0.4498,GRN:0.018,LIB:0.4356,NDP:0.0772,OTH:0.007,PPC:0.0124},
+  '35041':{CON:0.2754,GRN:0.0099,LIB:0.5741,NDP:0.119,OTH:0.0078,PPC:0.0137},
+  '35042':{CON:0.4376,GRN:0.0194,LIB:0.4462,NDP:0.0738,OTH:0.0095,PPC:0.0135},
+  '35043':{CON:0.2787,GRN:0.0171,LIB:0.6368,NDP:0.0555,OTH:0.0014,PPC:0.0105},
+  '35044':{CON:0.3849,GRN:0.0094,LIB:0.4026,NDP:0.18,OTH:0.0065,PPC:0.0167},
+  '35045':{CON:0.3765,GRN:0.0152,LIB:0.3576,NDP:0.2297,OTH:0.0065,PPC:0.0145},
+  '35046':{CON:0.2297,GRN:0.0184,LIB:0.6436,NDP:0.0912,OTH:0.0065,PPC:0.0105},
+  '35047':{CON:0.5302,GRN:0.014,LIB:0.398,NDP:0.0385,OTH:0.0073,PPC:0.012},
+  '35048':{CON:0.2495,GRN:0.3871,LIB:0.2912,NDP:0.0551,OTH:0.0037,PPC:0.0134},
+  '35049':{CON:0.3633,GRN:0.0627,LIB:0.4851,NDP:0.0664,OTH:0.0063,PPC:0.0162},
+  '35050':{CON:0.3933,GRN:0.0277,LIB:0.4977,NDP:0.0681,OTH:0.0014,PPC:0.0119},
+  '35051':{CON:0.4085,GRN:0.0186,LIB:0.4861,NDP:0.0664,OTH:0.0068,PPC:0.0135},
+  '35052':{CON:0.4104,GRN:0.0174,LIB:0.4763,NDP:0.076,OTH:0.0069,PPC:0.013},
+  '35053':{CON:0.2312,GRN:0.0201,LIB:0.5685,NDP:0.1674,OTH:0.0012,PPC:0.0116},
+  '35054':{CON:0.2735,GRN:0.0211,LIB:0.2751,NDP:0.408,OTH:0.0056,PPC:0.0166},
+  '35055':{CON:0.2851,GRN:0.0108,LIB:0.5801,NDP:0.1039,OTH:0.0079,PPC:0.0121},
+  '35056':{CON:0.3713,GRN:0.0117,LIB:0.5543,NDP:0.0489,OTH:0.0025,PPC:0.0113},
+  '35057':{CON:0.3333,GRN:0.0204,LIB:0.5776,NDP:0.0515,OTH:0.0035,PPC:0.0138},
+  '35058':{CON:0.4076,GRN:0.0143,LIB:0.5193,NDP:0.0399,OTH:0.006,PPC:0.0129},
+  '35059':{CON:0.4263,GRN:0.0164,LIB:0.4524,NDP:0.0891,OTH:0.0031,PPC:0.0128},
+  '35060':{CON:0.4003,GRN:0.0156,LIB:0.5249,NDP:0.0445,OTH:0.0031,PPC:0.0116},
+  '35061':{CON:0.3345,GRN:0.0147,LIB:0.5692,NDP:0.0627,OTH:0.006,PPC:0.0128},
+  '35062':{CON:0.3621,GRN:0.0137,LIB:0.5367,NDP:0.0643,OTH:0.0085,PPC:0.0147},
+  '35063':{CON:0.3224,GRN:0.0108,LIB:0.596,NDP:0.0547,OTH:0.0036,PPC:0.0124},
+  '35064':{CON:0.3583,GRN:0.0139,LIB:0.5627,NDP:0.0496,OTH:0.0045,PPC:0.0109},
+  '35065':{CON:0.3365,GRN:0.0165,LIB:0.5622,NDP:0.0624,OTH:0.0067,PPC:0.0156},
+  '35066':{CON:0.3637,GRN:0.0118,LIB:0.5499,NDP:0.056,OTH:0.0069,PPC:0.0116},
+  '35067':{CON:0.2572,GRN:0.0106,LIB:0.6657,NDP:0.0498,OTH:0.0068,PPC:0.0098},
+  '35068':{CON:0.4085,GRN:0.019,LIB:0.4957,NDP:0.0564,OTH:0.0068,PPC:0.0136},
+  '35069':{CON:0.5047,GRN:0.0167,LIB:0.4084,NDP:0.0503,OTH:0.0072,PPC:0.0126},
+  '35070':{CON:0.4032,GRN:0.0134,LIB:0.4826,NDP:0.0819,OTH:0.0064,PPC:0.0124},
+  '35071':{CON:0.3891,GRN:0.0138,LIB:0.4693,NDP:0.1102,OTH:0.0032,PPC:0.0144},
+  '35072':{CON:0.4226,GRN:0.0169,LIB:0.4612,NDP:0.0709,OTH:0.0151,PPC:0.0133},
+  '35073':{CON:0.3562,GRN:0.015,LIB:0.4927,NDP:0.1158,OTH:0.0067,PPC:0.0136},
+  '35074':{CON:0.4021,GRN:0.014,LIB:0.4956,NDP:0.0673,OTH:0.0089,PPC:0.0121},
+  '35075':{CON:0.3652,GRN:0.0101,LIB:0.5468,NDP:0.0644,OTH:0.0022,PPC:0.0112},
+  '35076':{CON:0.3652,GRN:0.0106,LIB:0.5714,NDP:0.0418,OTH:0.0004,PPC:0.0106},
+  '35077':{CON:0.2081,GRN:0.0128,LIB:0.7004,NDP:0.06,OTH:0.0094,PPC:0.0093},
+  '35078':{CON:0.3788,GRN:0.0172,LIB:0.4436,NDP:0.1388,OTH:0.0065,PPC:0.0151},
+  '35079':{CON:0.0886,GRN:0.0332,LIB:0.5485,NDP:0.3094,OTH:0.0124,PPC:0.0079},
+  '35080':{CON:0.1939,GRN:0.014,LIB:0.6603,NDP:0.1116,OTH:0.0102,PPC:0.01},
+  '35081':{CON:0.1467,GRN:0.0288,LIB:0.6624,NDP:0.1377,OTH:0.0154,PPC:0.009},
+  '35082':{CON:0.1975,GRN:0.0162,LIB:0.6437,NDP:0.1274,OTH:0.0048,PPC:0.0104},
+  '35083':{CON:0.4355,GRN:0.0211,LIB:0.4067,NDP:0.0898,OTH:0.0331,PPC:0.0137},
+  '35084':{CON:0.4197,GRN:0.0312,LIB:0.4505,NDP:0.0756,OTH:0.0066,PPC:0.0163},
+  '35085':{CON:0.4282,GRN:0.0269,LIB:0.4303,NDP:0.0914,OTH:0.0066,PPC:0.0165},
+  '35086':{CON:0.3279,GRN:0.013,LIB:0.5743,NDP:0.0677,OTH:0.0066,PPC:0.0106},
+  '35087':{CON:0.3315,GRN:0.0122,LIB:0.5776,NDP:0.0608,OTH:0.006,PPC:0.0118},
+  '35088':{CON:0.325,GRN:0.0178,LIB:0.5824,NDP:0.0583,OTH:0.0042,PPC:0.0122},
+  '35089':{CON:0.4377,GRN:0.0137,LIB:0.4847,NDP:0.0491,OTH:0.0037,PPC:0.0111},
+  '35090':{CON:0.4316,GRN:0.0147,LIB:0.4013,NDP:0.1046,OTH:0.032,PPC:0.0158},
+  '35091':{CON:0.3533,GRN:0.0127,LIB:0.4922,NDP:0.123,OTH:0.0059,PPC:0.0129},
+  '35092':{CON:0.3336,GRN:0.0129,LIB:0.5701,NDP:0.0641,OTH:0.0067,PPC:0.0125},
+  '35093':{CON:0.298,GRN:0.0151,LIB:0.5961,NDP:0.0708,OTH:0.0066,PPC:0.0134},
+  '35094':{CON:0.2399,GRN:0.0165,LIB:0.6572,NDP:0.0687,OTH:0.0066,PPC:0.0112},
+  '35095':{CON:0.25,GRN:0.01,LIB:0.6425,NDP:0.0797,OTH:0.0065,PPC:0.0112},
+  '35096':{CON:0.2559,GRN:0.0185,LIB:0.6105,NDP:0.0984,OTH:0.0057,PPC:0.011},
+  '35097':{CON:0.2122,GRN:0.0538,LIB:0.5194,NDP:0.0955,OTH:0.1071,PPC:0.0119},
+  '35098':{CON:0.4322,GRN:0.0211,LIB:0.47,NDP:0.0572,OTH:0.007,PPC:0.0126},
+  '35099':{CON:0.3948,GRN:0.026,LIB:0.483,NDP:0.0799,OTH:0.0034,PPC:0.0129},
+  '35100':{CON:0.2284,GRN:0.0127,LIB:0.6085,NDP:0.1381,OTH:0.0022,PPC:0.0101},
+  '35101':{CON:0.3146,GRN:0.0119,LIB:0.5373,NDP:0.1133,OTH:0.0105,PPC:0.0124},
+  '35102':{CON:0.4726,GRN:0.0155,LIB:0.432,NDP:0.0602,OTH:0.0054,PPC:0.0142},
+  '35103':{CON:0.299,GRN:0.0183,LIB:0.5251,NDP:0.1372,OTH:0.0064,PPC:0.014},
+  '35104':{CON:0.3857,GRN:0.0122,LIB:0.4358,NDP:0.1461,OTH:0.0069,PPC:0.0133},
+  '35105':{CON:0.114,GRN:0.033,LIB:0.4816,NDP:0.3521,OTH:0.0094,PPC:0.0099},
+  '35106':{CON:0.5779,GRN:0.01,LIB:0.3519,NDP:0.0408,OTH:0.0073,PPC:0.0121},
+  '35107':{CON:0.3453,GRN:0.0122,LIB:0.4958,NDP:0.1265,OTH:0.0067,PPC:0.0134},
+  '35108':{CON:0.2727,GRN:0.0135,LIB:0.5654,NDP:0.1296,OTH:0.0065,PPC:0.0124},
+  '35109':{CON:0.1351,GRN:0.0237,LIB:0.6098,NDP:0.213,OTH:0.0095,PPC:0.0088},
+  '35110':{CON:0.1201,GRN:0.026,LIB:0.6191,NDP:0.2209,OTH:0.0048,PPC:0.0091},
+  '35111':{CON:0.2554,GRN:0.0122,LIB:0.6452,NDP:0.074,OTH:0.003,PPC:0.0101},
+  '35112':{CON:0.1502,GRN:0.0272,LIB:0.5749,NDP:0.2284,OTH:0.0099,PPC:0.0094},
+  '35113':{CON:0.5079,GRN:0.0117,LIB:0.4192,NDP:0.0413,OTH:0.0071,PPC:0.0127},
+  '35114':{CON:0.2482,GRN:0.0329,LIB:0.6142,NDP:0.0836,OTH:0.0105,PPC:0.0106},
+  '35115':{CON:0.424,GRN:0.0286,LIB:0.4757,NDP:0.052,OTH:0.007,PPC:0.0127},
+  '35116':{CON:0.3543,GRN:0.0121,LIB:0.5595,NDP:0.0584,OTH:0.0037,PPC:0.012},
+  '35117':{CON:0.3471,GRN:0.0145,LIB:0.5576,NDP:0.0614,OTH:0.0067,PPC:0.0126},
+  '35118':{CON:0.3672,GRN:0.0111,LIB:0.4836,NDP:0.1161,OTH:0.0084,PPC:0.0136},
+  '35119':{CON:0.2645,GRN:0.0183,LIB:0.2818,NDP:0.4141,OTH:0.006,PPC:0.0153},
+  '35120':{CON:0.4493,GRN:0.0143,LIB:0.4551,NDP:0.0592,OTH:0.0068,PPC:0.0152},
+  '35121':{CON:0.4671,GRN:0.0168,LIB:0.4336,NDP:0.0615,OTH:0.007,PPC:0.014},
+  '35122':{CON:0.3032,GRN:0.0136,LIB:0.5631,NDP:0.0995,OTH:0.0064,PPC:0.0142},
+  '46001':{CON:0.5258,GRN:0.0305,LIB:0.1725,NDP:0.2392,OTH:0.0109,PPC:0.0212},
+  '46002':{CON:0.1703,GRN:0.039,LIB:0.4808,NDP:0.2814,OTH:0.01,PPC:0.0186},
+  '46003':{CON:0.3416,GRN:0.0175,LIB:0.2561,NDP:0.3583,OTH:0.0112,PPC:0.0153},
+  '46004':{CON:0.3959,GRN:0.0161,LIB:0.4885,NDP:0.0701,OTH:0.0107,PPC:0.0188},
+  '46005':{CON:0.6236,GRN:0.0234,LIB:0.2708,NDP:0.0457,OTH:0.0112,PPC:0.0254},
+  '46006':{CON:0.5878,GRN:0.0243,LIB:0.3053,NDP:0.0477,OTH:0.0111,PPC:0.0238},
+  '46007':{CON:0.5971,GRN:0.0237,LIB:0.2673,NDP:0.0795,OTH:0.0113,PPC:0.0212},
+  '46008':{CON:0.2548,GRN:0.0158,LIB:0.6336,NDP:0.0684,OTH:0.0103,PPC:0.0171},
+  '46009':{CON:0.5155,GRN:0.0238,LIB:0.342,NDP:0.066,OTH:0.0324,PPC:0.0203},
+  '46010':{CON:0.162,GRN:0.0282,LIB:0.3814,NDP:0.3888,OTH:0.0256,PPC:0.0141},
+  '46011':{CON:0.2764,GRN:0.0138,LIB:0.6198,NDP:0.0605,OTH:0.013,PPC:0.0164},
+  '46012':{CON:0.2833,GRN:0.0144,LIB:0.6306,NDP:0.0441,OTH:0.0104,PPC:0.0172},
+  '46013':{CON:0.2112,GRN:0.0175,LIB:0.662,NDP:0.063,OTH:0.0315,PPC:0.0148},
+  '46014':{CON:0.3325,GRN:0.0163,LIB:0.5842,NDP:0.0391,OTH:0.0105,PPC:0.0175},
+  '47001':{CON:0.6712,GRN:0.0188,LIB:0.2061,NDP:0.0477,OTH:0.0295,PPC:0.0267},
+  '47002':{CON:0.679,GRN:0.021,LIB:0.2016,NDP:0.0569,OTH:0.0107,PPC:0.0308},
+  '47003':{CON:0.1888,GRN:0.0261,LIB:0.6683,NDP:0.0909,OTH:0.0098,PPC:0.0161},
+  '47004':{CON:0.6548,GRN:0.0183,LIB:0.2055,NDP:0.0816,OTH:0.0112,PPC:0.0287},
+  '47005':{CON:0.6176,GRN:0.0247,LIB:0.2237,NDP:0.0967,OTH:0.0107,PPC:0.0266},
+  '47006':{CON:0.4235,GRN:0.0143,LIB:0.4749,NDP:0.0593,OTH:0.0109,PPC:0.0171},
+  '47007':{CON:0.5451,GRN:0.0367,LIB:0.3032,NDP:0.0818,OTH:0.0107,PPC:0.0225},
+  '47008':{CON:0.4263,GRN:0.0145,LIB:0.482,NDP:0.0483,OTH:0.0109,PPC:0.018},
+  '47009':{CON:0.4164,GRN:0.0144,LIB:0.4482,NDP:0.0932,OTH:0.0109,PPC:0.017},
+  '47010':{CON:0.4127,GRN:0.0135,LIB:0.4582,NDP:0.0876,OTH:0.0109,PPC:0.0172},
+  '47011':{CON:0.4417,GRN:0.0217,LIB:0.3087,NDP:0.1992,OTH:0.011,PPC:0.0178},
+  '47012':{CON:0.7343,GRN:0.0179,LIB:0.1227,NDP:0.0458,OTH:0.0471,PPC:0.0323},
+  '47013':{CON:0.7086,GRN:0.0201,LIB:0.1373,NDP:0.0579,OTH:0.0455,PPC:0.0307},
+  '47014':{CON:0.6781,GRN:0.0341,LIB:0.1731,NDP:0.056,OTH:0.0276,PPC:0.0312},
+  '48001':{CON:0.5765,GRN:0.0191,LIB:0.2913,NDP:0.0534,OTH:0.0354,PPC:0.0243},
+  '48002':{CON:0.7045,GRN:0.0179,LIB:0.1571,NDP:0.0661,OTH:0.0292,PPC:0.0251},
+  '48003':{CON:0.6616,GRN:0.0128,LIB:0.222,NDP:0.0466,OTH:0.0324,PPC:0.0247},
+  '48004':{CON:0.3857,GRN:0.0143,LIB:0.5324,NDP:0.0401,OTH:0.0089,PPC:0.0185},
+  '48005':{CON:0.3465,GRN:0.0139,LIB:0.5489,NDP:0.0574,OTH:0.0154,PPC:0.0178},
+  '48006':{CON:0.4699,GRN:0.0134,LIB:0.4487,NDP:0.04,OTH:0.0092,PPC:0.0188},
+  '48007':{CON:0.4832,GRN:0.0283,LIB:0.3841,NDP:0.0567,OTH:0.0229,PPC:0.0247},
+  '48008':{CON:0.4883,GRN:0.017,LIB:0.4132,NDP:0.0385,OTH:0.022,PPC:0.021},
+  '48009':{CON:0.3729,GRN:0.0153,LIB:0.5295,NDP:0.042,OTH:0.0207,PPC:0.0196},
+  '48010':{CON:0.5246,GRN:0.0162,LIB:0.3621,NDP:0.0474,OTH:0.0282,PPC:0.0214},
+  '48011':{CON:0.4692,GRN:0.0166,LIB:0.43,NDP:0.0477,OTH:0.016,PPC:0.0205},
+  '48012':{CON:0.5496,GRN:0.0125,LIB:0.3449,NDP:0.0438,OTH:0.0285,PPC:0.0207},
+  '48013':{CON:0.4782,GRN:0.0162,LIB:0.4347,NDP:0.0374,OTH:0.0131,PPC:0.0203},
+  '48014':{CON:0.4132,GRN:0.01,LIB:0.4225,NDP:0.0389,OTH:0.0936,PPC:0.0217},
+  '48015':{CON:0.2639,GRN:0.0158,LIB:0.4822,NDP:0.1866,OTH:0.0326,PPC:0.0189},
+  '48016':{CON:0.3648,GRN:0.0077,LIB:0.4084,NDP:0.0645,OTH:0.1317,PPC:0.0229},
+  '48017':{CON:0.3253,GRN:0.0141,LIB:0.2124,NDP:0.4074,OTH:0.0212,PPC:0.0196},
+  '48018':{CON:0.4004,GRN:0.0148,LIB:0.406,NDP:0.1273,OTH:0.0268,PPC:0.0246},
+  '48019':{CON:0.4064,GRN:0.0144,LIB:0.4422,NDP:0.0878,OTH:0.0272,PPC:0.022},
+  '48020':{CON:0.3619,GRN:0.0249,LIB:0.5136,NDP:0.0562,OTH:0.0229,PPC:0.0205},
+  '48021':{CON:0.4077,GRN:0.012,LIB:0.4528,NDP:0.0731,OTH:0.0291,PPC:0.0253},
+  '48022':{CON:0.217,GRN:0.0134,LIB:0.2018,NDP:0.5326,OTH:0.0187,PPC:0.0166},
+  '48023':{CON:0.4143,GRN:0.0147,LIB:0.4668,NDP:0.0741,OTH:0.0091,PPC:0.021},
+  '48024':{CON:0.6391,GRN:0.0202,LIB:0.2462,NDP:0.0426,OTH:0.0289,PPC:0.023},
+  '48025':{CON:0.7033,GRN:0.0159,LIB:0.202,NDP:0.0447,OTH:0.01,PPC:0.0241},
+  '48026':{CON:0.6981,GRN:0.0178,LIB:0.1679,NDP:0.0664,OTH:0.0263,PPC:0.0236},
+  '48027':{CON:0.7066,GRN:0.0185,LIB:0.1718,NDP:0.0596,OTH:0.0193,PPC:0.0241},
+  '48028':{CON:0.6241,GRN:0.0195,LIB:0.2257,NDP:0.0873,OTH:0.021,PPC:0.0223},
+  '48029':{CON:0.4836,GRN:0.0165,LIB:0.3954,NDP:0.0534,OTH:0.0308,PPC:0.0203},
+  '48030':{CON:0.6323,GRN:0.019,LIB:0.2263,NDP:0.0689,OTH:0.0284,PPC:0.025},
+  '48031':{CON:0.6386,GRN:0.0185,LIB:0.2361,NDP:0.0628,OTH:0.0205,PPC:0.0235},
+  '48032':{CON:0.5976,GRN:0.0192,LIB:0.1523,NDP:0.0721,OTH:0.128,PPC:0.0307},
+  '48033':{CON:0.5799,GRN:0.0143,LIB:0.1335,NDP:0.1257,OTH:0.1078,PPC:0.0389},
+  '48034':{CON:0.6009,GRN:0.023,LIB:0.282,NDP:0.0585,OTH:0.013,PPC:0.0226},
+  '48035':{CON:0.5282,GRN:0.0364,LIB:0.3315,NDP:0.0715,OTH:0.0112,PPC:0.0212},
+  '48036':{CON:0.5119,GRN:0.0235,LIB:0.3614,NDP:0.0686,OTH:0.0121,PPC:0.0225},
+  '48037':{CON:0.5622,GRN:0.0317,LIB:0.3109,NDP:0.0583,OTH:0.0125,PPC:0.0245},
+  '59001':{CON:0.3441,GRN:0.0123,LIB:0.3421,NDP:0.0376,OTH:0.2539,PPC:0.0101},
+  '59002':{CON:0.327,GRN:0.0143,LIB:0.4542,NDP:0.1868,OTH:0.01,PPC:0.0078},
+  '59003':{CON:0.2812,GRN:0.0161,LIB:0.6197,NDP:0.0664,OTH:0.0098,PPC:0.0069},
+  '59004':{CON:0.5458,GRN:0.0226,LIB:0.3454,NDP:0.0704,OTH:0.0085,PPC:0.0072},
+  '59005':{CON:0.4935,GRN:0.0201,LIB:0.3985,NDP:0.0791,OTH:0.0015,PPC:0.0072},
+  '59006':{CON:0.4174,GRN:0.0123,LIB:0.5054,NDP:0.0475,OTH:0.0103,PPC:0.0072},
+  '59007':{CON:0.4486,GRN:0.0183,LIB:0.3174,NDP:0.1909,OTH:0.0176,PPC:0.0072},
+  '59008':{CON:0.3707,GRN:0.012,LIB:0.5124,NDP:0.078,OTH:0.0199,PPC:0.0072},
+  '59009':{CON:0.2966,GRN:0.0252,LIB:0.2562,NDP:0.4125,OTH:0.0035,PPC:0.0061},
+  '59010':{CON:0.3165,GRN:0.0227,LIB:0.3085,NDP:0.3355,OTH:0.0101,PPC:0.0068},
+  '59011':{CON:0.3672,GRN:0.0118,LIB:0.5471,NDP:0.0565,OTH:0.0101,PPC:0.0075},
+  '59012':{CON:0.2378,GRN:0.0295,LIB:0.5277,NDP:0.1913,OTH:0.0079,PPC:0.0059},
+  '59013':{CON:0.3842,GRN:0.0125,LIB:0.5216,NDP:0.0637,OTH:0.0102,PPC:0.0078},
+  '59014':{CON:0.4628,GRN:0.0288,LIB:0.4314,NDP:0.0587,OTH:0.0104,PPC:0.008},
+  '59015':{CON:0.4558,GRN:0.0183,LIB:0.4438,NDP:0.064,OTH:0.0104,PPC:0.0078},
+  '59016':{CON:0.4038,GRN:0.0127,LIB:0.5239,NDP:0.0415,OTH:0.0102,PPC:0.0079},
+  '59017':{CON:0.4561,GRN:0.0107,LIB:0.4748,NDP:0.044,OTH:0.0069,PPC:0.0076},
+  '59018':{CON:0.5064,GRN:0.0172,LIB:0.4077,NDP:0.0503,OTH:0.0105,PPC:0.0079},
+  '59019':{CON:0.2993,GRN:0.1859,LIB:0.3075,NDP:0.1903,OTH:0.0098,PPC:0.0072},
+  '59020':{CON:0.2641,GRN:0.0163,LIB:0.3834,NDP:0.3206,OTH:0.009,PPC:0.0067},
+  '59021':{CON:0.3369,GRN:0.0227,LIB:0.2917,NDP:0.3414,OTH:0.0013,PPC:0.0061},
+  '59022':{CON:0.2852,GRN:0.02,LIB:0.6424,NDP:0.0456,OTH:0.0008,PPC:0.006},
+  '59023':{CON:0.4529,GRN:0.0134,LIB:0.4889,NDP:0.0375,OTH:0.0006,PPC:0.0067},
+  '59024':{CON:0.4121,GRN:0.0145,LIB:0.4917,NDP:0.0654,OTH:0.009,PPC:0.0074},
+  '59025':{CON:0.3484,GRN:0.0113,LIB:0.4748,NDP:0.1573,OTH:0.0013,PPC:0.007},
+  '59026':{CON:0.6566,GRN:0.0256,LIB:0.2307,NDP:0.0677,OTH:0.0108,PPC:0.0086},
+  '59027':{CON:0.4342,GRN:0.0118,LIB:0.4886,NDP:0.048,OTH:0.0104,PPC:0.007},
+  '59028':{CON:0.4012,GRN:0.0122,LIB:0.5235,NDP:0.0456,OTH:0.0102,PPC:0.0073},
+  '59029':{CON:0.2049,GRN:0.392,LIB:0.3449,NDP:0.0422,OTH:0.0091,PPC:0.0069},
+  '59030':{CON:0.3842,GRN:0.0188,LIB:0.4095,NDP:0.1696,OTH:0.0103,PPC:0.0077},
+  '59031':{CON:0.4148,GRN:0.0149,LIB:0.1311,NDP:0.4121,OTH:0.0196,PPC:0.0075},
+  '59032':{CON:0.3942,GRN:0.0164,LIB:0.5443,NDP:0.0275,OTH:0.0102,PPC:0.0074},
+  '59033':{CON:0.3778,GRN:0.0127,LIB:0.5244,NDP:0.0731,OTH:0.0052,PPC:0.0068},
+  '59034':{CON:0.3797,GRN:0.0082,LIB:0.5344,NDP:0.0639,OTH:0.0067,PPC:0.0072},
+  '59035':{CON:0.2557,GRN:0.017,LIB:0.5976,NDP:0.1238,OTH:0.0002,PPC:0.0058},
+  '59036':{CON:0.1392,GRN:0.022,LIB:0.3829,NDP:0.4438,OTH:0.0073,PPC:0.005},
+  '59037':{CON:0.3027,GRN:0.0158,LIB:0.562,NDP:0.1023,OTH:0.0101,PPC:0.0072},
+  '59038':{CON:0.2353,GRN:0.0185,LIB:0.6525,NDP:0.0776,OTH:0.0099,PPC:0.0062},
+  '59039':{CON:0.1994,GRN:0.0127,LIB:0.3934,NDP:0.3788,OTH:0.01,PPC:0.0058},
+  '59040':{CON:0.2513,GRN:0.0209,LIB:0.6665,NDP:0.0452,OTH:0.01,PPC:0.0062},
+  '59041':{CON:0.4406,GRN:0.0196,LIB:0.4664,NDP:0.0547,OTH:0.0102,PPC:0.0086},
+  '59042':{CON:0.1311,GRN:0.0332,LIB:0.5742,NDP:0.253,OTH:0.0038,PPC:0.0047},
+  '59043':{CON:0.2783,GRN:0.0375,LIB:0.6422,NDP:0.0352,OTH:0.0007,PPC:0.0062},
+  '60001':{CON:0.3086,GRN:0.0274,LIB:0.519,NDP:0.0883,OTH:0.0088,PPC:0.0478},
+  '61001':{CON:0.2574,GRN:0.0148,LIB:0.5154,NDP:0.1546,OTH:0.0086,PPC:0.0492},
+  '62001':{CON:0.2006,GRN:0.0175,LIB:0.3915,NDP:0.3294,OTH:0.0082,PPC:0.0527},
+};
+
 export default function CanadaApp() {
   const navigate = useNavigate();
   const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
@@ -1755,6 +2129,9 @@ export default function CanadaApp() {
   const [simExiting, setSimExiting] = useState(false);
   const [simRunning, setSimRunning] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
+  const [hiddenParties, setHiddenParties] = useState<Set<string>>(new Set());
+  const [partiesOpen, setPartiesOpen] = useState(false);
+  const partiesDropRef = useRef<HTMLDivElement>(null);
   const simTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const stopSim = useCallback(() => {
@@ -1946,46 +2323,26 @@ export default function CanadaApp() {
     const data = [...byIdMapRef.current.values()];
     if (data.length === 0) return;
 
-    // Compute 2025 national vote shares
-    const national2025: Record<string, number> = {};
-    let totalVotes = 0;
-    for (const r of data) {
-      for (const [pid, votes] of Object.entries(r.results2025)) {
-        national2025[pid] = (national2025[pid] ?? 0) + votes;
-        totalVotes += votes;
-      }
-    }
-    const pct2025: Record<string, number> = {};
-    for (const [pid, votes] of Object.entries(national2025)) {
-      pct2025[pid] = (votes / totalVotes) * 100;
-    }
-
-    // Shifts = 2026 poll − 2025 actual
-    const shifts: Record<string, number> = {};
-    for (const [pid, target] of Object.entries(POLL_2026)) {
-      shifts[pid] = target - (pct2025[pid] ?? 0);
-    }
-
-    // Apply uniform swing to each riding
     const results: Record<string, Record<string, number>> = {};
     for (const r of data) {
-      const ridingPct: Record<string, number> = {};
-      for (const [pid, votes] of Object.entries(r.results2025)) {
-        ridingPct[pid] = (votes / r.validVotes) * 100;
-      }
-      // Shift only parties that already have a presence in this riding
-      for (const [pid, shift] of Object.entries(shifts)) {
-        if (ridingPct[pid] !== undefined && ridingPct[pid] > 0) {
-          ridingPct[pid] = Math.max(0, ridingPct[pid] + shift);
-        }
-      }
-      // Renormalize to validVotes
-      const newSum = Object.values(ridingPct).reduce((s, v) => s + v, 0);
-      if (newSum === 0) { results[r.id] = {}; continue; }
+      const csvData = DATA_CA_2026[r.id];
+      if (!csvData) { results[r.id] = { ...r.results2025 }; continue; }
+
       const newResults: Record<string, number> = {};
-      for (const [pid, pct] of Object.entries(ridingPct)) {
-        if (pct > 0) newResults[pid] = Math.round((pct / newSum) * r.validVotes);
+      let assigned = 0;
+      for (const [pid, frac] of Object.entries(csvData)) {
+        const votes = Math.round(frac * r.validVotes);
+        newResults[pid] = votes;
+        assigned += votes;
       }
+
+      const diff = r.validVotes - assigned;
+      if (diff !== 0) {
+        const top = Object.entries(newResults)
+          .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a)[0]?.[0];
+        if (top) newResults[top] = (newResults[top] ?? 0) + diff;
+      }
+
       results[r.id] = newResults;
     }
     setCurrentResults(results);
@@ -2139,7 +2496,7 @@ export default function CanadaApp() {
         <button onClick={() => navigate('/')} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer shrink-0 pl-4" title="Home">
           <GlobeLogo />
           <div className="hidden sm:flex flex-col justify-center mr-2 leading-none">
-            <span className="font-title text-[13px] font-bold tracking-[-0.02em] text-ink leading-none">
+            <span className="font-display font-black uppercase tracking-[0.04em] text-[14px] text-ink leading-none">
               Global Election Simulator
             </span>
             <span className="text-[7.5px] font-mono uppercase tracking-[0.13em] text-ink-3 leading-none mt-[3px]">
@@ -2166,6 +2523,50 @@ export default function CanadaApp() {
             </svg>
             Simulation
           </button>
+          {(activePreset === 'blank' || simOpen) && (
+            <div ref={partiesDropRef} className="relative shrink-0">
+              <button
+                onClick={() => setPartiesOpen(o => !o)}
+                className={`${btnBase} flex items-center gap-1 ${partiesOpen ? 'border-[#c8a020] bg-[#c8a020] text-white' : btnInactive}`}
+              >
+                Parties
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true" style={{ marginTop: 1 }}>
+                  <path d="M1.5 2.5L4 5.5L6.5 2.5" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {partiesOpen && (
+                <>
+                  <div className="fixed inset-0 z-[99]" onClick={() => setPartiesOpen(false)} />
+                  <div className="absolute left-0 top-[calc(100%+6px)] z-[100] w-44 rounded-[8px] bg-white border border-default overflow-hidden shadow-md">
+                    <div className="px-3 py-2 border-b border-default">
+                      <span className="text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3">Toggle Parties</span>
+                    </div>
+                    <div className="py-1">
+                      {CA_PARTIES.map(p => {
+                        const hidden = hiddenParties.has(p.id);
+                        return (
+                          <label key={p.id} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-hover cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!hidden}
+                              onChange={() => setHiddenParties(prev => {
+                                const n = new Set(prev);
+                                if (n.has(p.id)) n.delete(p.id); else n.add(p.id);
+                                return n;
+                              })}
+                              className="w-3 h-3 rounded"
+                              style={{ accentColor: p.color }}
+                            />
+                            <span className="text-[11px] font-mono text-ink" style={{ color: p.color, fontWeight: 600 }}>{p.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <button
             onClick={() => {
               if (multiSelectMode) { setMultiSelectMode(false); setSelectedRidingIds(new Set()); }
@@ -2184,32 +2585,20 @@ export default function CanadaApp() {
         </div>
 
         <div className="shrink-0 flex items-center gap-2.5 pr-4">
-          <a
-            href="https://x.com/realleochang"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-default text-ink-3 hover:border-ink-3 hover:text-ink transition-colors"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.259 5.66zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-            <span className="text-[8.5px] font-mono font-black uppercase tracking-[0.18em] leading-none">@realleochang</span>
-          </a>
-
           {/* Contributors dropdown */}
           <div className="relative">
             <button
               onClick={() => setContributorsOpen(o => !o)}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-[8.5px] font-mono font-black uppercase tracking-[0.18em] leading-none transition-colors ${
+              className={`w-7 h-7 flex items-center justify-center rounded-[4px] border transition-colors ${
                 contributorsOpen
                   ? 'border-ink-3 text-ink bg-hover'
                   : 'border-default text-ink-3 hover:border-ink-3 hover:text-ink'
               }`}
+              title="Contributors"
             >
               <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
                 <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm10-9a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm1.5 7.5c.5-.25.5-.75.5-1s-.5-3-3-3.5a2.5 2.5 0 0 1 2.5 4.5z" fillRule="evenodd" clipRule="evenodd"/>
               </svg>
-              <span className="hidden sm:inline">Contributors</span>
             </button>
             {contributorsOpen && (
               <>
@@ -2222,7 +2611,15 @@ export default function CanadaApp() {
                     <div className="text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-ink leading-none">Contributors</div>
                   </div>
                   <div className="px-3.5 py-2.5 space-y-2">
+                    {/* Creator */}
+                    <a href="https://x.com/realleochang" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
+                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="shrink-0 text-ink-3" aria-hidden="true">
+                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.259 5.66zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
+                      </svg>
+                      <span className="text-[11px] font-mono font-semibold text-ink">@realleochang</span>
+                    </a>
                     {[
+                      { handle: 'RealAlbanianPat' },
                       { handle: 'kylejhutton' },
                       { handle: 'potatoConono' },
                     ].map(c => (
@@ -2281,7 +2678,7 @@ export default function CanadaApp() {
             transition: 'grid-template-rows 280ms cubic-bezier(0.4,0,0.2,1)',
           }}>
             <div className="overflow-hidden">
-              <CanadaScoreboard tally={tally} votePcts={votePcts} rawVotes={rawVotes} activePreset={activePreset} />
+              <CanadaScoreboard tally={tally} votePcts={votePcts} rawVotes={rawVotes} activePreset={activePreset} hiddenParties={hiddenParties} />
             </div>
           </div>
           <button
@@ -2466,6 +2863,7 @@ export default function CanadaApp() {
               setSimRunning={setSimRunning}
               setSimProgress={setSimProgress}
               stopSim={stopSim}
+              hiddenParties={hiddenParties}
             />
           )}
         </div>

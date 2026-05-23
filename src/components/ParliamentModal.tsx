@@ -43,7 +43,7 @@ const W_TOP_Y = 45;
 // ── Political spectrum order (L → R) ───────────────────────────────────────
 const POLITICAL_ORDER: PartyId[] = [
   'WPB', 'SF', 'SNP', 'ALB', 'PC', 'GRN', 'SDLP', 'ALL', 'LAB', 'LD',
-  'SDP', 'IND', 'YRK', 'OTH', 'YOUR', 'SPK',
+  'SDP', 'IND', 'YRK', 'OTH', 'SPK',
   'UUP', 'CON', 'CPA', 'RCL', 'DUP', 'TUV', 'HER', 'UKIP', 'RES', 'FOR', 'RFM',
 ];
 

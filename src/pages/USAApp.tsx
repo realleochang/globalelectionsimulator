@@ -701,7 +701,7 @@ function CandidatePicker({ partyId, candidates, selectedIdx, onChange }: {
 }
 
 // ── Party cards scoreboard ────────────────────────────────────────────────────
-function UsaScoreboard({ tally, votePcts, rawVotes, activePreset, nominees: nomineesOverride, blankDemIdx, blankGopIdx, onChangeBlankCandidate }: {
+function UsaScoreboard({ tally, votePcts, rawVotes, activePreset, nominees: nomineesOverride, blankDemIdx, blankGopIdx, onChangeBlankCandidate, hiddenParties }: {
   tally:        Record<string, number>;
   votePcts:     Record<string, number>;
   rawVotes:     Record<string, number>;
@@ -710,6 +710,7 @@ function UsaScoreboard({ tally, votePcts, rawVotes, activePreset, nominees: nomi
   blankDemIdx?: number;
   blankGopIdx?: number;
   onChangeBlankCandidate?: (partyId: UsaPartyId, idx: number) => void;
+  hiddenParties?: Set<UsaPartyId>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -734,11 +735,15 @@ function UsaScoreboard({ tally, votePcts, rawVotes, activePreset, nominees: nomi
     });
   }, [tally, votePcts]);
 
+  const visibleParties = hiddenParties && hiddenParties.size > 0
+    ? sortedParties.filter(p => !hiddenParties.has(p.id as UsaPartyId))
+    : sortedParties;
+
   return (
     <div className="shrink-0 border-b border-default bg-canvas">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 items-stretch pt-2 pb-2 mx-auto w-fit">
-          {sortedParties.map(p => {
+          {visibleParties.map(p => {
             const evCount  = tally[p.id] ?? 0;
             const pct      = votePcts[p.id];
             const votes    = rawVotes[p.id];
@@ -1063,7 +1068,7 @@ function StatePanel({ fips, name, results, onClose, onResultsChange, onReporting
   const [editVal, setEditVal] = useState('');
 
   return (
-    <div className="w-[260px] shrink-0 border-l border-default bg-canvas flex flex-col overflow-y-auto z-10">
+    <div className="w-[260px] shrink-0 border-l border-default bg-surface flex flex-col overflow-y-auto z-10">
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-default">
         <span className="text-[10.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3">State</span>
         <button onClick={onClose} className="w-5 h-5 flex items-center justify-center rounded text-ink-3 hover:text-ink hover:bg-hover transition-colors">
@@ -1318,7 +1323,7 @@ function MapTooltip({ tooltip, containerW, containerH }: { tooltip: TooltipState
           {tooltip.name}
         </div>
         <div style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.40)', marginTop: 3 }}>
-          {ev} electoral vote{ev !== 1 ? 's' : ''}{tooltip.reportingPct !== undefined ? ` · ${tooltip.reportingPct}% reporting` : ''}
+          {ev} electoral vote{ev !== 1 ? 's' : ''}{tooltip.reportingPct !== undefined ? <> · <span style={{ color: '#c8a020', fontWeight: 700 }}>{tooltip.reportingPct}% reporting</span></> : ''}
         </div>
         {sorted.length > 0 && (
           <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
@@ -1372,7 +1377,7 @@ function UsaSwingPanel({
   const baseLabel = activePreset === '2026' ? '2026 Polling' : '2024 Baseline';
 
   return (
-    <div className="w-[230px] shrink-0 border-l border-default bg-canvas flex flex-col z-10">
+    <div className="w-[230px] shrink-0 border-l border-default bg-surface flex flex-col z-10">
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-default">
         <div>
           <div className="text-[10px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3">National Swing</div>
@@ -1458,7 +1463,7 @@ function UsaMultiSelectPanel({
   );
 
   return (
-    <div className="w-[260px] shrink-0 border-l border-default bg-canvas flex flex-col overflow-y-auto z-10">
+    <div className="w-[260px] shrink-0 border-l border-default bg-surface flex flex-col overflow-y-auto z-10">
       <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-default">
         <div>
           <div className="text-[10px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3">Multi-Select</div>
@@ -1947,6 +1952,8 @@ export default function USAApp() {
   const [simRunning, setSimRunning] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
   const simTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [hiddenParties, setHiddenParties] = useState<Set<UsaPartyId>>(new Set());
+  const [partiesOpen, setPartiesOpen] = useState(false);
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedFipsSet, setSelectedFipsSet] = useState<Set<string>>(new Set());
   const layerRef              = useRef<L.GeoJSON | null>(null);
@@ -2045,9 +2052,12 @@ export default function USAApp() {
       if (!stateVotes) continue;
       const shareTotal = Object.values(results).reduce((s, v) => s + v, 0);
       if (shareTotal === 0) continue;
-      grandTotal += stateVotes;
+      const reportingFraction = (activePreset === 'blank' || activePreset === 'sim')
+        ? (stateReporting[fips] ?? 100) / 100
+        : 1;
+      grandTotal += stateVotes * reportingFraction;
       for (const [pid, share] of Object.entries(results)) {
-        raw[pid] = (raw[pid] ?? 0) + (share / shareTotal) * stateVotes;
+        raw[pid] = (raw[pid] ?? 0) + (share / shareTotal) * stateVotes * reportingFraction;
       }
     }
     const pcts: Record<string, number> = {};
@@ -2055,7 +2065,7 @@ export default function USAApp() {
       for (const [pid, v] of Object.entries(raw)) pcts[pid] = (v / grandTotal) * 100;
     }
     return { votePcts: pcts, rawVotes: raw };
-  }, [currentResults]);
+  }, [currentResults, activePreset, stateReporting]);
 
   // ── Bubble data ────────────────────────────────────────────────────────────
   const bubbleData = useMemo(() => {
@@ -2269,7 +2279,7 @@ export default function USAApp() {
         <button onClick={() => navigate('/')} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer shrink-0 pl-4" title="Home">
           <GlobeLogo />
           <div className="hidden sm:flex flex-col justify-center mr-2 leading-none">
-            <span className="font-title text-[13px] font-bold tracking-[-0.02em] text-ink leading-none">Global Election Simulator</span>
+            <span className="font-display font-black uppercase tracking-[0.04em] text-[14px] text-ink leading-none">Global Election Simulator</span>
             <span className="text-[7.5px] font-mono uppercase tracking-[0.13em] text-ink-3 leading-none mt-[3px]">White House Edition</span>
           </div>
         </button>
@@ -2291,6 +2301,50 @@ export default function USAApp() {
             </svg>
             Simulation
           </button>
+          {(activePreset === 'blank' || simOpen) && (
+            <div className="relative shrink-0">
+              <button
+                onClick={() => setPartiesOpen(o => !o)}
+                className={`${btnBase} flex items-center gap-1 ${partiesOpen ? 'border-[#c8a020] bg-[#c8a020] text-white' : btnMuted}`}
+              >
+                Parties
+                <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true" style={{ marginTop: 1 }}>
+                  <path d="M1.5 2.5L4 5.5L6.5 2.5" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {partiesOpen && (
+                <>
+                  <div className="fixed inset-0 z-[99]" onClick={() => setPartiesOpen(false)} />
+                  <div className="absolute left-0 top-[calc(100%+6px)] z-[100] w-44 rounded-[8px] bg-white border border-default overflow-hidden shadow-md">
+                    <div className="px-3 py-2 border-b border-default">
+                      <span className="text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3">Toggle Parties</span>
+                    </div>
+                    <div className="py-1">
+                      {USA_PARTIES.map(p => {
+                        const hidden = hiddenParties.has(p.id as UsaPartyId);
+                        return (
+                          <label key={p.id} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-hover cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={!hidden}
+                              onChange={() => setHiddenParties(prev => {
+                                const n = new Set(prev);
+                                if (n.has(p.id as UsaPartyId)) n.delete(p.id as UsaPartyId); else n.add(p.id as UsaPartyId);
+                                return n;
+                              })}
+                              className="w-3 h-3 rounded"
+                              style={{ accentColor: p.color }}
+                            />
+                            <span className="text-[11px] font-mono" style={{ color: p.color, fontWeight: 600 }}>{p.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
           <button
             onClick={() => {
               if (multiSelectMode) { setMultiSelectMode(false); setSelectedFipsSet(new Set()); }
@@ -2315,17 +2369,6 @@ export default function USAApp() {
         </div>
 
         <div className="shrink-0 flex items-center gap-2.5 pr-4">
-          <a
-            href="https://x.com/realleochang"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-default text-ink-3 hover:border-ink-3 hover:text-ink transition-colors"
-          >
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.259 5.66zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-            </svg>
-            <span className="text-[8.5px] font-mono font-black uppercase tracking-[0.18em] leading-none">@realleochang</span>
-          </a>
           <button
             onClick={() => setDark(d => !d)}
             className="w-7 h-7 flex items-center justify-center rounded-[4px] border border-default text-ink-3 hover:bg-hover hover:text-ink transition-colors"
@@ -2368,6 +2411,7 @@ export default function USAApp() {
                 nominees={activePreset === 'blank' ? blankNominees : undefined}
                 blankDemIdx={blankDemIdx} blankGopIdx={blankGopIdx}
                 onChangeBlankCandidate={(pid, idx) => { if (pid === 'DEM') setBlankDemIdx(idx); else setBlankGopIdx(idx); }}
+                hiddenParties={hiddenParties}
               />
             </div>
           </div>
