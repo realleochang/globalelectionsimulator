@@ -72,7 +72,7 @@ export default function HomePage() {
         <div className="flex items-center gap-2.5">
           <GlobeLogo />
           <div className="flex flex-col justify-center leading-none">
-            <span className="font-title text-[13px] font-bold uppercase tracking-widest text-ink leading-none">
+            <span className="font-title text-[13px] font-bold tracking-[-0.02em] text-ink leading-none">
               Global Election Simulator
             </span>
           </div>
@@ -122,7 +122,7 @@ export default function HomePage() {
         {/* Hero */}
         <div className="flex flex-col items-center mb-10">
           <GlobeLogo size={68} />
-          <h1 className="mt-6 font-title text-[clamp(24px,4.5vw,44px)] font-bold uppercase tracking-widest text-ink text-center leading-tight">
+          <h1 className="mt-6 font-title text-[clamp(26px,4.5vw,48px)] font-bold tracking-[-0.03em] text-ink text-center leading-tight">
             Global Election Simulator
           </h1>
           <p className="mt-4 text-[11px] font-mono uppercase tracking-[0.20em] text-ink-3 text-center">

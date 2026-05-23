@@ -8,6 +8,8 @@ import FranceApp from './pages/FranceApp.tsx'
 import CanadaApp from './pages/CanadaApp.tsx'
 import USAApp from './pages/USAApp.tsx'
 
+document.getElementById('splash')?.remove()
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <HashRouter>

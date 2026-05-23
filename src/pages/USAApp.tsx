@@ -2269,7 +2269,7 @@ export default function USAApp() {
         <button onClick={() => navigate('/')} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer shrink-0 pl-4" title="Home">
           <GlobeLogo />
           <div className="hidden sm:flex flex-col justify-center mr-2 leading-none">
-            <span className="font-title text-[13px] font-bold uppercase tracking-widest text-ink leading-none">Global Election Simulator</span>
+            <span className="font-title text-[13px] font-bold tracking-[-0.02em] text-ink leading-none">Global Election Simulator</span>
             <span className="text-[7.5px] font-mono uppercase tracking-[0.13em] text-ink-3 leading-none mt-[3px]">White House Edition</span>
           </div>
         </button>

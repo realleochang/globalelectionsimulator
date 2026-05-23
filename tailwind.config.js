@@ -8,7 +8,7 @@ export default {
         sans:    ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
         mono:    ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
         display: ['"Barlow Condensed"', 'sans-serif'],
-        title:   ['"Cinzel"', 'serif'],
+        title:   ['"Space Grotesk"', 'sans-serif'],
       },
       colors: {
         'canvas':     '#f5f4f0',
