@@ -246,6 +246,7 @@ export default function HomePage() {
           <FranceCard />
           <CanadaCard />
           <USACard />
+          <AustraliaCard />
 
           <GermanyCard />
 
@@ -349,7 +350,6 @@ export default function HomePage() {
             parties={[{ color: '#009933', abbr: 'LDP' }, { color: '#0066CC', abbr: 'CDP' }, { color: '#FF8200', abbr: 'KOM' }, { color: '#1E90FF', abbr: 'DPF' }, { color: '#28B463', abbr: 'ISH' }]}
           />
 
-          <AustraliaCard />
           <ComingSoonCard country="New Zealand" election="General Election" institution="Parliament"
             flagSrc={`${import.meta.env.BASE_URL}new-zealand-flag.png`}
             bgGradient="linear-gradient(to right, #00247D, #CC142B)"
@@ -511,7 +511,7 @@ function GermanyCard() {
 
 function AustraliaCard() {
   return (
-    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default opacity-50">
+    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default">
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: '2/1' }}>
         <img src={`${import.meta.env.BASE_URL}australia-flag.png`} alt="Australia flag" className="absolute inset-0 w-full h-full object-cover block" />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.22))' }} />
@@ -530,12 +530,12 @@ function AustraliaCard() {
       </div>
       <div className="px-4 pb-4 flex items-center gap-2">
         <div className="flex-1 h-px bg-black/8" />
-        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 opacity-50">
-          <svg width="9" height="10" viewBox="0 0 9 10" fill="none" aria-hidden="true">
-            <rect x="1" y="4.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-            <path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
-          </svg>
-          Coming Soon
+        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-red-500">
+          <span className="relative flex h-2 w-2 shrink-0">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
+          </span>
+          Release Imminent
         </div>
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-[2.5px]" style={{ background: 'linear-gradient(90deg, #003893 0%, #FFFFFF 50%, #003893 100%)' }} />
