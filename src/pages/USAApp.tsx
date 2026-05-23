@@ -427,41 +427,54 @@ function stateFill(results: Record<string, number>, dark: boolean): string {
 
 // ── Globe logo ────────────────────────────────────────────────────────────────
 function GlobeLogo({ size = 34 }: { size?: number }) {
+  const lats: [number, number, number, string][] = [
+    [7.6,  11.2, 2.8, '#12B6CF'],
+    [13.2, 13.7, 3.4, '#02A95B'],
+    [16.0, 14.0, 3.6, '#E4003B'],
+    [18.8, 13.7, 3.4, '#FAA61A'],
+    [24.4, 11.2, 2.8, '#0087DC'],
+  ];
   return (
     <svg width={size} height={size} viewBox="0 0 32 32" className="shrink-0" aria-hidden="true">
       <defs>
         <clipPath id="usa-logo-clip"><circle cx="16" cy="16" r="14" /></clipPath>
-        <radialGradient id="usa-logo-shine" cx="38%" cy="32%" r="62%">
-          <stop offset="0%" stopColor="white" stopOpacity="0.38" />
-          <stop offset="100%" stopColor="black" stopOpacity="0.22" />
+        <radialGradient id="usa-logo-shine" cx="32%" cy="24%" r="52%">
+          <stop offset="0%"   stopColor="white" stopOpacity="0.80" />
+          <stop offset="45%"  stopColor="white" stopOpacity="0.12" />
+          <stop offset="100%" stopColor="white" stopOpacity="0"    />
+        </radialGradient>
+        <radialGradient id="usa-logo-depth" cx="70%" cy="72%" r="55%">
+          <stop offset="0%"   stopColor="rgba(20,60,120,0.18)" />
+          <stop offset="100%" stopColor="rgba(20,60,120,0)"    />
         </radialGradient>
       </defs>
-      <g clipPath="url(#usa-logo-clip)">
-        <circle cx="16" cy="16" r="14" fill="#0087DC" />
-        <path d="M4.8 24.4 A11.2 2.8 0 0 1 27.2 24.4 A14 14 0 1 0 4.8 24.4Z" fill="#FAA61A" />
-        <path d="M2.3 18.8 A13.7 3.4 0 0 1 29.7 18.8 A14 14 0 1 0 2.3 18.8Z" fill="#E4003B" />
-        <path d="M2.3 13.2 A13.7 3.4 0 0 1 29.7 13.2 A14 14 0 0 0 2.3 13.2Z" fill="#02A95B" />
-        <path d="M4.8 7.6 A11.2 2.8 0 0 1 27.2 7.6 A14 14 0 0 0 4.8 7.6Z" fill="#12B6CF" />
+      <circle cx="16" cy="16" r="14" fill="rgba(180,215,255,0.09)" clipPath="url(#usa-logo-clip)" />
+      <g clipPath="url(#usa-logo-clip)" fill="none" strokeLinecap="round">
+        {lats.map(([y, rx, ry, color]) => (
+          <path key={`bk-${y}`} d={`M${16-rx} ${y} A${rx} ${ry} 0 0 0 ${16+rx} ${y}`}
+            stroke={color} strokeWidth="1.05" strokeOpacity="0.42" strokeDasharray="2 2" />
+        ))}
       </g>
-      <g clipPath="url(#usa-logo-clip)" stroke="white" strokeWidth="0.7" strokeOpacity="0.55" fill="none">
-        <path d="M4.8 7.6  A11.2 2.8 0 0 1 27.2 7.6" />
-        <path d="M2.3 13.2 A13.7 3.4 0 0 1 29.7 13.2" />
-        <path d="M2.3 18.8 A13.7 3.4 0 0 1 29.7 18.8" />
-        <path d="M4.8 24.4 A11.2 2.8 0 0 1 27.2 24.4" />
-      </g>
-      <g clipPath="url(#usa-logo-clip)" stroke="white" strokeWidth="0.6" strokeOpacity="0.22" strokeDasharray="1.5 1.5" fill="none">
-        <path d="M4.8 7.6  A11.2 2.8 0 0 0 27.2 7.6" />
-        <path d="M2.3 13.2 A13.7 3.4 0 0 0 29.7 13.2" />
-        <path d="M2.3 18.8 A13.7 3.4 0 0 0 29.7 18.8" />
-        <path d="M4.8 24.4 A11.2 2.8 0 0 0 27.2 24.4" />
-      </g>
-      <g clipPath="url(#usa-logo-clip)" stroke="white" strokeWidth="0.65" strokeOpacity="0.30" fill="none">
-        <line x1="16" y1="2" x2="16" y2="30" />
+      <g clipPath="url(#usa-logo-clip)" fill="none" strokeLinecap="round"
+         stroke="rgba(80,140,210,0.22)" strokeWidth="0.6" strokeDasharray="2 2">
         <ellipse cx="16" cy="16" rx="8" ry="14" />
         <ellipse cx="16" cy="16" rx="4" ry="14" />
       </g>
+      <g clipPath="url(#usa-logo-clip)" fill="none" strokeLinecap="round">
+        {lats.map(([y, rx, ry, color]) => (
+          <path key={`ft-${y}`} d={`M${16-rx} ${y} A${rx} ${ry} 0 0 1 ${16+rx} ${y}`}
+            stroke={color} strokeWidth="1.30" strokeOpacity="0.90" />
+        ))}
+      </g>
+      <g clipPath="url(#usa-logo-clip)" fill="none" stroke="rgba(80,140,210,0.32)" strokeLinecap="round">
+        <line x1="16" y1="2" x2="16" y2="30" strokeWidth="0.70" />
+        <ellipse cx="16" cy="16" rx="8" ry="14" strokeWidth="0.65" />
+        <ellipse cx="16" cy="16" rx="4" ry="14" strokeWidth="0.55" />
+      </g>
+      <circle cx="16" cy="16" r="14" fill="url(#usa-logo-depth)" />
       <circle cx="16" cy="16" r="14" fill="url(#usa-logo-shine)" />
-      <circle cx="16" cy="16" r="14" fill="none" stroke="rgba(0,0,0,0.28)" strokeWidth="1" />
+      <circle cx="16" cy="16" r="14" fill="none" stroke="rgba(140,195,255,0.55)" strokeWidth="1.1" />
+      <circle cx="16" cy="16" r="13.4" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="0.5" />
     </svg>
   );
 }
