@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { useElectionStore } from '../store/useElectionStore';
+import { useElectionStore, DATA_2026 } from '../store/useElectionStore';
 import { PARTIES } from '../data/parties';
 import type { PartyId } from '../data/parties';
 
@@ -26,8 +26,8 @@ const NI_PARTIES: PartyId[] = ['DUP', 'SF', 'SDLP', 'UUP', 'ALL', 'TUV'];
 
 const parseNum = (s: string) => { const n = parseFloat(s); return isNaN(n) ? 0 : Math.max(0, n); };
 
-// ── Compute 2024 national baselines ──────────────────────────────────────────
-type Constituency = { country: string; validVotes: number; results2024: Partial<Record<PartyId, number>> };
+// ── Compute 2026 polling baselines ────────────────────────────────────────────
+type Constituency = { id: string; country: string; validVotes: number; results2024: Partial<Record<PartyId, number>> };
 
 function computeBaselines(constituencies: Constituency[]) {
   const gbTotals: Partial<Record<PartyId, number>> = {};
@@ -37,7 +37,10 @@ function computeBaselines(constituencies: Constituency[]) {
 
   for (const c of constituencies) {
     if (c.country === 'NI') continue;
-    const entries = Object.entries(c.results2024) as [PartyId, number][];
+    const d = DATA_2026[c.id];
+    const entries: [PartyId, number][] = d
+      ? Object.entries(d).map(([p, frac]) => [p as PartyId, frac * c.validVotes])
+      : (Object.entries(c.results2024) as [PartyId, number][]);
     gbVotesTotal += c.validVotes;
     for (const [p, v] of entries) if (v > 0) gbTotals[p] = (gbTotals[p] ?? 0) + v;
     if (c.country === 'Scotland') {
@@ -69,11 +72,19 @@ function generateResultUNS(
   baselines: ReturnType<typeof computeBaselines>,
 ): Partial<Record<PartyId, number>> {
   const { gbBaselines, scotBaselines, walesBaselines } = baselines;
-  const result: Partial<Record<PartyId, number>> = { ...c.results2024 };
 
+  // NI uses 2024 results unchanged
   if (c.country === 'NI') {
-    return result;
-  } else {
+    return { ...c.results2024 };
+  }
+
+  // Start from 2026 polling data; fall back to 2024 for any missing constituency
+  const d = DATA_2026[c.id];
+  const result: Partial<Record<PartyId, number>> = d
+    ? Object.fromEntries(Object.entries(d).map(([p, frac]) => [p, Math.round(frac * c.validVotes)]))
+    : { ...c.results2024 };
+
+  {
     // Apply GB_MAIN swings (baseline = fraction of all GB/non-NI votes)
     for (const p of GB_MAIN) {
       const swing = (gbShares[p] ?? 0) - (gbBaselines[p] ?? 0);
@@ -313,7 +324,7 @@ export function SimulationPanel({ onClose }: Props) {
           )}
           <div className="flex justify-between pt-0.5 text-ink-3">
             <span>Northern Ireland</span>
-            <span className="font-semibold">2024 results</span>
+            <span className="font-semibold">2024 baseline</span>
           </div>
         </div>
 
