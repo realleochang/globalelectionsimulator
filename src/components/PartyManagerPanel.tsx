@@ -9,7 +9,7 @@ const ORIGINAL_ORDER: PartyId[] = [
   'IND','SPK','OTH',
 ];
 const EXTENDED_ORDER: PartyId[] = [
-  'WPB','ALB','SDP','RCL','UKIP','HER','FOR','YRK','CPA','RUK','YOUR',
+  'WPB','ALB','SDP','RCL','UKIP','HER','FOR','YRK','CPA','RES','YOUR',
 ];
 
 function PartyRow({ partyId, inElection }: { partyId: PartyId; inElection: boolean }) {

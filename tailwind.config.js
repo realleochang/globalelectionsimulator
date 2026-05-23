@@ -5,9 +5,10 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans:    ['"DM Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        mono:    ['"DM Mono"', 'ui-monospace', 'monospace'],
-        display: ['"Big Shoulders Display"', '"Bebas Neue"', 'sans-serif'],
+        sans:    ['"Plus Jakarta Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono:    ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
+        display: ['"Barlow Condensed"', 'sans-serif'],
+        title:   ['"Cinzel"', 'serif'],
       },
       colors: {
         'canvas':     '#f5f4f0',

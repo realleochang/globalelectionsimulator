@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { PartyId } from '../data/parties';
-import { EXTENDED_PARTY_IDS } from '../data/parties';
+import { EXTENDED_PARTY_IDS, partyAllowedIn } from '../data/parties';
 import type { Constituency } from '../types';
 import { constituencyFill, BLANK_COLOR } from '../lib/coloring';
 import { redistributeVotes } from '../lib/slider-math';
@@ -25,6 +25,15 @@ type ElectionStore = {
   multiSelectMode: boolean;
   selectedIds: Set<string>;
 
+  // Simulation runtime state
+  simulationRunning:    boolean;
+  simulationProgress:   number;
+  simulationTimerIds:   ReturnType<typeof setTimeout>[];
+  setSimulationRunning:    (v: boolean) => void;
+  setSimulationProgress:   (n: number) => void;
+  registerSimulationTimers:(ids: ReturnType<typeof setTimeout>[]) => void;
+  stopSimulation:          () => void;
+
   // Panel open/closed states
   nationalSwingOpen: boolean;
   breakdownOpen: boolean;
@@ -42,6 +51,7 @@ type ElectionStore = {
   load2026Polling: () => void;
   resetAll: () => void;
   setConstituencyResults: (id: string, results: Partial<Record<PartyId, number>>) => void;
+  batchSetResults: (results: Record<string, Partial<Record<PartyId, number>>>) => void;
   resetConstituency: (id: string) => void;
   declareConstituency: (id: string) => void;
   selectConstituency: (id: string | null) => void;
@@ -76,6 +86,9 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
   currentResults: {},
   isBlankMap: false,
   declaredIds: new Set(),
+  simulationRunning:  false,
+  simulationProgress: 0,
+  simulationTimerIds: [],
   selectedId: null,
   multiSelectMode: false,
   selectedIds: new Set(),
@@ -96,9 +109,9 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
     const currentResults: Record<string, Partial<Record<PartyId, number>>> = {};
     for (const c of constituencies) {
       currentResults[c.id] = { ...c.results2024 };
-      // Seed active extended parties with 0 votes
+      // Seed active extended parties with 0 votes (region-restricted)
       for (const extId of EXTENDED_PARTY_IDS) {
-        if (!hiddenParties.has(extId)) {
+        if (!hiddenParties.has(extId) && partyAllowedIn(extId, c.country)) {
           currentResults[c.id][extId] = currentResults[c.id][extId] ?? 0;
         }
       }
@@ -109,9 +122,9 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
   load2026Polling() {
     const { constituencies, hiddenParties } = get();
 
-    // May 2026 polling targets (% of GB-wide national vote)
+    // 2026 polling targets (% of GB-wide national vote)
     const POLLING_2026: Partial<Record<PartyId, number>> = {
-      RFM: 29, CON: 17, LAB: 17, GRN: 16, LD: 12, RUK: 3, SNP: 3,
+      RFM: 26, CON: 18, GRN: 17, LAB: 16, LD: 13, SNP: 4, RES: 3, PC: 2,
     };
 
     // Calculate 2024 national totals from non-NI constituencies only
@@ -134,9 +147,9 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
       swings[p] = target - actual;
     }
 
-    // Auto-activate RUK so it has a presence on the map
+    // Auto-activate RES so it has a presence on the map
     const nextHidden = new Set(hiddenParties);
-    nextHidden.delete('RUK');
+    nextHidden.delete('RES');
 
     const currentResults: Record<string, Partial<Record<PartyId, number>>> = {};
     for (const c of constituencies) {
@@ -144,7 +157,8 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
 
       if (c.country !== 'NI') {
         for (const [p, swing] of Object.entries(swings) as [PartyId, number][]) {
-          if (p === 'SNP' && c.country !== 'Scotland') continue; // SNP only stands in Scotland
+          if (p === 'SNP' && c.country !== 'Scotland') continue;
+          if (p === 'PC'  && c.country !== 'Wales')    continue;
           const current = newR[p] ?? 0;
           newR[p] = Math.max(0, current + (swing / 100) * c.validVotes);
         }
@@ -156,7 +170,6 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
           for (const p of Object.keys(newR) as PartyId[]) {
             newR[p] = Math.round((newR[p] ?? 0) * scale);
           }
-          // Fix rounding remainder on top party
           const rounded = (Object.values(newR) as number[]).reduce((s, v) => s + v, 0);
           const diff = c.validVotes - rounded;
           if (diff !== 0) {
@@ -167,15 +180,17 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
         }
       }
 
-      // Seed active extended parties (including newly-active RUK)
+      // Seed active extended parties (region-restricted)
       for (const extId of EXTENDED_PARTY_IDS) {
-        if (!nextHidden.has(extId)) newR[extId] = newR[extId] ?? 0;
+        if (!nextHidden.has(extId) && partyAllowedIn(extId, c.country)) {
+          newR[extId] = newR[extId] ?? 0;
+        }
       }
 
       currentResults[c.id] = newR;
     }
 
-    // ── Regional Green adjustments ──────────────────────────────────────
+    // ── Regional Green adjustments (urban inflate / rural deflate, net ≈ 0) ──
     const highMuslimNames = new Set([
       'Bradford East', 'Bradford West', 'Bradford South',
       'Batley and Spen', 'Dewsbury and Batley',
@@ -191,6 +206,42 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
       'Stratford and Bow',
     ]);
 
+    // Keywords that identify major urban English seats outside London
+    const URBAN_ENG_KW = [
+      'Manchester', 'Salford', 'Stretford', 'Wythenshawe', 'Gorton',
+      'Birmingham', 'Wolverhampton', 'Sandwell', 'Walsall', 'Dudley',
+      'Sheffield', 'Rotherham', 'Barnsley',
+      'Leeds', 'Wakefield',
+      'Newcastle', 'Gateshead', 'Sunderland', 'South Shields',
+      'Liverpool', 'Bootle', 'Birkenhead', 'Wallasey', 'Knowsley',
+      'Bristol', 'Brighton', 'Hove',
+      'Nottingham', 'Coventry', 'Stoke', 'Derby', 'Hull',
+      'Oxford', 'Cambridge', 'Exeter', 'Bath', 'York', 'Norwich',
+      'Canterbury', 'Southampton', 'Portsmouth', 'Reading',
+      'Middlesbrough', 'Stockton', 'Peterborough', 'Ipswich',
+      'Warrington', 'Stockport', 'Bolton', 'Preston',
+    ];
+    const isUrbanEng = (name: string) => URBAN_ENG_KW.some(kw => name.includes(kw));
+
+    const URBAN_SCO_KW = ['Edinburgh', 'Glasgow', 'Aberdeen', 'Dundee', 'Stirling'];
+    const isUrbanSco = (name: string) => URBAN_SCO_KW.some(kw => name.includes(kw));
+
+    const URBAN_WAL_KW = ['Cardiff', 'Swansea', 'Newport', 'Wrexham'];
+    const isUrbanWal = (name: string) => URBAN_WAL_KW.some(kw => name.includes(kw));
+
+    const normalise = (r: Partial<Record<PartyId, number>>, validVotes: number) => {
+      const total = (Object.values(r) as number[]).reduce((s, v) => s + v, 0);
+      if (total <= 0) return;
+      const scale = validVotes / total;
+      for (const p of Object.keys(r) as PartyId[]) r[p] = Math.round((r[p] ?? 0) * scale);
+      const rounded = (Object.values(r) as number[]).reduce((s, v) => s + v, 0);
+      const diff = validVotes - rounded;
+      if (diff !== 0) {
+        const top = (Object.entries(r) as [PartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a)[0]?.[0];
+        if (top) r[top] = (r[top] ?? 0) + diff;
+      }
+    };
+
     for (const c of constituencies) {
       if (c.country === 'NI') continue;
       const r = currentResults[c.id];
@@ -198,42 +249,44 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
       const isHighMuslim = highMuslimNames.has(c.name);
       let extraGrnPct = 0;
 
-      if (isLondon)     extraGrnPct += 3;
-      if (isHighMuslim) extraGrnPct += 4;
-
-      // Deflate Green slightly outside London and high-Muslim areas
-      if (!isLondon && !isHighMuslim && c.country === 'England') extraGrnPct -= 1;
-      else if (!isLondon && !isHighMuslim && c.country === 'Wales') extraGrnPct -= 0.5;
+      if (c.country === 'England') {
+        if (isLondon)          extraGrnPct = 4;
+        else if (isHighMuslim) extraGrnPct = 3;
+        else if (isUrbanEng(c.name)) extraGrnPct = 3;
+        else                   extraGrnPct = -2.5; // rural / suburban England
+      } else if (c.country === 'Scotland') {
+        extraGrnPct = isUrbanSco(c.name) ? 2 : -1;
+      } else if (c.country === 'Wales') {
+        extraGrnPct = (isHighMuslim || isUrbanWal(c.name)) ? 2 : -1.5;
+      }
 
       if (extraGrnPct !== 0) {
         r['GRN'] = Math.max(0, (r['GRN'] ?? 0) + (extraGrnPct / 100) * c.validVotes);
-        const total = (Object.values(r) as number[]).reduce((s, v) => s + v, 0);
-        if (total > 0) {
-          const scale = c.validVotes / total;
-          for (const p of Object.keys(r) as PartyId[]) r[p] = Math.round((r[p] ?? 0) * scale);
-          const rounded = (Object.values(r) as number[]).reduce((s, v) => s + v, 0);
-          const diff = c.validVotes - rounded;
-          if (diff !== 0) {
-            const top = (Object.entries(r) as [PartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a)[0]?.[0];
-            if (top) r[top] = (r[top] ?? 0) + diff;
-          }
-        }
+        normalise(r, c.validVotes);
       }
     }
 
-    // ── Great Yarmouth special case: RUK 35%, RFM 30% ──────────────────
+    // ── Wales: Plaid Cymru +50% of their post-UNS vote ───────────────
+    for (const c of constituencies) {
+      if (c.country !== 'Wales') continue;
+      const r = currentResults[c.id];
+      r['PC'] = Math.round((r['PC'] ?? 0) * 1.875);
+      normalise(r, c.validVotes);
+    }
+
+    // ── Great Yarmouth: Restore Britain wins ───────────────────────────
     const gy = constituencies.find(c => c.name === 'Great Yarmouth');
     if (gy) {
       const r = currentResults[gy.id];
-      const ruk35 = Math.round(0.35 * gy.validVotes);
-      const rfm30 = Math.round(0.30 * gy.validVotes);
-      const remaining = gy.validVotes - ruk35 - rfm30;
-      const others = (Object.entries(r) as [PartyId, number][]).filter(([p, v]) => p !== 'RUK' && p !== 'RFM' && v > 0);
+      const ruk38 = Math.round(0.38 * gy.validVotes);
+      const rfm24 = Math.round(0.24 * gy.validVotes);
+      const remaining = gy.validVotes - ruk38 - rfm24;
+      const others = (Object.entries(r) as [PartyId, number][]).filter(([p, v]) => p !== 'RES' && p !== 'RFM' && v > 0);
       const othersTotal = others.reduce((s, [, v]) => s + v, 0);
       const newGY: Partial<Record<PartyId, number>> = {};
       for (const p of Object.keys(r) as PartyId[]) newGY[p] = 0;
-      newGY['RUK'] = ruk35;
-      newGY['RFM'] = rfm30;
+      newGY['RES'] = ruk38;
+      newGY['RFM'] = rfm24;
       if (othersTotal > 0 && others.length > 0) {
         let dist = 0;
         for (let i = 0; i < others.length - 1; i++) {
@@ -264,7 +317,7 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
       const zeroed: Partial<Record<PartyId, number>> = {};
       for (const party of Object.keys(c.results2024) as PartyId[]) zeroed[party] = 0;
       for (const extId of EXTENDED_PARTY_IDS) {
-        if (!hiddenParties.has(extId)) zeroed[extId] = 0;
+        if (!hiddenParties.has(extId) && partyAllowedIn(extId, c.country)) zeroed[extId] = 0;
       }
       currentResults[c.id] = zeroed;
     }
@@ -284,13 +337,27 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
     set(state => ({ currentResults: { ...state.currentResults, [id]: results } }));
   },
 
+  batchSetResults(results) {
+    set(state => ({ currentResults: { ...state.currentResults, ...results } }));
+  },
+
+  setSimulationRunning(v)  { set({ simulationRunning: v }); },
+  setSimulationProgress(n) { set({ simulationProgress: n }); },
+  registerSimulationTimers(ids) { set({ simulationTimerIds: ids }); },
+  stopSimulation() {
+    get().simulationTimerIds.forEach(clearTimeout);
+    set({ simulationRunning: false, simulationProgress: 0, simulationTimerIds: [] });
+  },
+
   resetConstituency(id) {
     const c = get().byId.get(id);
     if (!c) return;
     const { hiddenParties } = get();
     const reset: Partial<Record<PartyId, number>> = { ...c.results2024 };
     for (const extId of EXTENDED_PARTY_IDS) {
-      if (!hiddenParties.has(extId)) reset[extId] = reset[extId] ?? 0;
+      if (!hiddenParties.has(extId) && partyAllowedIn(extId, c.country)) {
+        reset[extId] = reset[extId] ?? 0;
+      }
     }
     set(state => ({ currentResults: { ...state.currentResults, [id]: reset } }));
   },
@@ -353,10 +420,12 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
 
       let updatedResults = currentResults;
       if (baselineLoaded && EXTENDED_PARTY_IDS.has(id)) {
-        // Seed new party with 0 votes in every constituency
+        // Seed new party with 0 votes in allowed constituencies only
         const patched: typeof currentResults = {};
         for (const c of constituencies) {
-          patched[c.id] = { ...(updatedResults[c.id] ?? {}), [id]: 0 };
+          patched[c.id] = partyAllowedIn(id, c.country)
+            ? { ...(updatedResults[c.id] ?? {}), [id]: 0 }
+            : { ...(updatedResults[c.id] ?? {}) };
         }
         updatedResults = { ...updatedResults, ...patched };
       }
@@ -380,6 +449,7 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
     for (const id of targets) {
       const c = byId.get(id);
       if (!c) continue;
+      if (!partyAllowedIn(party, c.country)) continue;
       const current = updated[id] ?? c.results2024;
       const currentVotes = current[party] ?? 0;
       const newVotes = Math.max(0, Math.min(
@@ -423,8 +493,9 @@ export const useElectionStore = create<ElectionStore>((set, get) => ({
   },
 
   getFill(gssCode) {
-    const { baselineLoaded, currentResults, byId } = get();
+    const { baselineLoaded, currentResults, byId, isBlankMap, declaredIds } = get();
     if (!baselineLoaded) return BLANK_COLOR;
+    if (isBlankMap && !declaredIds.has(gssCode)) return BLANK_COLOR;
     const c = byId.get(gssCode);
     if (!c) return BLANK_COLOR;
     return constituencyFill(c.validVotes, currentResults[gssCode] ?? c.results2024);

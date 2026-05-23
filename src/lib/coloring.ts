@@ -8,6 +8,18 @@ export const LIGHTNESS_PALE = 82;
 export const LIGHTNESS_DEEP = 38;
 
 export const BLANK_COLOR = '#E5E7EB';
+export const BLANK_COLOR_DARK = '#374151';
+
+// Converts a light-mode fill to its dark-mode equivalent by re-mapping lightness.
+// Reverse-engineers t from the light range (82→38), then applies the dark range (55→28).
+export function darkModeFill(lightFill: string): string {
+  if (lightFill === BLANK_COLOR) return BLANK_COLOR_DARK;
+  const c = hsl(lightFill);
+  if (!isFinite(c.l)) return lightFill;
+  const t = Math.min(1, Math.max(0, (0.82 - c.l) / (0.82 - 0.38)));
+  c.l = (55 - t * 27) / 100;
+  return c.formatHex() as string;
+}
 
 function adjustLightness(hexColor: string, lightnessPercent: number): string {
   const c = hsl(hexColor);

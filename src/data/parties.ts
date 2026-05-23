@@ -5,7 +5,7 @@ export type PartyId =
   | 'IND' | 'SPK' | 'OTH'
   // Extended / minor parties
   | 'WPB' | 'ALB' | 'SDP' | 'HER' | 'RCL' | 'YRK' | 'CPA'
-  | 'UKIP' | 'FOR' | 'RUK' | 'YOUR';
+  | 'UKIP' | 'FOR' | 'RES' | 'YOUR';
 
 export type Party = {
   id: PartyId;
@@ -19,7 +19,7 @@ export type Party = {
 export const PARTIES: Record<PartyId, Party> = {
   // ── Original 2024 parties ──────────────────────────────────────────
   // Only Labour retains alternative leaders; all others have one leader.
-  LAB:  { id: 'LAB',  name: 'Labour',                        color: '#E4003B', defaultLeader: 'Keir Starmer',     alternativeLeaders: ['Andy Burnham', 'Angela Rayner', 'Wes Streeting', 'Lisa Nandy', 'Yvette Cooper'] },
+  LAB:  { id: 'LAB',  name: 'Labour',                        color: '#E4003B', defaultLeader: 'Keir Starmer',     alternativeLeaders: ['Andy Burnham', 'Angela Rayner'] },
   CON:  { id: 'CON',  name: 'Conservative',                  color: '#0087DC', defaultLeader: 'Kemi Badenoch',    alternativeLeaders: [] },
   LD:   { id: 'LD',   name: 'Liberal Democrats',             color: '#FAA61A', defaultLeader: 'Ed Davey',         alternativeLeaders: [] },
   RFM:  { id: 'RFM',  name: 'Reform UK',                     color: '#12B6CF', defaultLeader: 'Nigel Farage',     alternativeLeaders: [] },
@@ -46,7 +46,7 @@ export const PARTIES: Record<PartyId, Party> = {
   CPA:  { id: 'CPA',  name: 'Christian Peoples Alliance',    color: '#3B1F5E', defaultLeader: 'Sid Cordle',         alternativeLeaders: [], isExtended: true },
   UKIP: { id: 'UKIP', name: 'UKIP',                          color: '#702FA0', defaultLeader: 'Neil Hamilton',      alternativeLeaders: [], isExtended: true },
   FOR:  { id: 'FOR',  name: 'For Britain',                   color: '#003087', defaultLeader: 'Anne Marie Waters',  alternativeLeaders: [], isExtended: true },
-  RUK:  { id: 'RUK',  name: 'Restore UK',                    color: '#002366', defaultLeader: 'Rupert Lowe',        alternativeLeaders: [], isExtended: true },
+  RES:  { id: 'RES',  name: 'Restore Britain',               color: '#002366', defaultLeader: 'Rupert Lowe',        alternativeLeaders: [], isExtended: true },
   YOUR: { id: 'YOUR', name: 'Your Party',                    color: '#E8830A', defaultLeader: 'Your Leader',        alternativeLeaders: [], isExtended: true },
 };
 
@@ -57,10 +57,35 @@ export const ORIGINAL_PARTY_IDS = new Set<PartyId>([
 ]);
 
 export const EXTENDED_PARTY_IDS = new Set<PartyId>([
-  'WPB','ALB','SDP','HER','RCL','YRK','CPA','UKIP','FOR','RUK','YOUR',
+  'WPB','ALB','SDP','HER','RCL','YRK','CPA','UKIP','FOR','RES','YOUR',
 ]);
 
 export const VALID_PARTY_IDS = new Set<PartyId>(Object.keys(PARTIES) as PartyId[]);
+
+// Parties restricted to a specific nation. Absent = allowed everywhere.
+export const PARTY_REGIONS: Partial<Record<PartyId, string[]>> = {
+  PC:   ['Wales'],
+  SNP:  ['Scotland'],
+  ALB:  ['Scotland'],
+  DUP:  ['NI'],
+  SF:   ['NI'],
+  SDLP: ['NI'],
+  UUP:  ['NI'],
+  ALL:  ['NI'],
+  TUV:  ['NI'],
+};
+
+export function partyAllowedIn(id: PartyId, country: string): boolean {
+  const regions = PARTY_REGIONS[id];
+  return !regions || regions.includes(country);
+}
+
+// Leaders as they stood on election day, 4 July 2024.
+// Only parties whose leader has changed since then need an entry here.
+export const BASELINE_2024_LEADERS: Partial<Record<PartyId, string>> = {
+  CON: 'Rishi Sunak',
+  GRN: 'Carla Denyer',
+};
 
 // Maps every leader name to the Wikipedia article title used to fetch their photo.
 // Names absent from this map (e.g. placeholder "Your Leader") fall back to initials.
@@ -72,14 +97,16 @@ export const LEADER_WIKI_TITLES: Record<string, string> = {
   'Wes Streeting':     'Wes_Streeting',
   'Lisa Nandy':        'Lisa_Nandy',
   'Yvette Cooper':     'Yvette_Cooper',
-  // Conservative
+  // Conservative — current and 2024 baseline
   'Kemi Badenoch':     'Kemi_Badenoch',
+  'Rishi Sunak':       'Rishi_Sunak',
   // Liberal Democrats
   'Ed Davey':          'Ed_Davey',
   // Reform UK
   'Nigel Farage':      'Nigel_Farage',
-  // Green
+  // Green — current and 2024 baseline
   'Zack Polanski':     'Zack_Polanski',
+  'Carla Denyer':      'Carla_Denyer',
   // SNP
   'John Swinney':      'John_Swinney',
   // Plaid Cymru

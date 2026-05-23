@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { MapContainer, TileLayer, GeoJSON } from 'react-leaflet';
+import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { MapContainer, TileLayer, GeoJSON, CircleMarker, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { useElectionStore } from '../store/useElectionStore';
-import { PARTIES } from '../data/parties';
+import { PARTIES, } from '../data/parties';
 import type { PartyId } from '../data/parties';
+import { darkModeFill } from '../lib/coloring';
 
 type TooltipState = {
   x: number;
@@ -16,7 +17,20 @@ type TooltipState = {
   parties: { id: PartyId; votes: number; pct: number }[];
 } | null;
 
-export function MapView() {
+function computeCentroid(geometry: any): [number, number] {
+  let minLat = Infinity, maxLat = -Infinity, minLng = Infinity, maxLng = -Infinity;
+  const visit = (c: any) => {
+    if (typeof c[0] === 'number') {
+      if (c[1] < minLat) minLat = c[1]; if (c[1] > maxLat) maxLat = c[1];
+      if (c[0] < minLng) minLng = c[0]; if (c[0] > maxLng) maxLng = c[0];
+    } else { for (const ch of c) visit(ch); }
+  };
+  visit(geometry.coordinates);
+  if (!isFinite(minLat)) return [0, 0];
+  return [(minLat + maxLat) / 2, (minLng + maxLng) / 2];
+}
+
+export function MapView({ bubbleMapMode = false, dark = false }: { bubbleMapMode?: boolean; dark?: boolean }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const layerRef = useRef<L.GeoJSON | null>(null);
   const [geoData, setGeoData] = useState<any>(null);
@@ -31,39 +45,76 @@ export function MapView() {
   const multiSelectMode = useElectionStore(s => s.multiSelectMode);
   const selectedIds = useElectionStore(s => s.selectedIds);
   const toggleConstituencySelection = useElectionStore(s => s.toggleConstituencySelection);
+  const simulationRunning = useElectionStore(s => s.simulationRunning);
+  const declaredIds = useElectionStore(s => s.declaredIds);
 
   // Refs so Leaflet's once-created handlers always see current values
-  const multiSelectModeRef = useRef(multiSelectMode);
-  const selectRef = useRef(selectConstituency);
-  const toggleSelRef = useRef(toggleConstituencySelection);
-  const byIdRef = useRef(byId);
-  const currentResultsRef = useRef(currentResults);
+  const multiSelectModeRef    = useRef(multiSelectMode);
+  const selectRef             = useRef(selectConstituency);
+  const toggleSelRef          = useRef(toggleConstituencySelection);
+  const byIdRef               = useRef(byId);
+  const currentResultsRef     = useRef(currentResults);
+  const simulationRunningRef  = useRef(simulationRunning);
+  const declaredIdsRef        = useRef(declaredIds);
+  const bubbleModeRef         = useRef(bubbleMapMode);
 
-  useEffect(() => { multiSelectModeRef.current = multiSelectMode; }, [multiSelectMode]);
-  useEffect(() => { selectRef.current = selectConstituency; }, [selectConstituency]);
-  useEffect(() => { toggleSelRef.current = toggleConstituencySelection; }, [toggleConstituencySelection]);
-  useEffect(() => { byIdRef.current = byId; }, [byId]);
-  useEffect(() => { currentResultsRef.current = currentResults; }, [currentResults]);
+  useEffect(() => { multiSelectModeRef.current   = multiSelectMode;   }, [multiSelectMode]);
+  useEffect(() => { selectRef.current             = selectConstituency; }, [selectConstituency]);
+  useEffect(() => { toggleSelRef.current          = toggleConstituencySelection; }, [toggleConstituencySelection]);
+  useEffect(() => { byIdRef.current               = byId; }, [byId]);
+  useEffect(() => { currentResultsRef.current     = currentResults; }, [currentResults]);
+  useEffect(() => { simulationRunningRef.current  = simulationRunning; }, [simulationRunning]);
+  useEffect(() => { declaredIdsRef.current        = declaredIds; }, [declaredIds]);
+  useEffect(() => { bubbleModeRef.current         = bubbleMapMode; }, [bubbleMapMode]);
 
   // Load GeoJSON once
   useEffect(() => {
-    fetch('/uk-constituencies.geojson')
+    fetch(`${import.meta.env.BASE_URL}uk-constituencies.geojson`)
       .then(r => r.json())
       .then(setGeoData)
       .catch(err => console.error('Failed to load GeoJSON:', err));
   }, []);
 
+  // Enforce smoothFactor: 0 on every child layer once GeoJSON is mounted
+  useEffect(() => {
+    if (!layerRef.current) return;
+    enforceNoSmooth(layerRef.current);
+  }, [geoData]);
+
   // Re-style all paths reactively (no layer re-render)
   useEffect(() => {
     if (!layerRef.current) return;
-    layerRef.current.setStyle((feature: any) => featureStyle(feature, getFill, selectedId, selectedIds));
-  }, [getFill, currentResults, baselineLoaded, selectedId, selectedIds]);
+    if (bubbleMapMode) {
+      layerRef.current.setStyle(() => ({ fillOpacity: 0, weight: 0.4, color: dark ? '#666' : '#bbb', opacity: 0.6 }));
+    } else {
+      layerRef.current.setStyle((feature: any) => featureStyle(feature, getFill, selectedId, selectedIds, dark));
+    }
+  }, [bubbleMapMode, getFill, currentResults, baselineLoaded, selectedId, selectedIds, dark]);
+
+  const bubbleData = useMemo(() => {
+    if (!bubbleMapMode || !geoData) return [];
+    let maxMargin = 1;
+    const items: { gss: string; center: [number,number]; margin: number; color: string }[] = [];
+    for (const feature of geoData.features) {
+      const gss: string = feature.properties?.gssCode ?? '';
+      const c = byId.get(gss);
+      if (!c) continue;
+      const res = currentResults[gss] ?? c.results2024;
+      const sorted = (Object.values(res) as number[]).filter(v => v > 0).sort((a, b) => b - a);
+      if (sorted.length === 0) continue;
+      const margin = sorted.length >= 2 ? sorted[0] - sorted[1] : sorted[0];
+      if (margin > maxMargin) maxMargin = margin;
+      items.push({ gss, center: computeCentroid(feature.geometry), margin, color: getFill(gss) });
+    }
+    return items.map(it => ({ ...it, radius: 1.5 + Math.sqrt(it.margin / maxMargin) * 10.5 }));
+  }, [bubbleMapMode, geoData, currentResults, byId, getFill]);
 
   // onEachFeature: click + hover — uses refs to avoid stale closures
   const onEachFeature = useCallback((feature: any, layer: L.Layer) => {
     const gss: string = feature.properties?.gssCode ?? '';
 
     layer.on('click', (e: L.LeafletMouseEvent) => {
+      if (simulationRunningRef.current) return;
       if (e.originalEvent.shiftKey || multiSelectModeRef.current) {
         toggleSelRef.current(gss);
       } else {
@@ -72,6 +123,9 @@ export function MapView() {
     });
 
     layer.on('mousemove', (e: L.LeafletMouseEvent) => {
+      if (bubbleModeRef.current) { setTooltip(null); return; }
+      if (multiSelectModeRef.current) { setTooltip(null); return; }
+      if (simulationRunningRef.current && !declaredIdsRef.current.has(gss)) { setTooltip(null); return; }
       const c = byIdRef.current.get(gss);
       if (!c) { setTooltip(null); return; }
       const results = currentResultsRef.current[gss] ?? c.results2024;
@@ -108,19 +162,73 @@ export function MapView() {
         zoomControl
       >
         <TileLayer
-          url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png"
+          key={dark ? 'dark' : 'light'}
+          url={dark
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+          }
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
           subdomains="abcd"
+          updateWhenZooming={false}
+          updateWhenIdle={true}
           maxZoom={20}
         />
+        <MapController layerRef={layerRef} />
         {geoData && (
           <GeoJSON
             ref={layerRef as any}
             data={geoData}
-            style={(feature: any) => featureStyle(feature, getFill, selectedId, selectedIds)}
+            style={(feature: any) => bubbleMapMode
+              ? { fillOpacity: 0, weight: 0.4, color: dark ? '#666' : '#bbb', opacity: 0.6 }
+              : featureStyle(feature, getFill, selectedId, selectedIds, dark)
+            }
             onEachFeature={onEachFeature}
+            {...({ smoothFactor: 0 } as any)}
           />
         )}
+        {bubbleData.map(b => (
+          <CircleMarker
+            key={b.gss}
+            center={b.center}
+            radius={b.radius}
+            pathOptions={{ fillColor: b.color, fillOpacity: 0.85, color: 'rgba(255,255,255,0.7)', weight: 0.6, opacity: 0.9 }}
+            eventHandlers={{
+              click: () => {
+                if (simulationRunningRef.current) return;
+                if (multiSelectModeRef.current) {
+                  toggleSelRef.current(b.gss);
+                } else {
+                  selectRef.current(b.gss);
+                }
+              },
+              mousemove: (e) => {
+                const c = byIdRef.current.get(b.gss);
+                if (!c) return;
+                const results = currentResultsRef.current[b.gss] ?? c.results2024;
+                const parties = (Object.entries(results) as [PartyId, number][])
+                  .filter(([, v]) => v > 0)
+                  .sort(([, a], [, b]) => b - a)
+                  .map(([id, votes]) => ({
+                    id,
+                    votes,
+                    pct: c.validVotes > 0 ? Math.round((votes / c.validVotes) * 1000) / 10 : 0,
+                  }));
+                const rect = containerRef.current?.getBoundingClientRect();
+                if (!rect) return;
+                setTooltip({
+                  x: (e as L.LeafletMouseEvent).originalEvent.clientX - rect.left,
+                  y: (e as L.LeafletMouseEvent).originalEvent.clientY - rect.top,
+                  name: c.name,
+                  region: c.region || c.country,
+                  electorate: c.electorate,
+                  validVotes: c.validVotes,
+                  parties,
+                });
+              },
+              mouseout: () => setTooltip(null),
+            }}
+          />
+        ))}
       </MapContainer>
 
       {tooltip && (() => {
@@ -130,138 +238,62 @@ export function MapView() {
         const TH_EST = 120 + tooltip.parties.length * 46;
         const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
         const top  = Math.max(6, Math.min(tooltip.y - 20, ch - TH_EST - 8));
-        const turnout = tooltip.electorate > 0
-          ? ((tooltip.validVotes / tooltip.electorate) * 100).toFixed(1)
-          : '—';
         return (
           <div
-            className="absolute pointer-events-none z-[1000] map-tooltip"
+            className="absolute pointer-events-none z-[1000]"
             style={{ left, top, width: TW }}
           >
-            <div
-              className="bg-white rounded-[10px] overflow-hidden map-tooltip-card"
-              style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.07)' }}
-            >
-              {/* ── Header ──────────────────────────────────────────── */}
-              <div className="px-4 pt-3.5 pb-2.5">
-                <div
-                  className="font-bold leading-tight"
-                  style={{ fontSize: 15, color: 'var(--tt-ink, #1a1a1a)' }}
-                >
+            <div style={{
+              background: 'rgba(18,24,44,0.96)',
+              borderRadius: 10,
+              border: '1px solid rgba(255,255,255,0.09)',
+              boxShadow: '0 6px 28px rgba(0,0,0,0.5)',
+              backdropFilter: 'blur(10px)',
+              overflow: 'hidden',
+            }}>
+              {/* Header */}
+              <div style={{ padding: '12px 16px 10px' }}>
+                <div style={{ fontSize: 15, fontWeight: 700, color: 'rgba(255,255,255,0.92)', lineHeight: 1.2 }}>
                   {tooltip.name}
                 </div>
-                <div
-                  className="font-mono mt-0.5 leading-none"
-                  style={{ fontSize: 10.5, color: 'var(--tt-ink3, #7a7870)' }}
-                >
+                <div style={{ fontSize: 10.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.42)', marginTop: 3 }}>
                   {tooltip.region}
                 </div>
               </div>
 
-              {/* ── Results sub-header ──────────────────────────────── */}
-              <div
-                className="flex items-center justify-between px-4 py-1.5"
-                style={{ borderTop: '1px solid rgba(0,0,0,0.06)', borderBottom: '1px solid rgba(0,0,0,0.06)', background: 'var(--tt-sub-bg, #faf9f7)' }}
-              >
-                <span
-                  className="font-mono font-bold uppercase tracking-widest"
-                  style={{ fontSize: 9, color: 'var(--tt-ink3, #7a7870)' }}
-                >
-                  Results
-                </span>
-                <span
-                  className="font-mono font-bold text-[#c8a020]"
-                  style={{ fontSize: 9.5 }}
-                >
-                  {turnout}% Turnout
-                </span>
-              </div>
-
-              {/* ── Party rows ──────────────────────────────────────── */}
-              <div className="px-3.5 pt-2.5 pb-1">
+              {/* Party rows */}
+              <div style={{ padding: '0 14px 12px' }}>
                 {tooltip.parties.length > 0 ? tooltip.parties.map(({ id, votes, pct }, i) => {
                   const color  = PARTIES[id]?.color ?? '#888888';
                   const name   = PARTIES[id]?.name ?? id;
                   const isWinner = i === 0;
                   return (
-                    <div key={id} className={i < tooltip.parties.length - 1 ? 'mb-2.5' : 'mb-1.5'}>
-                      {/* Name row */}
-                      <div className="flex items-center gap-1.5 mb-1">
-                        <span
-                          className="shrink-0 rounded-[2px]"
-                          style={{ width: 8, height: 8, background: color, flexShrink: 0 }}
-                        />
-                        <span
-                          className="flex-1 min-w-0 truncate leading-none"
-                          style={{
-                            fontSize: 11.5,
-                            fontWeight: isWinner ? 600 : 500,
-                            color: 'var(--tt-ink, #1a1a1a)',
-                          }}
-                        >
-                          {name}
-                          <span
-                            style={{ fontSize: 9.5, fontFamily: '"DM Mono",monospace', color: 'var(--tt-ink3, #7a7870)', marginLeft: 3 }}
-                          >
-                            ({id})
-                          </span>
-                        </span>
-                        <span
-                          className="font-mono tabular-nums shrink-0"
-                          style={{ fontSize: 10.5, color: 'var(--tt-ink2, #4a4844)', marginRight: 6 }}
-                        >
-                          {votes.toLocaleString()}
-                        </span>
-                        <span
-                          className="font-mono font-bold tabular-nums shrink-0"
-                          style={{ fontSize: 13, color, minWidth: 44, textAlign: 'right' }}
-                        >
-                          {pct.toFixed(1)}%
-                        </span>
-                      </div>
-                      {/* Bar */}
-                      <div
-                        style={{
-                          height: 3,
-                          background: 'var(--tt-bar, #e8e5e0)',
-                          borderRadius: 2,
-                          overflow: 'hidden',
-                        }}
-                      >
-                        <div
-                          style={{
-                            height: '100%',
-                            width: `${pct}%`,
-                            background: color,
-                            borderRadius: 2,
-                            transition: 'width 0.3s ease',
-                          }}
-                        />
-                      </div>
+                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: i < tooltip.parties.length - 1 ? 7 : 0 }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                      <span style={{ flex: 1, minWidth: 0, fontSize: 11.5, fontWeight: isWinner ? 600 : 400, color: 'rgba(255,255,255,0.85)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {name}
+                      </span>
+                      <span style={{ fontSize: 10.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.38)', marginRight: 6 }}>
+                        {votes.toLocaleString()}
+                      </span>
+                      <span style={{ fontSize: 13, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color, minWidth: 44, textAlign: 'right' }}>
+                        {pct.toFixed(1)}%
+                      </span>
                     </div>
                   );
                 }) : (
-                  <p style={{ fontSize: 11, color: 'var(--tt-ink3, #7a7870)', fontStyle: 'italic', margin: '4px 0 8px' }}>
+                  <p style={{ fontSize: 11, color: 'rgba(255,255,255,0.32)', fontStyle: 'italic', margin: '4px 0 4px' }}>
                     No results loaded
                   </p>
                 )}
               </div>
 
-              {/* ── Footer ──────────────────────────────────────────── */}
-              <div
-                className="flex items-center justify-between px-4 py-2"
-                style={{ borderTop: '1px solid rgba(0,0,0,0.06)', background: 'var(--tt-sub-bg, #faf9f7)' }}
-              >
-                <span
-                  className="font-mono"
-                  style={{ fontSize: 10, color: 'var(--tt-ink3, #7a7870)' }}
-                >
+              {/* Footer */}
+              <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', padding: '7px 16px', display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.28)' }}>
                   {tooltip.validVotes.toLocaleString()} votes cast
                 </span>
-                <span
-                  className="font-mono"
-                  style={{ fontSize: 10, color: 'var(--tt-ink3, #7a7870)' }}
-                >
+                <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(255,255,255,0.28)' }}>
                   {tooltip.electorate.toLocaleString()} electorate
                 </span>
               </div>
@@ -279,20 +311,43 @@ export function MapView() {
   );
 }
 
+function enforceNoSmooth(geoLayer: L.GeoJSON) {
+  geoLayer.eachLayer((layer: L.Layer) => {
+    const p = layer as any;
+    if (p.options) p.options.smoothFactor = 0;
+  });
+}
+
+function MapController({ layerRef }: { layerRef: { current: L.GeoJSON | null } }) {
+  const map = useMap();
+  useEffect(() => {
+    const onZoomEnd = () => {
+      if (!layerRef.current) return;
+      enforceNoSmooth(layerRef.current);
+    };
+    map.on('zoomend', onZoomEnd);
+    return () => { map.off('zoomend', onZoomEnd); };
+  }, [map, layerRef]);
+  return null;
+}
+
 function featureStyle(
   feature: any,
   getFill: (gss: string) => string,
   selectedId: string | null,
   selectedIds: Set<string>,
+  dark = false,
 ): L.PathOptions {
   const gss: string = feature?.properties?.gssCode ?? '';
   const isSelected = gss === selectedId;
   const isMulti = selectedIds.has(gss);
+  const baseColor = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)';
+  const rawFill = getFill(gss);
   return {
-    fillColor: getFill(gss),
-    weight: isSelected || isMulti ? 2.5 : 0.7,
-    color: isMulti ? '#c8a020' : isSelected ? '#c8a020' : 'rgba(0,0,0,0.22)',
-    fillOpacity: 0.65,
+    fillColor: dark ? darkModeFill(rawFill) : rawFill,
+    weight: isSelected || isMulti ? 2 : 0.5,
+    color: isMulti ? '#c8a020' : isSelected ? '#c8a020' : baseColor,
+    fillOpacity: 0.72,
     opacity: 1,
   };
 }

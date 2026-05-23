@@ -2,18 +2,71 @@
 @tailwind components;
 @tailwind utilities;
 
+@keyframes livePulse {
+  0%   { box-shadow: 0 0 0 0 rgba(239,68,68,0.7); }
+  70%  { box-shadow: 0 0 0 7px rgba(239,68,68,0); }
+  100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
+}
+
 @layer base {
   html, body, #root {
     height: 100%;
-    overflow: hidden;
   }
   body {
     background: #f5f4f0;
     color: #1a1a1a;
-    font-family: 'DM Sans', ui-sans-serif, system-ui, sans-serif;
+    font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
+}
+
+/* ── Forum panel slide-in from left ─────────────────────────────────── */
+.forum-panel-enter {
+  animation: forumPanelIn 220ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes forumPanelIn {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.forum-panel-exit {
+  animation: forumPanelOut 240ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes forumPanelOut {
+  from { transform: translateX(0);     opacity: 1; }
+  to   { transform: translateX(-100%); opacity: 0; }
+}
+.forum-backdrop-enter {
+  animation: forumFadeIn 220ms ease both;
+}
+@keyframes forumFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+.forum-backdrop-exit {
+  animation: forumFadeOut 240ms ease both;
+  pointer-events: none;
+}
+@keyframes forumFadeOut {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
+
+/* ── Country widget card hover ───────────────────────────────────────── */
+.country-card {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+}
+.country-card:hover {
+  box-shadow: 0 10px 40px rgba(1,33,105,0.15), 0 3px 10px rgba(0,0,0,0.08);
+  border-color: rgba(1,33,105,0.28) !important;
+}
+html.dark .country-card {
+  box-shadow: 0 2px 8px rgba(0,0,0,0.20);
+}
+html.dark .country-card:hover {
+  box-shadow: 0 10px 40px rgba(80,140,220,0.18), 0 3px 10px rgba(0,0,0,0.30);
+  border-color: rgba(80,140,220,0.35) !important;
 }
 
 /* ── Compact party slider (3px track, 12px thumb) ───────────────────── */
@@ -85,9 +138,82 @@
   cursor: not-allowed;
 }
 
+/* ── Canada riding panel slider (skinny bar thumb, party-colored) ────── */
+.ca-party-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 3px;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+  outline: none;
+}
+.ca-party-slider::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(
+    to right,
+    var(--party-color, #7a7870) 0%,
+    var(--party-color, #7a7870) var(--pct, 0%),
+    #e0ddd7 var(--pct, 0%),
+    #e0ddd7 100%
+  );
+}
+.ca-party-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -4.5px;
+  height: 12px;
+  width: 4px;
+  border-radius: 3px;
+  background: var(--party-color, #7a7870);
+  border: none;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.28);
+  cursor: grab;
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out;
+}
+.ca-party-slider:hover::-webkit-slider-thumb {
+  transform: scaleY(1.15);
+  box-shadow: 0 2px 7px rgba(0,0,0,0.30);
+}
+.ca-party-slider:active::-webkit-slider-thumb { cursor: grabbing; }
+.ca-party-slider::-moz-range-track {
+  height: 3px;
+  border-radius: 2px;
+  background: #e0ddd7;
+}
+.ca-party-slider::-moz-range-progress {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--party-color, #7a7870);
+}
+.ca-party-slider::-moz-range-thumb {
+  height: 12px;
+  width: 4px;
+  border-radius: 3px;
+  border: none;
+  background: var(--party-color, #7a7870);
+  cursor: grab;
+}
+.ca-party-slider:disabled {
+  opacity: 0.28;
+  cursor: not-allowed;
+}
+.ca-party-slider:disabled::-webkit-slider-thumb { cursor: not-allowed; }
+html.dark .ca-party-slider::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--party-color, #55708a) 0%,
+    var(--party-color, #55708a) var(--pct, 0%),
+    rgba(80,140,220,0.13) var(--pct, 0%),
+    rgba(80,140,220,0.13) 100%
+  );
+}
+html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13); }
+
 /* ── Eyebrow / section label ─────────────────────────────────────────── */
 .eyebrow {
-  font-family: 'DM Mono', ui-monospace, monospace;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.10em;
@@ -111,11 +237,47 @@
   from { transform: translateX(0);    opacity: 1; }
   to   { transform: translateX(100%); opacity: 0; }
 }
+.panel-slide-left {
+  animation: slideInLeft 180ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes slideInLeft {
+  from { transform: translateX(-100%); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+.panel-exit-left {
+  animation: slideOutLeft 260ms cubic-bezier(0.4, 0, 1, 1) both;
+  pointer-events: none;
+}
+@keyframes slideOutLeft {
+  from { transform: translateX(0);      opacity: 1; }
+  to   { transform: translateX(-100%);  opacity: 0; }
+}
+
+/* ── Live pulse dot for reporting bubble ─────────────────────────────── */
+@keyframes livePulse {
+  0%, 100% { opacity: 1;   transform: scale(1);    }
+  50%       { opacity: 0.4; transform: scale(0.75); }
+}
 
 /* ── Thin scrollbar for panels ───────────────────────────────────────── */
 .thin-scroll::-webkit-scrollbar { width: 3px; }
 .thin-scroll::-webkit-scrollbar-track { background: transparent; }
 .thin-scroll::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.10); border-radius: 2px; }
+
+/* ── Hidden scrollbar (scroll still works) ───────────────────────────── */
+.scroll-none { scrollbar-width: none; -ms-overflow-style: none; }
+.scroll-none::-webkit-scrollbar { display: none; }
+
+/* ── Header scroll strip: hidden on md+, thin accent bar on small screens ── */
+.header-scroll-strip { overflow-x: auto; scrollbar-width: none; -ms-overflow-style: none; }
+.header-scroll-strip::-webkit-scrollbar { display: none; }
+@media (max-width: 767px) {
+  .header-scroll-strip { scrollbar-width: thin; scrollbar-color: rgba(0,0,0,0.18) transparent; }
+  .header-scroll-strip::-webkit-scrollbar { display: block; height: 3px; }
+  .header-scroll-strip::-webkit-scrollbar-track { background: transparent; }
+  .header-scroll-strip::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.18); border-radius: 2px; }
+  html.dark .header-scroll-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); }
+}
 
 /* ── Leaflet overrides ───────────────────────────────────────────────── */
 .leaflet-container { background: #f0eeea; font-family: inherit; }
@@ -140,7 +302,9 @@
   height: 28px !important;
 }
 .leaflet-control-zoom a:hover { background: #ebe9e5 !important; color: #1a1a1a !important; }
-.leaflet-interactive { cursor: pointer !important; }
+.leaflet-interactive { cursor: pointer !important; transition: fill 0.18s ease, stroke 0.12s ease; }
+.overseas-marker { background: transparent !important; border: none !important; }
+.overseas-marker::before, .overseas-marker::after { display: none !important; }
 
 /* ═══════════════════════════════════════════════════════════════════════
    Candidate Tile  (.cand-col)
@@ -148,7 +312,7 @@
    Per-tile dynamic: --cand-color, --cand-color-alpha (set inline from JS)
 ═══════════════════════════════════════════════════════════════════════ */
 :root {
-  --vh-font: "TT Norms Pro","Avenir Next",-apple-system,BlinkMacSystemFont,"Segoe UI","DM Sans",sans-serif;
+  --vh-font: "TT Norms Pro","Avenir Next",-apple-system,BlinkMacSystemFont,"Segoe UI","Plus Jakarta Sans",sans-serif;
   --vh-text-xs: 0.75rem;
   --vh-text-sm: 0.875rem;
   --vh-text-md: 1rem;
@@ -207,6 +371,15 @@
   100% { transform: translateX(200%);  }
 }
 
+@keyframes goldRipple {
+  0%   { box-shadow: 0 0 0 0 rgba(200,160,32,0.65); }
+  65%  { box-shadow: 0 0 0 9px rgba(200,160,32,0); }
+  100% { box-shadow: 0 0 0 0 rgba(200,160,32,0); }
+}
+.gold-ripple {
+  animation: goldRipple 1.5s ease-out infinite;
+}
+
 /* ── Avatar bubble ───────────────────────────────────────────────────── */
 [id^="cand-photo-"] {
   display: flex;
@@ -260,7 +433,7 @@
   letter-spacing: -0.5px;
   line-height: 1;
   user-select: none;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
 }
 
 /* ── Winner tick badge ───────────────────────────────────────────────── */
@@ -317,7 +490,7 @@
 
 .cand-leader-select {
   font-size: 9px;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   background: transparent;
   border: 0;
   color: var(--muted);
@@ -346,7 +519,7 @@
   font-weight: 900;
   line-height: 1;
   color: var(--cand-color);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -1px;
   margin-bottom: 0;
@@ -377,7 +550,7 @@
 .pct-number {
   font-size: var(--vh-text-sm);
   font-weight: 700;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   color: var(--cand-color);
   letter-spacing: -0.3px;
   font-variant-numeric: tabular-nums;
@@ -386,7 +559,7 @@
 /* Change badge — fades in from above, lingers, then fades out */
 .pct-delta {
   font-size: 9px;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-weight: 600;
   letter-spacing: -0.2px;
   white-space: nowrap;
@@ -405,7 +578,7 @@
 /* ── Vote count ──────────────────────────────────────────────────────── */
 .cand-votes {
   font-size: var(--vh-text-xs);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   color: var(--muted);
   text-align: center;
   margin-top: 1px;
@@ -494,7 +667,7 @@
   font-size: 13px;
   font-weight: 800;
   color: var(--cand-color);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   line-height: 1;
   user-select: none;
 }
@@ -529,7 +702,7 @@
   font-weight: 900;
   line-height: 1;
   color: var(--cand-color);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-variant-numeric: tabular-nums;
   letter-spacing: -1px;
 }
@@ -550,7 +723,7 @@
 
 .ls-leader {
   font-size: 8.5px;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   color: var(--muted);
   max-width: 60px;
   overflow: hidden;
@@ -570,7 +743,7 @@
 }
 .ls-votes {
   font-size: 9px;
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   color: var(--muted);
   white-space: nowrap;
 }
@@ -602,7 +775,7 @@
 .ni-group-label {
   writing-mode: vertical-rl;
   transform: rotate(180deg);
-  font-family: "DM Mono", monospace;
+  font-family: "JetBrains Mono", monospace;
   font-size: 7.5px;
   font-weight: 700;
   letter-spacing: 0.10em;
@@ -740,25 +913,14 @@ html.dark .leaflet-control-zoom a:hover {
   color: #d8e8f5 !important;
 }
 
-/* ── Map tooltip dark mode ───────────────────────────────────────────── */
-.map-tooltip {
-  --tt-ink:    #1a1a1a;
-  --tt-ink2:   #4a4844;
-  --tt-ink3:   #7a7870;
-  --tt-sub-bg: #faf9f7;
-  --tt-bar:    #e8e5e0;
+/* ── Forum panel dark mode ───────────────────────────────────────────── */
+html.dark .forum-input {
+  background: rgba(80,140,220,0.07);
+  color: #d8e8f5;
 }
-html.dark .map-tooltip {
-  --tt-ink:    #d8e8f5;
-  --tt-ink2:   #8aa2c0;
-  --tt-ink3:   #55708a;
-  --tt-sub-bg: #0b1422;
-  --tt-bar:    rgba(80,140,220,0.13);
-}
-html.dark .map-tooltip-card {
-  background-color: #0f1a2e;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.5), 0 2px 8px rgba(0,0,0,0.3), 0 0 0 1px rgba(80,140,220,0.20) !important;
-}
+html.dark .forum-input::placeholder { color: rgba(85,112,138,0.6); }
+
+/* ── Map tooltip (dark-glass style, no overrides needed) ────────────── */
 
 /* Winner shimmer in dark mode uses a blue-tinted sheen */
 html.dark .cand-col.is-winner::after {

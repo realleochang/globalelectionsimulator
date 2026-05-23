@@ -5,11 +5,10 @@ import type { PartyId } from '../data/parties';
 import {
   computeConstituencyResults,
   computeRegionBreakdown,
-  computeBiggestSwings,
   computeFptpDistortion,
 } from '../lib/seat-tally';
 
-type Tab = 'region' | 'swings' | 'closest' | 'distortion';
+type Tab = 'region' | 'closest' | 'distortion';
 
 export function BreakdownDrawer({ exiting = false }: { exiting?: boolean }) {
   const setBreakdownOpen = useElectionStore(s => s.setBreakdownOpen);
@@ -26,11 +25,6 @@ export function BreakdownDrawer({ exiting = false }: { exiting?: boolean }) {
 
   const regionData = useMemo(() => computeRegionBreakdown(cResults), [cResults]);
 
-  const swings = useMemo(
-    () => computeBiggestSwings(constituencies, currentResults),
-    [constituencies, currentResults],
-  );
-
   const closestSeats = useMemo(
     () => [...cResults].sort((a, b) => a.marginPct - b.marginPct).slice(0, 20),
     [cResults],
@@ -43,7 +37,6 @@ export function BreakdownDrawer({ exiting = false }: { exiting?: boolean }) {
 
   const tabs: { id: Tab; label: string }[] = [
     { id: 'region', label: 'By region' },
-    { id: 'swings', label: 'Biggest swings' },
     { id: 'closest', label: 'Closest seats' },
     { id: 'distortion', label: 'Votes vs seats' },
   ];
@@ -87,7 +80,6 @@ export function BreakdownDrawer({ exiting = false }: { exiting?: boolean }) {
       {baselineLoaded && (
         <div className="flex-1 overflow-y-auto thin-scroll">
           {tab === 'region' && <RegionTab data={regionData} />}
-          {tab === 'swings' && <SwingsTab data={swings} />}
           {tab === 'closest' && <ClosestTab data={closestSeats} />}
           {tab === 'distortion' && <DistortionTab data={distortion} />}
         </div>
@@ -137,41 +129,6 @@ function RegionTab({ data }: { data: ReturnType<typeof computeRegionBreakdown> }
                 </span>
               ))}
           </div>
-        </div>
-      ))}
-    </div>
-  );
-}
-
-function SwingsTab({ data }: { data: ReturnType<typeof computeBiggestSwings> }) {
-  const maxSwing = Math.max(...data.map(s => Math.abs(s.swingPct)), 1);
-  return (
-    <div className="divide-y divide-subtle">
-      {data.map((s, i) => (
-        <div key={`${s.id}-${s.party}`} className="px-4 py-2.5 flex items-center gap-3">
-          <span className="text-[10px] text-ink-3 w-4 shrink-0 font-mono">{i + 1}</span>
-          <PartyDot partyId={s.party} />
-          <div className="flex-1 min-w-0">
-            <div className="text-[12px] text-ink truncate">{s.name}</div>
-            <div className="flex items-center gap-1 mt-0.5">
-              {/* Bar */}
-              <div className="flex-1 h-1.5 bg-active rounded overflow-hidden">
-                <div
-                  className="h-full rounded"
-                  style={{
-                    width: `${(Math.abs(s.swingPct) / maxSwing) * 100}%`,
-                    background: PARTIES[s.party]?.color ?? '#888',
-                    opacity: s.swingPct > 0 ? 1 : 0.5,
-                  }}
-                />
-              </div>
-            </div>
-          </div>
-          <span
-            className={`text-[12px] font-mono shrink-0 ${s.swingPct > 0 ? 'text-emerald-600' : 'text-red-500'}`}
-          >
-            {s.swingPct > 0 ? '+' : ''}{s.swingPct.toFixed(1)}pp
-          </span>
         </div>
       ))}
     </div>

@@ -8,7 +8,9 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "build-data": "tsx scripts/build-data.ts",
-    "build-boundaries": "node scripts/merge-boundaries.mjs"
+    "build-boundaries": "node scripts/merge-boundaries.mjs",
+    "predeploy": "npm run build",
+    "deploy": "gh-pages -d dist"
   },
   "dependencies": {
     "@types/leaflet": "^1.9.21",
@@ -19,6 +21,7 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-leaflet": "^4.2.1",
+    "react-router-dom": "^7.15.1",
     "topojson-client": "^3.1.0",
     "topojson-server": "^3.0.1",
     "topojson-simplify": "^3.0.3",
@@ -32,6 +35,7 @@
     "@types/topojson-client": "^3.1.4",
     "@vitejs/plugin-react": "^4.3.4",
     "autoprefixer": "^10.4.20",
+    "gh-pages": "^6.3.0",
     "mapshaper": "^0.7.18",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",

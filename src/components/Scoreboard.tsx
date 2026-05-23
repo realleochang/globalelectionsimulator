@@ -1,6 +1,6 @@
 import { useMemo, useState, useRef, useEffect, useLayoutEffect, forwardRef } from 'react';
 import { useElectionStore } from '../store/useElectionStore';
-import { PARTIES, LEADER_WIKI_TITLES } from '../data/parties';
+import { PARTIES, LEADER_WIKI_TITLES, BASELINE_2024_LEADERS } from '../data/parties';
 import type { PartyId } from '../data/parties';
 import { fetchWikiPhoto } from '../lib/wikiPhotos';
 const MAJORITY = 326;
@@ -40,14 +40,71 @@ interface CandTileProps {
   isWinner: boolean;
 }
 
+// ── Floating leader dropdown (replaces native <select>) ──────────────────
+function LeaderDropdown({ options, value, color, onChange }: {
+  options: string[];
+  value: string;
+  color: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const lastName = value.trim().split(/\s+/).pop() ?? value;
+
+  const handleToggle = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!open && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect();
+      setPos({ top: r.bottom + 4, left: r.left + r.width / 2 });
+    }
+    setOpen(o => !o);
+  };
+
+  return (
+    <>
+      <button ref={btnRef} onClick={handleToggle} className="cand-leader-wrap" style={{ background: 'none', border: 'none', padding: 0 }}>
+        <span className="cand-leader-name">{lastName}</span>
+        <svg className="leader-chevron" width="7" height="4" viewBox="0 0 7 4" fill="none" aria-hidden="true">
+          <path d="M0.5 0.5L3.5 3.5L6.5 0.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      {open && pos && (
+        <>
+          <div className="fixed inset-0 z-[1999]" onClick={() => setOpen(false)} />
+          <div className="fixed z-[2000] bg-white border border-default rounded-lg shadow-xl py-1"
+            style={{ top: pos.top, left: pos.left, transform: 'translateX(-50%)', minWidth: 190 }}>
+            {options.map(opt => (
+              <button key={opt} onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
+                className={`flex items-center gap-2 w-full px-3 py-2 text-left transition-colors ${opt === value ? 'bg-[#f8f7f4]' : 'hover:bg-hover'}`}>
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                <span className="text-[10px] font-mono text-ink leading-none flex-1">{opt}</span>
+                {opt === value && (
+                  <svg className="shrink-0 ml-1" width="8" height="8" viewBox="0 0 8 8" fill="none">
+                    <path d="M1.5 4L3.2 5.8L6.5 2.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </>
+  );
+}
+
 // ── Candidate tile ────────────────────────────────────────────────────────
 const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
   function CandTile({ partyId, seats, votes, votePct, isLeader, isWinner }, ref) {
-    const leaderPicks = useElectionStore(s => s.leaderPicks);
-    const setLeader   = useElectionStore(s => s.setLeader);
+    const leaderPicks  = useElectionStore(s => s.leaderPicks);
+    const setLeader    = useElectionStore(s => s.setLeader);
+    const activePreset = useElectionStore(s => s.activePreset);
     const party = PARTIES[partyId];
 
-    const leader   = leaderPicks[partyId] ?? party?.defaultLeader ?? partyId;
+    const isBaseline = activePreset === 'baseline';
+    const leader   = isBaseline
+      ? (BASELINE_2024_LEADERS[partyId] ?? party?.defaultLeader ?? partyId)
+      : (leaderPicks[partyId] ?? party?.defaultLeader ?? partyId);
     const isDash   = leader === '—';
     const initials = isDash
       ? partyId.slice(0, 2).toUpperCase()
@@ -55,7 +112,8 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
 
     const color      = party?.color ?? '#888888';
     const colorAlpha = hexToRgba(color, 0.13);
-    const hasAlt     = !isDash && (party?.alternativeLeaders.length ?? 0) > 0;
+    // Suppress dropdown in 2024 baseline — leaders are fixed to election-day names.
+    const hasAlt     = !isBaseline && !isDash && (party?.alternativeLeaders.length ?? 0) > 0;
     const options    = hasAlt ? [party!.defaultLeader, ...party!.alternativeLeaders] : [leader];
     const barPct     = Math.min(Math.max(votePct, 0), 100);
 
@@ -126,20 +184,7 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
 
         {/* 3. Leader name or dropdown */}
         {hasAlt ? (
-          <div className="cand-leader-wrap">
-            <select
-              className="cand-leader-select"
-              value={leader}
-              onChange={e => setLeader(partyId, e.target.value)}
-              onClick={e => e.stopPropagation()}
-              title={leader}
-            >
-              {options.map(l => <option key={l} value={l}>{l}</option>)}
-            </select>
-            <svg className="leader-chevron" width="7" height="4" viewBox="0 0 7 4" fill="none" aria-hidden="true">
-              <path d="M0.5 0.5L3.5 3.5L6.5 0.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </div>
+          <LeaderDropdown options={options} value={leader} color={color} onChange={v => setLeader(partyId, v)} />
         ) : (
           <span className="cand-leader-name" title={leader}>{isDash ? '' : leader}</span>
         )}
@@ -179,6 +224,20 @@ export function Scoreboard() {
   const hiddenParties  = useElectionStore(s => s.hiddenParties);
   const isBlankMap     = useElectionStore(s => s.isBlankMap);
   const declaredIds    = useElectionStore(s => s.declaredIds);
+
+  // ── Wheel → horizontal scroll ──────────────────────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => {
+      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // already horizontal
+      e.preventDefault();
+      el.scrollLeft += e.deltaY;
+    };
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
 
   // ── FLIP reorder animation ─────────────────────────────────────────
   const tileRefs      = useRef<Map<PartyId, HTMLDivElement>>(new Map());
@@ -270,7 +329,7 @@ export function Scoreboard() {
     <div className="relative bg-white border-b border-default shrink-0 select-none z-[45]">
 
       {/* Party tile row */}
-      <div className="flex gap-1.5 px-3 overflow-x-auto thin-scroll items-stretch pt-2 pb-1.5">
+      <div ref={scrollRef} className="flex gap-1.5 px-3 overflow-x-auto items-stretch pt-2 pb-1.5 scroll-none">
 
         {!baselineLoaded && (
           <span className="text-[11px] font-mono text-ink-3 uppercase tracking-wide py-3 self-center">

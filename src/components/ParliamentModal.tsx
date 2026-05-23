@@ -44,7 +44,7 @@ const W_TOP_Y = 45;
 const POLITICAL_ORDER: PartyId[] = [
   'WPB', 'SF', 'SNP', 'ALB', 'PC', 'GRN', 'SDLP', 'ALL', 'LAB', 'LD',
   'SDP', 'IND', 'YRK', 'OTH', 'YOUR', 'SPK',
-  'UUP', 'CON', 'CPA', 'RCL', 'DUP', 'TUV', 'HER', 'UKIP', 'RUK', 'FOR', 'RFM',
+  'UUP', 'CON', 'CPA', 'RCL', 'DUP', 'TUV', 'HER', 'UKIP', 'RES', 'FOR', 'RFM',
 ];
 
 const EMPTY_COLOR = '#ddd8d0';

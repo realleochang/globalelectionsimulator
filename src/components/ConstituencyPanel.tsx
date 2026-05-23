@@ -1,6 +1,6 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useElectionStore } from '../store/useElectionStore';
-import { PARTIES, EXTENDED_PARTY_IDS } from '../data/parties';
+import { PARTIES, EXTENDED_PARTY_IDS, partyAllowedIn } from '../data/parties';
 import type { PartyId } from '../data/parties';
 import { redistributeVotes, getConstituencyParties } from '../lib/slider-math';
 import { constituencyFill } from '../lib/coloring';
@@ -21,6 +21,10 @@ export function ConstituencyPanel() {
 
   const [locked, setLocked] = useState<Set<PartyId>>(new Set());
   const [show2024, setShow2024] = useState(false);
+  const [editingPct, setEditingPct] = useState<Partial<Record<PartyId, string>>>({});
+
+  // Reset locks and inline edits whenever the user switches constituency
+  useEffect(() => { setLocked(new Set()); setEditingPct({}); }, [selectedId]);
 
   const c = selectedId ? byId.get(selectedId) : null;
   const isDeclared = !isBlankMap || (selectedId ? declaredIds.has(selectedId) : true);
@@ -46,10 +50,11 @@ export function ConstituencyPanel() {
   // Base parties for this constituency (region-aware), minus hidden ones
   const existingParties = (Object.keys(c.results2024) as PartyId[]).filter(p => (c.results2024[p] ?? 0) > 0);
   const basePartyIds = getConstituencyParties(c.country, existingParties)
-    .filter(p => !hiddenParties.has(p));
+    .filter(p => !hiddenParties.has(p) && partyAllowedIn(p, c.country));
 
-  // Any active (not-hidden) extended parties that user has added to the simulation
-  const activeExtended = Array.from(EXTENDED_PARTY_IDS).filter(p => !hiddenParties.has(p)) as PartyId[];
+  // Any active (not-hidden) extended parties allowed in this constituency's nation
+  const activeExtended = Array.from(EXTENDED_PARTY_IDS)
+    .filter(p => !hiddenParties.has(p) && partyAllowedIn(p, c.country)) as PartyId[];
 
   // Final deduplicated list: base parties first, then any active extended parties
   const partyIds = [...new Set([...basePartyIds, ...activeExtended])];
@@ -228,9 +233,36 @@ export function ConstituencyPanel() {
                       </svg>
                     )}
                   </button>
-                  <span className="text-[10px] font-mono font-semibold text-ink-2 tabular-nums min-w-[38px] text-right leading-none">
-                    {pct.toFixed(1)}%
-                  </span>
+                  {editingPct[partyId] !== undefined ? (
+                    <input
+                      type="text"
+                      value={editingPct[partyId]}
+                      onChange={e => setEditingPct(prev => ({ ...prev, [partyId]: e.target.value }))}
+                      onBlur={() => {
+                        const raw = parseFloat(editingPct[partyId] ?? '');
+                        if (!isNaN(raw)) handleSlider(partyId, Math.max(0, Math.min(100, raw)));
+                        setEditingPct(prev => { const n = { ...prev }; delete n[partyId]; return n; });
+                      }}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                        if (e.key === 'Escape') setEditingPct(prev => { const n = { ...prev }; delete n[partyId]; return n; });
+                      }}
+                      className="text-[10px] font-mono font-semibold text-blue-600 tabular-nums w-[38px] text-right leading-none bg-transparent border-b border-blue-400 outline-none"
+                      // eslint-disable-next-line jsx-a11y/no-autofocus
+                      autoFocus
+                    />
+                  ) : (
+                    <span
+                      className="text-[10px] font-mono font-semibold text-ink-2 tabular-nums min-w-[38px] text-right leading-none cursor-text hover:text-blue-600 hover:underline"
+                      title="Click to type a value"
+                      onClick={() => {
+                        if (!baselineLoaded) return;
+                        setEditingPct(prev => ({ ...prev, [partyId]: pct.toFixed(1) }));
+                      }}
+                    >
+                      {pct.toFixed(1)}%
+                    </span>
+                  )}
                 </div>
 
                 <input
