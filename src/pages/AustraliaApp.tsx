@@ -1924,7 +1924,7 @@ export default function AustraliaApp() {
   const navigate = useNavigate();
 
   // ── Core state ───────────────────────────────────────────────────────────────
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
   const [activePreset, setActivePreset] = useState<PresetId | null>('polling2026');
   const [currentResults, setCurrentResults] = useState<Record<string, Partial<Record<AuPartyId, number>>>>(() => buildPollingResults());

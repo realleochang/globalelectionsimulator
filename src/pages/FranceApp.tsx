@@ -2358,7 +2358,7 @@ function FrSummaryPanel({ deptResults, getCandInfo, roundLabel, onClose }: FrSum
 // ── Main France App ───────────────────────────────────────────────────────────
 export default function FranceApp() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [contributorsOpen, setContributorsOpen] = useState(false);
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [selectedDept, setSelectedDept] = useState<DeptInfo | null>(null);

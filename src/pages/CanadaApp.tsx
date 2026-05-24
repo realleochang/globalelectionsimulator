@@ -2129,7 +2129,7 @@ const DATA_CA_2026: Record<string, Record<string, number>> = {
 
 export default function CanadaApp() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [contributorsOpen, setContributorsOpen] = useState(false);
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
   const [ridingData, setRidingData] = useState<RidingData[]>([]);
