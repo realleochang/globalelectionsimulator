@@ -274,9 +274,9 @@ export default function HomePage() {
             accentGradient="linear-gradient(90deg, #009C3B 0%, #FFDF00 50%, #002776 100%)"
             parties={[{ color: '#C0112A', abbr: 'PT' }, { color: '#002F87', abbr: 'PL' }]}
           />
-          <ReleaseImminentCard
-            country="South Korea" election="Presidential Election" institution="Cheong Wa Dae"
+          <ComingSoonCard country="South Korea" election="Presidential Election" institution="Cheong Wa Dae"
             flagSrc={`${import.meta.env.BASE_URL}south-korea-flag.png`}
+            bgGradient="linear-gradient(to right, #C60C30 33%, #FFFFFF 33%, #FFFFFF 67%, #003087 67%)"
             accentGradient="linear-gradient(90deg, #C60C30 0%, #FFFFFF 50%, #003087 100%)"
             parties={[{ color: '#004EA2', abbr: 'DP' }, { color: '#C9151E', abbr: 'PPP' }]}
           />
