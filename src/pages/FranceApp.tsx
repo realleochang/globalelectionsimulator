@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
@@ -254,7 +255,7 @@ function LeaderDropdown({ options, value, color, onChange }: {
   onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number; upward: boolean } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const displayName = getLastName(value);
 
@@ -262,7 +263,14 @@ function LeaderDropdown({ options, value, color, onChange }: {
     e.stopPropagation();
     if (!open && btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left + r.width / 2 });
+      const spaceBelow = window.innerHeight - r.bottom;
+      const dropHeight = Math.min(options.length * 36 + 8, 300);
+      const openUpward = spaceBelow < dropHeight + 8;
+      setPos({
+        top: openUpward ? r.top - 4 : r.bottom + 4,
+        left: r.left + r.width / 2,
+        upward: openUpward,
+      });
     }
     setOpen(o => !o);
   };
@@ -275,11 +283,19 @@ function LeaderDropdown({ options, value, color, onChange }: {
           <path d="M1 1l2.5 2.5L6 1" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
-      {open && pos && (
+      {open && pos && createPortal(
         <>
           <div className="fixed inset-0 z-[1999]" onClick={() => setOpen(false)} />
           <div className="fixed z-[2000] bg-white border border-default rounded-lg shadow-xl py-1"
-            style={{ top: pos.top, left: pos.left, transform: 'translateX(-50%)', minWidth: 200 }}>
+            style={{
+              top: pos.upward ? undefined : pos.top,
+              bottom: pos.upward ? window.innerHeight - pos.top : undefined,
+              left: pos.left,
+              transform: 'translateX(-50%)',
+              minWidth: 200,
+              maxHeight: 300,
+              overflowY: 'auto',
+            }}>
             {options.map(opt => (
               <button key={opt} onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
                 className={`flex items-center gap-2 w-full px-3 py-2 text-left transition-colors ${opt === value ? 'bg-[#f8f7f4]' : 'hover:bg-hover'}`}>
@@ -293,7 +309,8 @@ function LeaderDropdown({ options, value, color, onChange }: {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
