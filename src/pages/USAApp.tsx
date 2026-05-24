@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, GeoJSON, CircleMarker, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { hsl } from 'd3';
@@ -580,6 +580,104 @@ function MapFitter({ geojson }: { geojson: GeoJsonObject }) {
   return null;
 }
 
+// ── Bubble map layer (imperative — matches Australia pattern) ─────────────────
+interface UsaBubbleLayerProps {
+  geojson: GeoJsonObject;
+  currentResults: Record<string, Record<string, number>>;
+  dark: boolean;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  blankSliderMemoryRef: React.MutableRefObject<Record<string, Record<UsaPartyId, number>>>;
+  blankReportingMemoryRef: React.MutableRefObject<Record<string, string>>;
+  currentResultsRef: React.MutableRefObject<Record<string, Record<string, number>>>;
+  stateReportingRef: React.MutableRefObject<Record<string, number>>;
+  multiSelectModeRef: React.MutableRefObject<boolean>;
+  activePresetRef: React.MutableRefObject<string | null>;
+  setTooltip: (t: any) => void;
+  setSelectedFips: (fn: (prev: string | null) => string | null) => void;
+  setSelectedFipsSet: (fn: (prev: Set<string>) => Set<string>) => void;
+}
+
+function UsaBubbleLayer({
+  geojson, currentResults, dark,
+  containerRef, blankSliderMemoryRef, blankReportingMemoryRef,
+  currentResultsRef, stateReportingRef, multiSelectModeRef, activePresetRef,
+  setTooltip, setSelectedFips, setSelectedFipsSet,
+}: UsaBubbleLayerProps) {
+  const map = useMap();
+  const markersRef = useRef<L.CircleMarker[]>([]);
+
+  useEffect(() => {
+    for (const m of markersRef.current) m.remove();
+    markersRef.current = [];
+
+    for (const feature of (geojson as any).features ?? []) {
+      const fips: string = feature.properties?.STATE ?? '';
+      const name: string = feature.properties?.NAME ?? '';
+      if (!fips) continue;
+      const results = currentResults[fips] ?? {};
+      const sorted = Object.values(results).filter((v): v is number => v > 0).sort((a, b) => b - a);
+      const total = sorted.reduce((s, v) => s + v, 0);
+      if (sorted.length === 0 || total === 0) continue;
+      const marginShare = sorted.length >= 2 ? sorted[0] - sorted[1] : sorted[0];
+      const marginPct = (marginShare / total) * 100;
+      const radius = 3 + Math.min(marginPct / 30, 1) * 10;
+      const color = stateFill(results, dark);
+      const center: [number, number] = CENTROID_OVERRIDES[fips] ?? computeCentroid(feature.geometry);
+
+      const marker = L.circleMarker(center, {
+        radius,
+        color: 'rgba(255,255,255,0.7)',
+        fillColor: color,
+        fillOpacity: 0.85,
+        weight: 0.8,
+        opacity: 0.9,
+      }).addTo(map);
+
+      marker.on('click', () => {
+        if (multiSelectModeRef.current) {
+          setSelectedFipsSet(prev => { const n = new Set(prev); n.has(fips) ? n.delete(fips) : n.add(fips); return n; });
+          return;
+        }
+        setSelectedFips(prev => prev === fips ? null : fips);
+      });
+
+      marker.on('mousemove', (e: L.LeafletMouseEvent) => {
+        const rect = containerRef.current?.getBoundingClientRect();
+        if (!rect) return;
+        const isBlank = activePresetRef.current === 'blank';
+        const blankRptPct = isBlank ? (parseFloat(blankReportingMemoryRef.current[fips] ?? '') || 0) : 0;
+        const blankPcts = isBlank ? blankSliderMemoryRef.current[fips] : undefined;
+        setTooltip({
+          x: e.originalEvent.clientX - rect.left,
+          y: e.originalEvent.clientY - rect.top,
+          name,
+          fips,
+          results: blankPcts
+            ? Object.fromEntries(Object.entries(blankPcts).map(([k, v]) => [k, Math.round(v * 1000)]))
+            : currentResultsRef.current[fips] ?? {},
+          stateVotes: isBlank
+            ? (blankRptPct > 0 ? Math.round((STATE_VOTES[fips] ?? 0) * blankRptPct / 100) : 0)
+            : (STATE_VOTES[fips] ?? 0),
+          reportingPct: isBlank
+            ? (blankRptPct > 0 ? blankRptPct : undefined)
+            : stateReportingRef.current[fips],
+        });
+      });
+
+      marker.on('mouseout', () => setTooltip(null));
+
+      markersRef.current.push(marker);
+    }
+
+    return () => {
+      for (const m of markersRef.current) m.remove();
+      markersRef.current = [];
+    };
+  }, [map, geojson, currentResults, dark]);
+
+  return null;
+}
+
 // ── Nominee photo circle ──────────────────────────────────────────────────────
 function UsaNomineePhoto({ partyId, isWinner, size = 52, nominees = USA_NOMINEES_2024 }: {
   partyId:   UsaPartyId;
@@ -935,15 +1033,23 @@ interface StatePanelProps {
   activePreset: string | null;
   splitCds?: Array<{ key: string; label: string; desc: string }>;
   cdResultsMap?: Record<string, Record<string, number>>;
+  blankSliderMemory?: React.MutableRefObject<Record<string, Record<UsaPartyId, number>>>;
+  blankReportingMemory?: React.MutableRefObject<Record<string, string>>;
 }
 
-function StatePanel({ fips, name, results, onClose, onResultsChange, onReportingCommit, activePreset, splitCds, cdResultsMap }: StatePanelProps) {
+function StatePanel({ fips, name, results, onClose, onResultsChange, onReportingCommit, activePreset, splitCds, cdResultsMap, blankSliderMemory, blankReportingMemory }: StatePanelProps) {
   const ev = EV[fips] ?? 0;
   const cdEvTotal = splitCds?.reduce((s, cd) => s + (EV[cd.key] ?? 0), 0) ?? 0;
 
   // All slider state lives here so statewide ↔ CD sync can happen in one place
-  const initPcts = (key: string, r?: Record<string, number>) =>
-    activePreset === 'blank' && !r ? blankInitPcts(key) : pctsFromResults(r);
+  const initPcts = (key: string, r?: Record<string, number>) => {
+    if (activePreset === 'blank') {
+      const saved = blankSliderMemory?.current[key];
+      if (saved) return saved;
+      if (!r) return blankInitPcts(key);
+    }
+    return pctsFromResults(r);
+  };
 
   const initCdDerivedState = (cdMap: Record<string, Record<UsaPartyId, number>>) => {
     const agg = { ...DEFAULT_PCTS };
@@ -970,12 +1076,20 @@ function StatePanel({ fips, name, results, onClose, onResultsChange, onReporting
   });
   const [locked, setLocked] = useState<Set<UsaPartyId>>(() => new Set(DEFAULT_LOCKED));
   const [projected, setProjected] = useState(false);
-  const [reporting, setReporting] = useState('');
+  const [reporting, setReporting] = useState(() =>
+    activePreset === 'blank' ? (blankReportingMemory?.current[fips] ?? '') : ''
+  );
 
   // Reset when the user selects a different state or loads a preset
   useEffect(() => {
-    const r2 = (key: string, r?: Record<string, number>) =>
-      activePreset === 'blank' && !r ? blankInitPcts(key) : pctsFromResults(r);
+    const r2 = (key: string, r?: Record<string, number>) => {
+      if (activePreset === 'blank') {
+        const saved = blankSliderMemory?.current[key];
+        if (saved) return saved;
+        if (!r) return blankInitPcts(key);
+      }
+      return pctsFromResults(r);
+    };
     if (splitCds && splitCds.length > 0 && activePreset === 'blank') {
       // ME/NE blank: statewide derived from CDs
       const newCds = Object.fromEntries(splitCds.map(cd => [cd.key, r2(cd.key, cdResultsMap?.[cd.key])]));
@@ -987,7 +1101,7 @@ function StatePanel({ fips, name, results, onClose, onResultsChange, onReporting
     }
     setLocked(new Set(DEFAULT_LOCKED));
     setProjected(false);
-    setReporting('');
+    setReporting(activePreset === 'blank' ? (blankReportingMemory?.current[fips] ?? '') : '');
   // Only reset on explicit navigation / preset change, not on every slider move
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fips, activePreset]);
@@ -1009,6 +1123,25 @@ function StatePanel({ fips, name, results, onClose, onResultsChange, onReporting
     const prevState = statePctsRef.current;
     const newState  = applySlide(prevState, pid, val, lockedRef.current);
     setStatePcts(newState);
+    if (activePreset === 'blank') {
+      if (blankSliderMemory) blankSliderMemory.current[fips] = newState;
+      if (splitCds && splitCds.length > 0) {
+        const deltas = ALL_PIDS.reduce((acc, p) => { acc[p] = (newState[p] ?? 0) - (prevState[p] ?? 0); return acc; }, {} as Record<UsaPartyId, number>);
+        const newCdPcts = { ...cdPctsRef.current };
+        for (const cd of splitCds) {
+          const cur = newCdPcts[cd.key] ?? { ...DEFAULT_PCTS };
+          const shifted = { ...DEFAULT_PCTS };
+          for (const p of ALL_PIDS) shifted[p] = Math.max(0, (cur[p] ?? 0) + deltas[p]);
+          const total = ALL_PIDS.reduce((s, p) => s + shifted[p], 0);
+          if (total > 0) for (const p of ALL_PIDS) shifted[p] = (shifted[p] / total) * 100;
+          newCdPcts[cd.key] = shifted;
+          if (blankSliderMemory) blankSliderMemory.current[cd.key] = shifted;
+        }
+        setCdPcts(newCdPcts);
+      }
+      setProjected(false);
+      return;
+    }
 
     if (splitCds && splitCds.length > 0) {
       const deltas = ALL_PIDS.reduce((acc, p) => {
@@ -1023,14 +1156,12 @@ function StatePanel({ fips, name, results, onClose, onResultsChange, onReporting
         const total = ALL_PIDS.reduce((s, p) => s + shifted[p], 0);
         if (total > 0) for (const p of ALL_PIDS) shifted[p] = (shifted[p] / total) * 100;
         newCdPcts[cd.key] = shifted;
-        if (activePreset !== 'blank') onResultsChange(cd.key, toRawResults(shifted));
+        onResultsChange(cd.key, toRawResults(shifted));
       }
       setCdPcts(newCdPcts);
     }
-
-    if (activePreset === 'blank') { setProjected(false); return; }
     onResultsChange(fips, toRawResults(newState));
-  }, [fips, splitCds, onResultsChange, activePreset]);
+  }, [fips, splitCds, onResultsChange, activePreset, blankSliderMemory]);
 
   // CD slider → proportional redistribution within that CD, then recompute statewide weighted avg
   const handleCdSlide = useCallback((cdKey: string, pid: UsaPartyId, val: number) => {
@@ -1049,11 +1180,12 @@ function StatePanel({ fips, name, results, onClose, onResultsChange, onReporting
       if (totalW > 0) for (const p of ALL_PIDS) newState[p] /= totalW;
       setStatePcts(newState);
       if (activePreset !== 'blank') onResultsChange(fips, toRawResults(newState));
+      else if (blankSliderMemory) { blankSliderMemory.current[cdKey] = newEntry; blankSliderMemory.current[fips] = newState; }
     }
 
     if (activePreset === 'blank') { setProjected(false); return; }
     onResultsChange(cdKey, toRawResults(newEntry));
-  }, [fips, splitCds, onResultsChange, activePreset]);
+  }, [fips, splitCds, onResultsChange, activePreset, blankSliderMemory]);
 
   const handleCommit = useCallback(() => {
     onResultsChange(fips, toRawResults(statePctsRef.current));
@@ -1149,7 +1281,7 @@ function StatePanel({ fips, name, results, onClose, onResultsChange, onReporting
           <input
             type="range" min={0} max={100} step={1}
             value={parseFloat(reporting) || 0}
-            onChange={e => { setReporting(e.target.value); setProjected(false); }}
+            onChange={e => { setReporting(e.target.value); setProjected(false); if (blankReportingMemory) blankReportingMemory.current[fips] = e.target.value; }}
             className="ca-party-slider w-full"
             style={{ '--party-color': '#c8a020', '--pct': `${parseFloat(reporting) || 0}%` } as React.CSSProperties}
           />
@@ -1165,8 +1297,7 @@ function StatePanel({ fips, name, results, onClose, onResultsChange, onReporting
           </div>
         </div>
 
-        {/* Sliders — hidden in blank mode until % reporting > 0 */}
-        {(activePreset !== 'blank' || (parseFloat(reporting) || 0) > 0) ? (
+        {(true) ? (
           <div className="space-y-3.5">
             {USA_PARTIES.map(p => {
               const pid = p.id as UsaPartyId;
@@ -1986,14 +2117,18 @@ export default function USAApp() {
   const containerRef          = useRef<HTMLDivElement | null>(null);
   const headerScrollRef       = useRef<HTMLDivElement>(null);
   const initialLoadRef        = useRef(false);
+  const blankSliderMemoryRef  = useRef<Record<string, Record<UsaPartyId, number>>>({});
+  const blankReportingMemoryRef = useRef<Record<string, string>>({});
   const currentResultsRef     = useRef(currentResults);
   const stateReportingRef     = useRef(stateReporting);
   const bubbleModeRef         = useRef(bubbleMapMode);
   const multiSelectModeRef    = useRef(multiSelectMode);
+  const activePresetRef       = useRef(activePreset);
   useEffect(() => { currentResultsRef.current = currentResults; }, [currentResults]);
   useEffect(() => { stateReportingRef.current = stateReporting; }, [stateReporting]);
   useEffect(() => { bubbleModeRef.current = bubbleMapMode; }, [bubbleMapMode]);
   useEffect(() => { multiSelectModeRef.current = multiSelectMode; }, [multiSelectMode]);
+  useEffect(() => { activePresetRef.current = activePreset; }, [activePreset]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -2093,47 +2228,10 @@ export default function USAApp() {
     return { votePcts: pcts, rawVotes: raw };
   }, [currentResults, activePreset, stateReporting]);
 
-  // ── Bubble data ────────────────────────────────────────────────────────────
-  const bubbleData = useMemo(() => {
-    if (!bubbleMapMode || !geojson) return [];
-    const items: { fips: string; name: string; center: [number, number]; marginVotes: number; color: string }[] = [];
-    for (const feature of (geojson as any).features ?? []) {
-      const fips: string = feature.properties?.STATE ?? '';
-      const name: string = feature.properties?.NAME ?? '';
-      if (!fips) continue;
-      const results = currentResults[fips] ?? {};
-      const sorted = Object.values(results).filter((v): v is number => v > 0).sort((a, b) => b - a);
-      const total = sorted.reduce((s, v) => s + v, 0);
-      if (sorted.length === 0 || total === 0) continue;
-      // Convert share-point margin → actual vote margin using state turnout
-      const stateVotes = STATE_VOTES[fips] ?? 0;
-      const marginShare = sorted.length >= 2 ? sorted[0] - sorted[1] : sorted[0];
-      const marginVotes = stateVotes > 0
-        ? Math.round((marginShare / total) * stateVotes)
-        : marginShare;
-      const hasFill = Object.values(results).some(v => v > 0);
-      const color = hasFill ? stateFill(results, dark) : (dark ? '#374151' : '#E5E7EB');
-      const center = CENTROID_OVERRIDES[fips] ?? computeCentroid(feature.geometry);
-      items.push({ fips, name, center, marginVotes, color });
-    }
-    // Area-proportional: area ∝ margin so visual size ratios match margin ratios exactly
-    // radius = sqrt(margin / maxMargin) * MAX_R  →  area = π·r² ∝ margin
-    const maxMarginVotes = Math.max(1, ...items.map(it => it.marginVotes));
-    const MAX_R = 20;
-    return items.map(it => ({
-      ...it,
-      radius: Math.max(3, Math.sqrt(it.marginVotes / maxMarginVotes) * MAX_R),
-    }));
-  }, [bubbleMapMode, geojson, currentResults, dark]);
-
-  // ── Re-style layer whenever results/selection/dark/bubble changes ──────────
+  // ── Re-style layer whenever results/selection/dark/bubbleMode changes ────
   useEffect(() => {
     if (!layerRef.current) return;
     enforceNoSmooth(layerRef.current);
-    if (bubbleMapMode) {
-      layerRef.current.setStyle(() => ({ fillOpacity: 0, weight: 0.5, color: dark ? '#555' : '#bbb', opacity: 0.7 }));
-      return;
-    }
     const lineColor = dark ? 'rgba(255,255,255,0.35)' : 'rgba(0,0,0,0.35)';
     layerRef.current.eachLayer((layer: L.Layer) => {
       const path = layer as L.Path & { feature?: Feature };
@@ -2180,6 +2278,8 @@ export default function USAApp() {
     setSelectedFipsSet(new Set());
     setMultiSelectMode(false);
     setSwingOpen(false);
+    blankSliderMemoryRef.current = {};
+    blankReportingMemoryRef.current = {};
   }, []);
 
   const stopSim = useCallback(() => {
@@ -2273,13 +2373,22 @@ export default function USAApp() {
       if (bubbleModeRef.current) { setTooltip(null); return; }
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
+      const isBlank = activePresetRef.current === 'blank';
+      const blankReportingPct = isBlank ? (parseFloat(blankReportingMemoryRef.current[fips] ?? '') || 0) : 0;
+      const blankPcts = isBlank ? blankSliderMemoryRef.current[fips] : undefined;
       setTooltip({
         x: e.originalEvent.clientX - rect.left,
         y: e.originalEvent.clientY - rect.top,
         name, fips,
-        results: currentResultsRef.current[fips] ?? {},
-        stateVotes: STATE_VOTES[fips] ?? 0,
-        reportingPct: stateReportingRef.current[fips],
+        results: blankPcts
+          ? Object.fromEntries(Object.entries(blankPcts).map(([k, v]) => [k, Math.round(v * 1000)]))
+          : currentResultsRef.current[fips] ?? {},
+        stateVotes: isBlank
+          ? (blankReportingPct > 0 ? Math.round((STATE_VOTES[fips] ?? 0) * blankReportingPct / 100) : 0)
+          : (STATE_VOTES[fips] ?? 0),
+        reportingPct: isBlank
+          ? (blankReportingPct > 0 ? blankReportingPct : undefined)
+          : stateReportingRef.current[fips],
       });
     });
 
@@ -2490,52 +2599,33 @@ export default function USAApp() {
                     updateWhenIdle={true}
                   />
                   <UsaMapController layerRef={layerRef} />
-                  <GeoJSON
-                    key="usa-states"
-                    data={geojson}
-                    style={geoStyle}
-                    onEachFeature={handleEachFeature}
-                    ref={layerRef as any}
-                    {...({ smoothFactor: 0 } as any)}
-                  />
-                  {bubbleData.map(b => (
-                    <CircleMarker
-                      key={b.fips}
-                      center={b.center}
-                      radius={b.radius}
-                      pathOptions={{
-                        fillColor: b.color,
-                        fillOpacity: 0.85,
-                        color: 'rgba(255,255,255,0.7)',
-                        weight: 0.8,
-                        opacity: 0.9,
-                      }}
-                      eventHandlers={{
-                        click: () => {
-                          if (multiSelectModeRef.current) {
-                            setSelectedFipsSet(prev => { const n = new Set(prev); n.has(b.fips) ? n.delete(b.fips) : n.add(b.fips); return n; });
-                            return;
-                          }
-                          setSelectedFips(prev => prev === b.fips ? null : b.fips);
-                        },
-                        mousemove: (e) => {
-                          const rect = containerRef.current?.getBoundingClientRect();
-                          if (!rect) return;
-                          const lme = e as unknown as L.LeafletMouseEvent;
-                          setTooltip({
-                            x: lme.originalEvent.clientX - rect.left,
-                            y: lme.originalEvent.clientY - rect.top,
-                            name: b.name,
-                            fips: b.fips,
-                            results: currentResultsRef.current[b.fips] ?? {},
-                            stateVotes: STATE_VOTES[b.fips] ?? 0,
-                            reportingPct: stateReportingRef.current[b.fips],
-                          });
-                        },
-                        mouseout: () => setTooltip(null),
-                      }}
+                  {!bubbleMapMode && (
+                    <GeoJSON
+                      key="usa-states"
+                      data={geojson}
+                      style={geoStyle}
+                      onEachFeature={handleEachFeature}
+                      ref={layerRef as any}
+                      {...({ smoothFactor: 0 } as any)}
                     />
-                  ))}
+                  )}
+                  {bubbleMapMode && activePreset !== 'blank' && (
+                    <UsaBubbleLayer
+                      geojson={geojson}
+                      currentResults={currentResults}
+                      dark={dark}
+                      containerRef={containerRef}
+                      blankSliderMemoryRef={blankSliderMemoryRef}
+                      blankReportingMemoryRef={blankReportingMemoryRef}
+                      currentResultsRef={currentResultsRef}
+                      stateReportingRef={stateReportingRef}
+                      multiSelectModeRef={multiSelectModeRef}
+                      activePresetRef={activePresetRef}
+                      setTooltip={setTooltip}
+                      setSelectedFips={setSelectedFips}
+                      setSelectedFipsSet={setSelectedFipsSet}
+                    />
+                  )}
                   <MapFitter geojson={geojson} />
                 </MapContainer>
 
@@ -2606,6 +2696,8 @@ export default function USAApp() {
                     SPLIT_STATES[selectedFips].map(cd => [cd.key, currentResults[cd.key] ?? {}])
                   )
                 : undefined}
+              blankSliderMemory={blankSliderMemoryRef}
+              blankReportingMemory={blankReportingMemoryRef}
             />
           )}
         </div>

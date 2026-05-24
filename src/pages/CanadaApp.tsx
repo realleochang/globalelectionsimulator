@@ -408,7 +408,7 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
   const [editValue, setEditValue] = useState('');
   const [reporting, setReporting] = useState('');
   const reportingNum = parseFloat(reporting) || 0;
-  const showReporting = activePreset === 'blank' || activePreset === 'sim';
+  const showReporting = activePreset === 'sim';
 
   useEffect(() => {
     if (total === 0) { setSliderPcts({}); return; }
@@ -592,11 +592,10 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
           <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 mb-3">
             {activePreset === '2025' ? '2025 Result' : activePreset === '2026' ? '2026 Projection' : activePreset === 'sim' ? 'Simulation' : 'Manual Entry'}
           </div>
-          {(activePreset !== 'blank' || reportingNum > 0) ? (
           <div className="space-y-3.5">
             {sliderParties.map(p => {
               const pct = sliderPcts[p.id] ?? 0;
-              const reportingFactor = (showReporting && activePreset === 'blank') ? reportingNum / 100 : 1;
+              const reportingFactor = showReporting ? reportingNum / 100 : 1;
               const votes = Math.round((pct / 100) * total * reportingFactor);
               const isLocked = locked.has(p.id);
               const isProjectedLock = activePreset === 'blank' && projected;
@@ -667,10 +666,6 @@ function RidingPanel({ name_en, name_fr, province, id, results, results2025, val
             })}
           </div>
           ) : (
-            <div className="py-4 text-center">
-              <div className="text-[10px] font-mono text-ink-3 italic">Slide % Reporting above to unlock</div>
-            </div>
-          )}
           <div className="text-[7.5px] font-mono text-ink-3/50 mt-2.5 pt-2 border-t border-default">
             {total.toLocaleString()} votes
           </div>

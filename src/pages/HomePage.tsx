@@ -287,6 +287,12 @@ export default function HomePage() {
             accentGradient="linear-gradient(90deg, #009246 0%, #FFFFFF 50%, #CE2B37 100%)"
             parties={[{ color: '#1A3A6B', abbr: 'FdI' }, { color: '#009934', abbr: 'LEG' }, { color: '#0047A0', abbr: 'FI' }, { color: '#E2001A', abbr: 'PD' }, { color: '#F0CD00', abbr: 'M5S' }]}
           />
+          <ComingSoonCard country="Sweden" election="General Election" institution="Riksdag"
+            flagSrc={`${import.meta.env.BASE_URL}sweden-flag.png`}
+            bgGradient="linear-gradient(to right, #006AA7 35%, #FECC00 35%, #FECC00 47%, #006AA7 47%)"
+            accentGradient="linear-gradient(90deg, #006AA7 0%, #FECC00 50%, #006AA7 100%)"
+            parties={[{ color: '#E8112D', abbr: 'S' }, { color: '#1B6EC4', abbr: 'M' }, { color: '#0052A5', abbr: 'SD' }, { color: '#009A44', abbr: 'C' }, { color: '#DA291C', abbr: 'V' }, { color: '#231F7A', abbr: 'KD' }]}
+          />
           <ComingSoonCard country="Netherlands" election="General Election" institution="Tweede Kamer"
             flagSrc={`${import.meta.env.BASE_URL}netherlands-flag.png`}
             bgGradient="linear-gradient(to bottom, #AE1C28 33%, #FFFFFF 33%, #FFFFFF 67%, #21468B 67%)"
@@ -310,12 +316,6 @@ export default function HomePage() {
             bgGradient="linear-gradient(to bottom, #FFFFFF 50%, #DC143C 50%)"
             accentGradient="linear-gradient(90deg, #FFFFFF 0%, #DC143C 100%)"
             parties={[{ color: '#FF7A00', abbr: 'KO' }, { color: '#1A3D7C', abbr: 'PiS' }, { color: '#008000', abbr: 'TD' }, { color: '#2C2C2C', abbr: 'KON' }, { color: '#CC0033', abbr: 'LEW' }]}
-          />
-          <ComingSoonCard country="Sweden" election="General Election" institution="Riksdag"
-            flagSrc={`${import.meta.env.BASE_URL}sweden-flag.png`}
-            bgGradient="linear-gradient(to right, #006AA7 35%, #FECC00 35%, #FECC00 47%, #006AA7 47%)"
-            accentGradient="linear-gradient(90deg, #006AA7 0%, #FECC00 50%, #006AA7 100%)"
-            parties={[{ color: '#E8112D', abbr: 'S' }, { color: '#1B6EC4', abbr: 'M' }, { color: '#0052A5', abbr: 'SD' }, { color: '#009A44', abbr: 'C' }, { color: '#DA291C', abbr: 'V' }, { color: '#231F7A', abbr: 'KD' }]}
           />
           <ComingSoonCard country="Denmark" election="General Election" institution="Folketing"
             flagSrc={`${import.meta.env.BASE_URL}denmark-flag.png`}
@@ -535,14 +535,18 @@ function ReleaseImminentCard({ country, election, institution, flagSrc, accentGr
 }
 
 function GermanyCard() {
+  const navigate = useNavigate();
   return (
-    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-not-allowed">
+    <button
+      onClick={() => navigate('/germany')}
+      className="country-card group relative rounded-xl overflow-hidden border border-default bg-white text-left transition-all duration-200 hover:-translate-y-1"
+    >
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: '2/1' }}>
         <img src={`${import.meta.env.BASE_URL}germany-flag.png`} alt="Germany flag" className="absolute inset-0 w-full h-full object-cover block" />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.22))' }} />
         <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/20">
-          <span className="w-[5px] h-[5px] rounded-full bg-amber-400 animate-pulse shrink-0" />
-          <span className="text-[7.5px] font-mono font-bold uppercase tracking-wider text-white/90 leading-none">Release Imminent</span>
+          <span className="w-[5px] h-[5px] rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <span className="text-[7.5px] font-mono font-bold uppercase tracking-wider text-white/90 leading-none">Live</span>
         </div>
       </div>
       <div className="p-4 pb-3">
@@ -560,13 +564,18 @@ function GermanyCard() {
       </div>
       <div className="px-4 pb-4 flex items-center gap-2">
         <div className="flex-1 h-px bg-black/8" />
-        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-amber-500">
-          <span className="w-[5px] h-[5px] rounded-full bg-amber-400 shrink-0" />
-          Release Imminent
+        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-gold group-hover:text-gold-deep transition-colors">
+          Open Simulator
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+            <path d="M2.5 5.5h6M5.5 3L8 5.5 5.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-[2.5px]" style={{ background: 'linear-gradient(90deg, #000000 0%, #DD0000 50%, #FFCE00 100%)' }} />
-    </div>
+      <div
+        className="absolute bottom-0 left-0 right-0 h-[2.5px] opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        style={{ background: 'linear-gradient(90deg, #000000 0%, #DD0000 50%, #FFCE00 100%)' }}
+      />
+    </button>
   );
 }
 
