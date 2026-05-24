@@ -91,6 +91,8 @@ function partyColor(id: DePartyId, dark = false): string {
   return DE_PARTY_MAP[id]?.color ?? '#888';
 }
 
+const PARTY_DISPLAY_ID: Partial<Record<DePartyId, string>> = { GRUE: 'GRÜ' };
+
 // ── Scoreboard tile ────────────────────────────────────────────────────────────
 function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVotes, isLeader, isWinner, hasMajority, dark }: {
   partyId: DePartyId; totalSeats: number; pct: number; votes: number;
@@ -142,7 +144,7 @@ function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVot
         )}
       </div>
       <span className="cand-leader-name" title={leader?.name}>{leader?.name.split(' ').pop() ?? party.name}</span>
-      <span className="cand-party-abbrev">{partyId}</span>
+      <span className="cand-party-abbrev">{PARTY_DISPLAY_ID[partyId] ?? partyId}</span>
       <span className="cand-seats">{totalSeats}</span>
       <span className="cand-party-name">{party.name}</span>
 
@@ -345,6 +347,15 @@ function MapController({ layerRef }: { layerRef: React.MutableRefObject<L.GeoJSO
     map.on('zoomend', h);
     return () => { map.off('zoomend', h); };
   }, [map, layerRef]);
+
+  // Invalidate Leaflet size whenever the map container resizes (e.g. scoreboard collapses)
+  useEffect(() => {
+    const container = map.getContainer();
+    const ro = new ResizeObserver(() => { map.invalidateSize(); });
+    ro.observe(container);
+    return () => ro.disconnect();
+  }, [map]);
+
   return null;
 }
 
