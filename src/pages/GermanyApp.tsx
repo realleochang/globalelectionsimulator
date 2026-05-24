@@ -6,7 +6,7 @@ import 'leaflet/dist/leaflet.css';
 import { hsl } from 'd3';
 import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import {
-  DE_PARTIES, DE_PARTY_MAP, DE_WAHLKREISE, DE_LEADERS,
+  DE_PARTIES, DE_PARTY_MAP, DE_WAHLKREISE, DE_LEADERS, DE_LEADERS_2026,
   calcBundestag, calcDirectSeats, calcMMP,
   BUNDESTAG_TOTAL, DIRECT_THRESHOLD, THRESHOLD_EXEMPT,
   ZWEITSTIMMEN_2025, ZWEIT_GRAND_TOTAL_2025,
@@ -94,24 +94,23 @@ function partyColor(id: DePartyId, dark = false): string {
 const PARTY_DISPLAY_ID: Partial<Record<DePartyId, string>> = { GRUE: 'GRÜNEN' };
 
 // ── Scoreboard tile ────────────────────────────────────────────────────────────
-function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVotes, isLeader, isWinner, hasMajority, dark }: {
+function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVotes, isLeader, isWinner, hasMajority, dark, leaders }: {
   partyId: DePartyId; totalSeats: number; pct: number; votes: number;
   zweitPct?: number; zweitRawVotes?: number;
   isLeader: boolean; isWinner: boolean;
   hasMajority?: boolean; dark?: boolean;
+  leaders?: Partial<Record<DePartyId, { name: string; wikiTitle?: string }>>;
 }) {
   const party = DE_PARTY_MAP[partyId];
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const leader = (leaders ?? DE_LEADERS)[partyId];
 
   useEffect(() => {
-    const leader = DE_LEADERS[partyId];
-    if (!leader?.wikiTitle) return;
+    if (!leader?.wikiTitle) { setPhotoUrl(null); return; }
     let cancelled = false;
     fetchWikiPhoto(leader.wikiTitle).then(url => { if (!cancelled) setPhotoUrl(url); });
     return () => { cancelled = true; };
-  }, [partyId]);
-
-  const leader = DE_LEADERS[partyId];
+  }, [leader?.wikiTitle]);
   const initials = leader?.name.split(' ').map((w: string) => w[0]).join('').slice(0,2) ?? party.name.slice(0,2);
   const color = partyColor(partyId, dark ?? false);
   const colorAlpha = hexToRgba(color, 0.13);
@@ -185,12 +184,13 @@ const UNION_IDS: DePartyId[] = ['CDU', 'CSU'];
 // Left → right political spectrum order for hemicycle
 const PARTY_LR_ORDER: DePartyId[] = ['LINKE', 'BSW', 'SPD', 'GRUE', 'SSW', 'FW', 'FDP', 'CDU', 'CSU', 'AFD'];
 
-function GermanyScoreboard({ wahlkreise, currentResults, zweitstimmen, directSeats: directSeatsOverride, dark }: {
+function GermanyScoreboard({ wahlkreise, currentResults, zweitstimmen, directSeats: directSeatsOverride, dark, leaders }: {
   wahlkreise: DeWahlkreis[];
   currentResults: Record<number, Partial<Record<DePartyId, number>>>;
   zweitstimmen?: Partial<Record<DePartyId, number>>;
   directSeats?: Partial<Record<DePartyId, number>>;
   dark?: boolean;
+  leaders?: Partial<Record<DePartyId, { name: string; wikiTitle?: string }>>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -293,7 +293,7 @@ function GermanyScoreboard({ wahlkreise, currentResults, zweitstimmen, directSea
               totalSeats={totalSeats[id] ?? 0} pct={pct} votes={votes}
               zweitPct={zp} zweitRawVotes={zv}
               isLeader={false} isWinner={false}
-              hasMajority={isUnionWinner} dark={dark}
+              hasMajority={isUnionWinner} dark={dark} leaders={leaders}
             />
           );
         })}
@@ -321,7 +321,7 @@ function GermanyScoreboard({ wahlkreise, currentResults, zweitstimmen, directSea
                   totalSeats={seats} pct={pct} votes={votes}
                   zweitPct={zp} zweitRawVotes={zv}
                   isLeader={isLeader} isWinner={isWinner}
-                  hasMajority={hasMaj} dark={dark}
+                  hasMajority={hasMaj} dark={dark} leaders={leaders}
                 />
               </>
             );
@@ -2179,6 +2179,7 @@ export default function GermanyApp() {
                 zweitstimmen={zweitVotes ?? undefined}
                 directSeats={zweitVotes ? directSeats : undefined}
                 dark={dark}
+                leaders={preset === 'polling2026' || preset === 'blank' ? { ...DE_LEADERS, ...DE_LEADERS_2026 } : DE_LEADERS}
               />
             </div>
           </div>

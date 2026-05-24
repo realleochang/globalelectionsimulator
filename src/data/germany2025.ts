@@ -534,8 +534,8 @@ export const STATE_NAMES: Record<string, string> = {
 export const DE_LEADERS: Partial<Record<DePartyId, { name: string; wikiTitle?: string }>> = {
   CDU:   { name: 'Friedrich Merz',    wikiTitle: 'Friedrich_Merz' },
   CSU:   { name: 'Markus Söder',      wikiTitle: 'Markus_Söder' },
-  SPD:   { name: 'Lars Klingbeil',    wikiTitle: 'Lars_Klingbeil' },
-  GRUE:  { name: 'Franziska Brantner', wikiTitle: 'Franziska_Brantner' },
+  SPD:   { name: 'Olaf Scholz',       wikiTitle: 'Olaf_Scholz' },
+  GRUE:  { name: 'Robert Habeck',     wikiTitle: 'Robert_Habeck' },
   AFD:   { name: 'Alice Weidel',      wikiTitle: 'Alice_Weidel' },
   LINKE: { name: 'Jan van Aken',      wikiTitle: 'Jan_van_Aken_(politician)' },
   FDP:   { name: 'Christian Lindner', wikiTitle: 'Christian_Lindner' },
@@ -543,4 +543,9 @@ export const DE_LEADERS: Partial<Record<DePartyId, { name: string; wikiTitle?: s
   BSW:   { name: 'Sahra Wagenknecht', wikiTitle: 'Sahra_Wagenknecht' },
   SSW:   { name: 'Stefan Seidler',    wikiTitle: 'Stefan_Seidler' },
   SONST: { name: 'Sonstige' },
+};
+
+export const DE_LEADERS_2026: Partial<Record<DePartyId, { name: string; wikiTitle?: string }>> = {
+  SPD:  { name: 'Lars Klingbeil',     wikiTitle: 'Lars_Klingbeil' },
+  GRUE: { name: 'Franziska Brantner', wikiTitle: 'Franziska_Brantner' },
 };
