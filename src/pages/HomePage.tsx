@@ -118,13 +118,13 @@ export default function HomePage() {
 
         <div className="ml-auto flex items-center gap-2.5">
           <a
-            href="https://buymeacoffee.com/realleochang"
+            href="https://ko-fi.com/globalelectionsimulator"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border border-default text-ink-3 hover:border-ink-3 hover:text-ink transition-colors"
+            className="relative flex items-center gap-1.5 px-2.5 py-1 rounded-full overflow-hidden font-mono font-black text-[8.5px] uppercase tracking-[0.18em] leading-none text-white"
+            style={{ background: 'linear-gradient(90deg, #e05c00, #e8a020, #c8a020, #e05c00)', backgroundSize: '200% 100%', animation: 'donateCycle 2.8s linear infinite' }}
           >
-            <span className="text-[10px] leading-none">☕</span>
-            <span className="text-[8.5px] font-mono font-black uppercase tracking-[0.18em] leading-none">Donate</span>
+            Donate
           </a>
           <a
             href="https://x.com/realleochang"
@@ -197,6 +197,24 @@ export default function HomePage() {
             </a>
           </div>
 
+          {/* Supporters strip */}
+          <div className="mt-5 flex flex-col items-center gap-3 w-fit mx-auto">
+            <span className="text-[10px] font-mono font-bold uppercase tracking-[0.22em] text-ink-3 text-center">Supporters</span>
+            <a
+              href="https://x.com/comfoofifoo"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center gap-2.5 px-4 py-2.5 rounded-xl border border-default hover:border-ink-3 bg-white transition-all duration-150 hover:-translate-y-0.5 hover:shadow-sm"
+            >
+              <div className="w-7 h-7 rounded-full bg-ink flex items-center justify-center shrink-0">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="white" aria-hidden="true">
+                  <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.259 5.66zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                </svg>
+              </div>
+              <span className="text-[11px] font-mono font-semibold text-ink group-hover:text-gold transition-colors">@comfoofifoo</span>
+            </a>
+          </div>
+
         </div>
 
         {/* Country grid */}
@@ -250,6 +268,25 @@ export default function HomePage() {
 
           <GermanyCard />
 
+          <ReleaseImminentCard
+            country="Brazil" election="Presidential Election" institution="Palácio do Planalto"
+            flagSrc={`${import.meta.env.BASE_URL}brazil-flag.png`}
+            accentGradient="linear-gradient(90deg, #009C3B 0%, #FFDF00 50%, #002776 100%)"
+            parties={[{ color: '#C0112A', abbr: 'PT' }, { color: '#002F87', abbr: 'PL' }]}
+          />
+          <ReleaseImminentCard
+            country="South Korea" election="Presidential Election" institution="Cheong Wa Dae"
+            flagSrc={`${import.meta.env.BASE_URL}south-korea-flag.png`}
+            accentGradient="linear-gradient(90deg, #C60C30 0%, #FFFFFF 50%, #003087 100%)"
+            parties={[{ color: '#004EA2', abbr: 'DP' }, { color: '#C9151E', abbr: 'PPP' }]}
+          />
+
+          <ComingSoonCard country="Netherlands" election="General Election" institution="Tweede Kamer"
+            flagSrc={`${import.meta.env.BASE_URL}netherlands-flag.png`}
+            bgGradient="linear-gradient(to bottom, #AE1C28 33%, #FFFFFF 33%, #FFFFFF 67%, #21468B 67%)"
+            accentGradient="linear-gradient(90deg, #AE1C28 0%, #FFFFFF 50%, #21468B 100%)"
+            parties={[{ color: '#003366', abbr: 'PVV' }, { color: '#00A650', abbr: 'GL' }, { color: '#CC0000', abbr: 'PvdA' }, { color: '#005B8E', abbr: 'VVD' }, { color: '#CC0000', abbr: 'SP' }]}
+          />
           <ComingSoonCard country="Romania" election="Presidential Election" institution="Cotroceni Palace"
             flagSrc={`${import.meta.env.BASE_URL}romania-flag.png`}
             bgGradient="linear-gradient(to right, #002B7F 33%, #FCD116 33%, #FCD116 67%, #CE1126 67%)"
@@ -293,12 +330,6 @@ export default function HomePage() {
             parties={[{ color: '#009835', abbr: 'SVP' }, { color: '#F0554D', abbr: 'SP' }, { color: '#3871C1', abbr: 'FDP' }, { color: '#84B135', abbr: 'GPS' }, { color: '#FF8000', abbr: 'MDT' }]}
           />
 
-          <ComingSoonCard country="Brazil" election="Presidential Election" institution="Palácio do Planalto"
-            flagSrc={`${import.meta.env.BASE_URL}brazil-flag.png`}
-            bgGradient="linear-gradient(to bottom, #009C3B 33%, #FFDF00 33%, #FFDF00 67%, #002776 67%)"
-            accentGradient="linear-gradient(90deg, #009C3B 0%, #FFDF00 50%, #002776 100%)"
-            parties={[{ color: '#C0112A', abbr: 'PT' }, { color: '#002F87', abbr: 'PL' }, { color: '#0C7FC9', abbr: 'MDB' }, { color: '#FF6B00', abbr: 'NOV' }]}
-          />
           <ComingSoonCard country="Peru" election="Presidential Election" institution="Palacio de Gobierno"
             flagSrc={`${import.meta.env.BASE_URL}peru-flag.png`}
             bgGradient="linear-gradient(to right, #D91023 33%, #FFFFFF 33%, #FFFFFF 67%, #D91023 67%)"
@@ -313,12 +344,6 @@ export default function HomePage() {
             parties={[{ color: '#006400', abbr: 'ANC' }, { color: '#0099CC', abbr: 'DA' }, { color: '#111111', abbr: 'MK' }, { color: '#CC0000', abbr: 'EFF' }, { color: '#FFCC00', abbr: 'IFP' }]}
           />
 
-          <ComingSoonCard country="South Korea" election="Presidential Election" institution="Cheong Wa Dae"
-            flagSrc={`${import.meta.env.BASE_URL}south-korea-flag.png`}
-            bgGradient="linear-gradient(135deg, #FFFFFF 50%, #C60C30 50%)"
-            accentGradient="linear-gradient(90deg, #C60C30 0%, #FFFFFF 50%, #003087 100%)"
-            parties={[{ color: '#C9151E', abbr: 'PPP' }, { color: '#004EA2', abbr: 'DP' }, { color: '#FFCC00', abbr: 'JUS' }, { color: '#00A63C', abbr: 'REF' }]}
-          />
           <ComingSoonCard country="Taiwan" election="Presidential Election" institution="Executive Yuan"
             flagSrc={`${import.meta.env.BASE_URL}taiwan-flag.png`}
             bgGradient="linear-gradient(to right, #003893 40%, #FE0000 40%)"
@@ -473,12 +498,52 @@ function CanadaCard() {
 
 
 
+function ReleaseImminentCard({ country, election, institution, flagSrc, accentGradient, parties }: {
+  country: string;
+  election: string;
+  institution: string;
+  flagSrc: string;
+  accentGradient: string;
+  parties: { color: string; abbr: string }[];
+}) {
+  return (
+    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-not-allowed">
+      <div className="relative w-full overflow-hidden" style={{ aspectRatio: '2/1' }}>
+        <img src={flagSrc} alt={`${country} flag`} className="absolute inset-0 w-full h-full object-cover block" />
+        <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.22))' }} />
+        <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/20">
+          <span className="w-[5px] h-[5px] rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <span className="text-[7.5px] font-mono font-bold uppercase tracking-wider text-white/90 leading-none">Release Imminent</span>
+        </div>
+      </div>
+      <div className="p-4 pb-3">
+        <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-ink-3 mb-1.5">{country}</div>
+        <div className="font-display text-[15px] font-black uppercase tracking-normal text-ink leading-tight">{election}</div>
+        <div className="mt-2 text-[8.5px] font-mono text-ink-3">{institution}</div>
+        <PartyDots parties={parties} />
+      </div>
+      <div className="px-4 pb-4 flex items-center gap-2">
+        <div className="flex-1 h-px bg-black/8" />
+        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-amber-500">
+          <span className="w-[5px] h-[5px] rounded-full bg-amber-400 shrink-0" />
+          Release Imminent
+        </div>
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 h-[2.5px]" style={{ background: accentGradient }} />
+    </div>
+  );
+}
+
 function GermanyCard() {
   return (
-    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default opacity-50">
+    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-not-allowed">
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: '2/1' }}>
         <img src={`${import.meta.env.BASE_URL}germany-flag.png`} alt="Germany flag" className="absolute inset-0 w-full h-full object-cover block" />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.22))' }} />
+        <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/20">
+          <span className="w-[5px] h-[5px] rounded-full bg-amber-400 animate-pulse shrink-0" />
+          <span className="text-[7.5px] font-mono font-bold uppercase tracking-wider text-white/90 leading-none">Release Imminent</span>
+        </div>
       </div>
       <div className="p-4 pb-3">
         <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-ink-3 mb-1.5">Germany</div>
@@ -495,12 +560,9 @@ function GermanyCard() {
       </div>
       <div className="px-4 pb-4 flex items-center gap-2">
         <div className="flex-1 h-px bg-black/8" />
-        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 opacity-50">
-          <svg width="9" height="10" viewBox="0 0 9 10" fill="none" aria-hidden="true">
-            <rect x="1" y="4.5" width="7" height="5" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/>
-            <path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" fill="none"/>
-          </svg>
-          Coming Soon
+        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-amber-500">
+          <span className="w-[5px] h-[5px] rounded-full bg-amber-400 shrink-0" />
+          Release Imminent
         </div>
       </div>
       <div className="absolute bottom-0 left-0 right-0 h-[2.5px]" style={{ background: 'linear-gradient(90deg, #000000 0%, #DD0000 50%, #FFCE00 100%)' }} />
@@ -510,11 +572,19 @@ function GermanyCard() {
 
 
 function AustraliaCard() {
+  const navigate = useNavigate();
   return (
-    <div className="country-card relative rounded-xl overflow-hidden border border-default bg-white text-left select-none cursor-default">
+    <button
+      onClick={() => navigate('/australia')}
+      className="country-card group relative rounded-xl overflow-hidden border border-default bg-white text-left transition-all duration-200 hover:-translate-y-1"
+    >
       <div className="relative w-full overflow-hidden" style={{ aspectRatio: '2/1' }}>
         <img src={`${import.meta.env.BASE_URL}australia-flag.png`} alt="Australia flag" className="absolute inset-0 w-full h-full object-cover block" />
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 55%, rgba(0,0,0,0.22))' }} />
+        <div className="absolute top-2.5 right-2.5 flex items-center gap-1 px-2 py-0.5 rounded-full bg-black/30 backdrop-blur-sm border border-white/20">
+          <span className="w-[5px] h-[5px] rounded-full bg-emerald-400 animate-pulse shrink-0" />
+          <span className="text-[7.5px] font-mono font-bold uppercase tracking-wider text-white/90 leading-none">Live</span>
+        </div>
       </div>
       <div className="p-4 pb-3">
         <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-ink-3 mb-1.5">Australia</div>
@@ -530,16 +600,18 @@ function AustraliaCard() {
       </div>
       <div className="px-4 pb-4 flex items-center gap-2">
         <div className="flex-1 h-px bg-black/8" />
-        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-red-500">
-          <span className="relative flex h-2 w-2 shrink-0">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
-            <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500" />
-          </span>
-          Release Imminent
+        <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-gold group-hover:text-gold-deep transition-colors">
+          Open Simulator
+          <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+            <path d="M2.5 5.5h6M5.5 3L8 5.5 5.5 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
         </div>
       </div>
-      <div className="absolute bottom-0 left-0 right-0 h-[2.5px]" style={{ background: 'linear-gradient(90deg, #003893 0%, #FFFFFF 50%, #003893 100%)' }} />
-    </div>
+      <div
+        className="absolute bottom-0 left-0 right-0 h-[2.5px] opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+        style={{ background: 'linear-gradient(90deg, #003893 0%, #FFFFFF 50%, #003893 100%)' }}
+      />
+    </button>
   );
 }
 
