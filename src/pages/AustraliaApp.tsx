@@ -2264,7 +2264,7 @@ export default function AustraliaApp() {
           <GlobeLogo />
           <div className="hidden sm:flex flex-col justify-center mr-2 leading-none">
             <span className="font-display font-black uppercase tracking-[0.04em] text-[14px] text-ink leading-none">Global Election Simulator</span>
-            <span className="text-[7.5px] font-mono uppercase tracking-[0.13em] text-ink-3 leading-none mt-[3px]">Australian Edition</span>
+            <span className="text-[7.5px] font-mono uppercase tracking-[0.13em] text-ink-3 leading-none mt-[3px]">Canberra Edition</span>
           </div>
         </button>
 
@@ -2557,7 +2557,7 @@ export default function AustraliaApp() {
 
         {/* Branding stamp */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none z-30 flex items-center justify-between px-3 py-1 bg-ink/60">
-          <span className="text-[10px] text-white/70 font-mono tracking-wide uppercase">Global Election Simulator — Australian Edition</span>
+          <span className="text-[10px] text-white/70 font-mono tracking-wide uppercase">Global Election Simulator — Canberra Edition</span>
           <span className="text-[10px] text-white/40 font-mono">{typeof window !== 'undefined' ? window.location.hostname : ''}</span>
         </div>
       </div>
