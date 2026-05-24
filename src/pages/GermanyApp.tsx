@@ -91,7 +91,7 @@ function partyColor(id: DePartyId, dark = false): string {
   return DE_PARTY_MAP[id]?.color ?? '#888';
 }
 
-const PARTY_DISPLAY_ID: Partial<Record<DePartyId, string>> = { GRUE: 'GRÜ' };
+const PARTY_DISPLAY_ID: Partial<Record<DePartyId, string>> = { GRUE: 'GRÜNEN' };
 
 // ── Scoreboard tile ────────────────────────────────────────────────────────────
 function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVotes, isLeader, isWinner, hasMajority, dark }: {
