@@ -281,6 +281,12 @@ export default function HomePage() {
             parties={[{ color: '#004EA2', abbr: 'DP' }, { color: '#C9151E', abbr: 'PPP' }]}
           />
 
+          <ComingSoonCard country="Italy" election="General Election" institution="Camera dei Deputati"
+            flagSrc={`${import.meta.env.BASE_URL}italy-flag.png`}
+            bgGradient="linear-gradient(to right, #009246 33%, #FFFFFF 33%, #FFFFFF 67%, #CE2B37 67%)"
+            accentGradient="linear-gradient(90deg, #009246 0%, #FFFFFF 50%, #CE2B37 100%)"
+            parties={[{ color: '#1A3A6B', abbr: 'FdI' }, { color: '#009934', abbr: 'LEG' }, { color: '#0047A0', abbr: 'FI' }, { color: '#E2001A', abbr: 'PD' }, { color: '#F0CD00', abbr: 'M5S' }]}
+          />
           <ComingSoonCard country="Netherlands" election="General Election" institution="Tweede Kamer"
             flagSrc={`${import.meta.env.BASE_URL}netherlands-flag.png`}
             bgGradient="linear-gradient(to bottom, #AE1C28 33%, #FFFFFF 33%, #FFFFFF 67%, #21468B 67%)"
@@ -292,12 +298,6 @@ export default function HomePage() {
             bgGradient="linear-gradient(to right, #002B7F 33%, #FCD116 33%, #FCD116 67%, #CE1126 67%)"
             accentGradient="linear-gradient(90deg, #002B7F 0%, #FCD116 50%, #CE1126 100%)"
             parties={[{ color: '#B8860B', abbr: 'AUR' }, { color: '#CE0002', abbr: 'PSD' }, { color: '#FFCC00', abbr: 'PNL' }, { color: '#162A56', abbr: 'USR' }]}
-          />
-          <ComingSoonCard country="Italy" election="General Election" institution="Camera dei Deputati"
-            flagSrc={`${import.meta.env.BASE_URL}italy-flag.png`}
-            bgGradient="linear-gradient(to right, #009246 33%, #FFFFFF 33%, #FFFFFF 67%, #CE2B37 67%)"
-            accentGradient="linear-gradient(90deg, #009246 0%, #FFFFFF 50%, #CE2B37 100%)"
-            parties={[{ color: '#1A3A6B', abbr: 'FdI' }, { color: '#009934', abbr: 'LEG' }, { color: '#0047A0', abbr: 'FI' }, { color: '#E2001A', abbr: 'PD' }, { color: '#F0CD00', abbr: 'M5S' }]}
           />
           <ComingSoonCard country="Austria" election="Parliamentary Election" institution="Nationalrat"
             flagSrc={`${import.meta.env.BASE_URL}austria-flag.png`}
