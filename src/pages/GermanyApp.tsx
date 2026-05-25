@@ -699,6 +699,7 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
   const [locks, setLocks]   = useState<Set<DePartyId>>(new Set());
   const [editId, setEditId] = useState<DePartyId | null>(null);
   const [editVal, setEditVal] = useState('');
+  const [showRef, setShowRef] = useState(false);
 
   const pctsRef  = useRef(pcts);
   const locksRef = useRef(locks);
@@ -833,9 +834,42 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
             </div>
           );
         })}
+        {/* 2025 reference — blank map only */}
+        {isBlank && showRef && (
+          <div className="mt-3 pt-3 border-t border-default">
+            <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-2">2025 Actual Results</div>
+            <div className="space-y-1.5">
+              {[...sortedIds]
+                .filter(id => (basePcts[id] ?? 0) > 0)
+                .sort((a, b) => (basePcts[b] ?? 0) - (basePcts[a] ?? 0))
+                .map(id => {
+                  const color = partyColor(id, dark ?? false);
+                  const base = basePcts[id] ?? 0;
+                  return (
+                    <div key={id}>
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                        <span className="text-[9px] font-medium text-ink-2 flex-1 truncate">{DE_PARTY_MAP[id].name}</span>
+                        <span className="text-[9px] font-mono font-semibold tabular-nums text-ink-2">{base.toFixed(1)}%</span>
+                      </div>
+                      <div className="w-full h-1 rounded-full overflow-hidden bg-black/6">
+                        <div style={{ width: `${Math.min(base / 50 * 100, 100)}%`, height: '100%', background: color, opacity: 0.6, borderRadius: 9999 }} />
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="px-3.5 py-2 border-t border-default space-y-1.5">
+        {isBlank && !isProjected && (
+          <button
+            onClick={() => setShowRef(v => !v)}
+            className={`w-full py-1.5 text-[10px] font-mono rounded-[4px] border transition-colors ${showRef ? 'border-gold/60 bg-amber-50 text-amber-700' : 'border-default text-ink-3 hover:bg-hover'}`}
+          >{showRef ? 'Hide 2025 Reference' : 'Show 2025 Reference'}</button>
+        )}
         {isBlank && (
           isProjected ? (
             <div className="w-full py-2 flex items-center justify-center gap-2 text-[11px] font-mono font-bold rounded-[4px] bg-emerald-600/15 text-emerald-700 border border-emerald-300 select-none">
