@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, useCallback, useMemo, forwardRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MapContainer, TileLayer, GeoJSON, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { hsl } from 'd3';
@@ -422,13 +422,40 @@ function MapFitter({ geojson }: { geojson: GeoJsonObject }) {
   return null;
 }
 
-function MapController({ layerRef }: { layerRef: { current: L.GeoJSON | null } }) {
+function AuGeoLayer({ geojson, style, onEachFeature, layerRef }: {
+  geojson: GeoJsonObject;
+  style: () => L.PathOptions;
+  onEachFeature: (feature: Feature, layer: L.Layer) => void;
+  layerRef: { current: L.GeoJSON | null };
+}) {
   const map = useMap();
+  const styleRef = useRef(style);
+  const onEachRef = useRef(onEachFeature);
+  useEffect(() => { styleRef.current = style; }, [style]);
+  useEffect(() => { onEachRef.current = onEachFeature; }, [onEachFeature]);
+
   useEffect(() => {
-    const onZoomEnd = () => { if (layerRef.current) enforceNoSmooth(layerRef.current); };
+    const layer = L.geoJSON(geojson as any, {
+      ...({ smoothFactor: 0 } as any),
+      renderer: L.svg({ padding: 0.5 }),
+      style: () => styleRef.current(),
+      onEachFeature: (f, l) => onEachRef.current(f, l),
+    });
+    layer.addTo(map);
+    layerRef.current = layer;
+    enforceNoSmooth(layer);
+
+    const onZoomEnd = () => enforceNoSmooth(layer);
     map.on('zoomend', onZoomEnd);
-    return () => { map.off('zoomend', onZoomEnd); };
-  }, [map, layerRef]);
+
+    return () => {
+      map.off('zoomend', onZoomEnd);
+      layer.remove();
+      layerRef.current = null;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, geojson]);
+
   return null;
 }
 
@@ -2571,15 +2598,11 @@ export default function AustraliaApp() {
                     : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'}
                   maxZoom={19}
                 />
-                <GeoJSON
-                  key="au-geo"
-                  data={geojson}
+                <AuGeoLayer
+                  geojson={geojson}
                   style={geoStyle}
                   onEachFeature={handleEachFeature}
-                  ref={(r: L.GeoJSON | null) => {
-                    layerRef.current = r;
-                    if (r) enforceNoSmooth(r);
-                  }}
+                  layerRef={layerRef}
                 />
                 {bubbleMap && !!activePreset && (
                   <BubbleLayer
@@ -2590,7 +2613,6 @@ export default function AustraliaApp() {
                   />
                 )}
                 <MapFitter geojson={geojson} />
-                <MapController layerRef={layerRef} />
               </MapContainer>
             )}
 
