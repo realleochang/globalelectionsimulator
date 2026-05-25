@@ -41,24 +41,25 @@ type TooltipState = {
 } | null;
 
 // ── Leaders ────────────────────────────────────────────────────────────────────
-// Post-2025 leaders (Dutton lost Dickson → Taylor; Bandt lost Melbourne → Waters)
+// Post-2025 / 2026 leaders (Dutton lost Dickson → Taylor; Bandt lost Melbourne → Waters; Littleproud → Canavan)
 const AU_LEADERS: Record<AuPartyId, LeaderInfo> = {
-  ALP: { lastName: 'Albanese',    wikiTitle: 'Anthony_Albanese' },
-  LIB: { lastName: 'Taylor',      wikiTitle: 'Angus_Taylor_(politician)' },
-  NAT: { lastName: 'Littleproud', wikiTitle: 'David_Littleproud' },
-  LNP: { lastName: 'Crisafulli',  wikiTitle: 'David_Crisafulli' },
-  GRN: { lastName: 'Waters',      wikiTitle: 'Larissa_Waters' },
-  KAP: { lastName: 'Katter',      wikiTitle: 'Bob_Katter' },
-  CA:  { lastName: 'Sharkie',     wikiTitle: 'Rebekha_Sharkie' },
-  ONP: { lastName: 'Hanson',      wikiTitle: 'Pauline_Hanson' },
-  IND: { lastName: 'Ind.',        initials: 'IND' },
-  OTH: { lastName: 'Other',       initials: 'OTH' },
+  ALP: { lastName: 'Albanese',   wikiTitle: 'Anthony_Albanese' },
+  LIB: { lastName: 'Taylor',     wikiTitle: 'Angus_Taylor_(politician)' },
+  NAT: { lastName: 'Canavan',    localImage: 'leaders/matt-canavan.jpg', objectPosition: 'center 15%' },
+  LNP: { lastName: 'Crisafulli', wikiTitle: 'David_Crisafulli' },
+  GRN: { lastName: 'Waters',     wikiTitle: 'Larissa_Waters' },
+  KAP: { lastName: 'Katter',     wikiTitle: 'Bob_Katter' },
+  CA:  { lastName: 'Sharkie',    wikiTitle: 'Rebekha_Sharkie' },
+  ONP: { lastName: 'Hanson',     wikiTitle: 'Pauline_Hanson' },
+  IND: { lastName: 'Ind.',       initials: 'IND' },
+  OTH: { lastName: 'Other',      initials: 'OTH' },
 };
 
 // 2025 election leaders (shown when the 2025 preset is active)
 const AU_LEADERS_2025: Partial<Record<AuPartyId, LeaderInfo>> = {
-  LIB: { lastName: 'Dutton',  wikiTitle: 'Peter_Dutton' },
-  GRN: { lastName: 'Bandt',   wikiTitle: 'Adam_Bandt' },
+  LIB: { lastName: 'Dutton',      wikiTitle: 'Peter_Dutton' },
+  NAT: { lastName: 'Littleproud', wikiTitle: 'David_Littleproud' },
+  GRN: { lastName: 'Bandt',       wikiTitle: 'Adam_Bandt' },
 };
 
 // ── Hemicycle constants ────────────────────────────────────────────────────────
