@@ -2015,8 +2015,8 @@ export default function AustraliaApp() {
   // ── Core state ───────────────────────────────────────────────────────────────
   const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
-  const [activePreset, setActivePreset] = useState<PresetId | null>('polling2026');
-  const [currentResults, setCurrentResults] = useState<Record<string, Partial<Record<AuPartyId, number>>>>(() => buildPollingResults());
+  const [activePreset, setActivePreset] = useState<PresetId | null>('baseline');
+  const [currentResults, setCurrentResults] = useState<Record<string, Partial<Record<AuPartyId, number>>>>(() => buildBaselineResults());
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [tooltip, setTooltip] = useState<TooltipState>(null);
