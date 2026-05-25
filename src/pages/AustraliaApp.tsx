@@ -1106,7 +1106,14 @@ function AuSimPanel({ onClose, onStart, onStop, running, progress, declared, hid
                   <span className="text-[10px] font-mono text-ink-2 w-8 shrink-0">{id}</span>
                   <input type="number" step={0.1} min={0} max={cap ?? 100}
                     value={shares[id]} disabled={running}
-                    onChange={e => setShares(prev => ({ ...prev, [id]: e.target.value }))}
+                    onChange={e => {
+                      const raw = e.target.value;
+                      const num = parseFloat(raw);
+                      const clamped = cap !== undefined && !isNaN(num) && num > cap
+                        ? cap.toFixed(1)
+                        : raw;
+                      setShares(prev => ({ ...prev, [id]: clamped }));
+                    }}
                     className={`flex-1 h-6 text-[11px] font-mono rounded-[4px] border bg-white text-ink px-2 text-center focus:outline-none disabled:opacity-40 ${overCap ? 'border-amber-400 focus:border-amber-500' : 'border-default focus:border-strong'}`} />
                   <span className="text-[8px] font-mono text-ink-3 w-14 shrink-0 text-right leading-tight">
                     {cap !== undefined ? `≤${cap.toFixed(1)}%` : (note ?? '')}
