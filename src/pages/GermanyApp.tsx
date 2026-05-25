@@ -1144,7 +1144,8 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
   }
 
   function applyPctChange(id: DePartyId, newVal: number) {
-    const next = redistributePcts(pctsRef.current, id, newVal, locks);
+    const clamped = Math.max(0, Math.min(100, newVal));
+    const next = { ...pctsRef.current, [id]: clamped };
     pctsRef.current = next;
     setPcts(next);
     onVotesChange(pctToRaw(next));

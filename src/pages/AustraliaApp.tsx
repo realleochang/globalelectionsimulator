@@ -25,6 +25,11 @@ type LeaderInfo = {
   initials?: string;
 };
 
+type IrvRound = {
+  eliminated: AuPartyId | null; // null = first preferences
+  votes: Partial<Record<AuPartyId, number>>;
+};
+
 type TooltipState = {
   x: number; y: number;
   name: string; state: string;
@@ -32,6 +37,7 @@ type TooltipState = {
   parties: { id: string; votes: number; pct: number }[];
   winner: AuPartyId | null;
   tpp: { alp: number; coal: number } | null;
+  irvRounds: IrvRound[];
 } | null;
 
 // ── Leaders ────────────────────────────────────────────────────────────────────
@@ -121,82 +127,93 @@ function enforceNoSmooth(layer: L.GeoJSON) {
   });
 }
 
-// ── Preferential voting winner ─────────────────────────────────────────────────
-// Preference flows are spectrum-based: GRN/ALP/CA/IND sit left of centre;
-// voters strongly prefer ALP over ONP and LNP/NAT over ONP as the lesser-right option.
+// ── Preference flows: when a party is eliminated in IRV, where do votes go? ────
+// On party lines: ALP↔GRN very strong; LIB→ONP and ONP→LIB strong.
+// Values don't need to sum to 1 — runIRV normalises to remaining candidates.
+const PREF_FLOWS: Partial<Record<AuPartyId, Partial<Record<AuPartyId, number>>>> = {
+  // Greens voters → Labor almost entirely
+  GRN: { ALP: 0.93, CA: 0.03, IND: 0.02, OTH: 0.01, LIB: 0.005, LNP: 0.003, NAT: 0.002 },
+  // Labor voters → Greens first; small trickle to right so normalization works in LIB v ONP final
+  ALP: { GRN: 0.88, CA: 0.04, IND: 0.03, OTH: 0.02, LIB: 0.02, LNP: 0.01, NAT: 0.01, ONP: 0.005 },
+  // Centre Alliance → ALP/GRN heavily
+  CA:  { ALP: 0.68, GRN: 0.20, IND: 0.06, LIB: 0.03, ONP: 0.01, OTH: 0.01, NAT: 0.01 },
+  // Independents (teals) → ALP/GRN majority
+  IND: { ALP: 0.55, GRN: 0.22, CA: 0.10, LIB: 0.06, NAT: 0.03, ONP: 0.02, OTH: 0.01, LNP: 0.01 },
+  // Liberals → ONP nearly entirely (party-line preference)
+  LIB: { ONP: 0.83, NAT: 0.07, LNP: 0.04, ALP: 0.03, OTH: 0.02, KAP: 0.01 },
+  // Nationals → LIB/LNP first, then ONP
+  NAT: { LIB: 0.40, LNP: 0.22, ONP: 0.26, KAP: 0.06, ALP: 0.03, OTH: 0.03 },
+  // LNP → LIB/NAT first, then ONP
+  LNP: { LIB: 0.38, NAT: 0.25, ONP: 0.26, KAP: 0.06, ALP: 0.03, OTH: 0.02 },
+  // ONP → Coalition strongly (party-line, vice versa to LIB)
+  ONP: { LIB: 0.58, NAT: 0.12, LNP: 0.12, KAP: 0.08, ALP: 0.06, OTH: 0.03, GRN: 0.005, IND: 0.005, CA: 0.005 },
+  // Katter → LNP then ONP (far North Queensland rural)
+  KAP: { LNP: 0.38, ONP: 0.28, NAT: 0.15, ALP: 0.12, OTH: 0.05, GRN: 0.01, IND: 0.01 },
+  // Other → mixed
+  OTH: { ALP: 0.30, LIB: 0.20, GRN: 0.16, ONP: 0.12, NAT: 0.08, IND: 0.06, LNP: 0.05, CA: 0.02, KAP: 0.01 },
+};
+
+// ── Full IRV simulation — returns round-by-round elimination trace ──────────────
+type IrvResult = { rounds: IrvRound[]; winner: AuPartyId };
+
+function runIRV(results: Partial<Record<AuPartyId, number>>, validVotes: number): IrvResult {
+  const total = validVotes > 0 ? validVotes
+    : Math.max(1, Object.values(results).reduce((s, v) => s + (v ?? 0), 0));
+
+  let current: Partial<Record<AuPartyId, number>> = {};
+  for (const [id, v] of Object.entries(results) as [AuPartyId, number][]) {
+    if ((v ?? 0) > 0) current[id] = v;
+  }
+
+  const rounds: IrvRound[] = [{ eliminated: null, votes: { ...current } }];
+
+  for (let r = 0; r < 10; r++) {
+    const candidates = (Object.entries(current) as [AuPartyId, number][])
+      .filter(([, v]) => (v ?? 0) > 0)
+      .sort(([, a], [, b]) => (b ?? 0) - (a ?? 0));
+
+    if (candidates.length === 0) break;
+    if ((candidates[0][1] ?? 0) > total * 0.5) return { rounds, winner: candidates[0][0] };
+    if (candidates.length <= 2) return { rounds, winner: candidates[0][0] };
+
+    // Eliminate party with fewest votes
+    const [eliminated, eliminatedVotes] = candidates[candidates.length - 1];
+    const remaining = candidates.slice(0, -1).map(([id]) => id);
+
+    // Build normalised preference flows to remaining candidates only
+    const rawFlows = PREF_FLOWS[eliminated] ?? {};
+    let redistFlows: Partial<Record<AuPartyId, number>> = {};
+    let flowSum = 0;
+    for (const id of remaining) {
+      const f = rawFlows[id] ?? 0;
+      if (f > 0) { redistFlows[id] = f; flowSum += f; }
+    }
+
+    const newCurrent: Partial<Record<AuPartyId, number>> = {};
+    let totalAdded = 0;
+    for (const id of remaining) {
+      const fraction = flowSum > 0 ? (redistFlows[id] ?? 0) / flowSum : 1 / remaining.length;
+      const added = Math.round(eliminatedVotes * fraction);
+      newCurrent[id] = (current[id] ?? 0) + added;
+      totalAdded += added;
+    }
+    // Fix rounding error on the leading candidate
+    const err = eliminatedVotes - totalAdded;
+    if (err !== 0 && remaining.length > 0) newCurrent[remaining[0]] = (newCurrent[remaining[0]] ?? 0) + err;
+
+    current = newCurrent;
+    rounds.push({ eliminated, votes: { ...current } });
+  }
+
+  const winner = (Object.entries(current) as [AuPartyId, number][])
+    .sort(([, a], [, b]) => b - a)[0]?.[0] ?? 'ALP';
+  return { rounds, winner };
+}
+
 function determineWinner(results: Partial<Record<AuPartyId, number>>, validVotes: number): AuPartyId {
-  if (validVotes === 0) return 'ALP';
-  const r = results as Record<AuPartyId, number>;
-  const alp = r.ALP ?? 0, lib = r.LIB ?? 0, nat = r.NAT ?? 0, lnp = r.LNP ?? 0;
-  const grn = r.GRN ?? 0, ind = r.IND ?? 0, ca = r.CA ?? 0, onp = r.ONP ?? 0, kap = r.KAP ?? 0, oth = r.OTH ?? 0;
-  const coal = lib + nat + lnp;
-  const total = alp + coal + grn + ind + ca + onp + kap + oth;
-  if (total === 0) return 'ALP';
-
-  // Traditional 2PP (ALP vs Coalition) preference flows
-  const alp2cp  = alp + grn*0.90 + ca*0.61 + onp*0.24 + ind*0.69 + kap*0.38 + oth*0.47;
-  const coal2cp = coal + grn*0.10 + ca*0.39 + onp*0.76 + ind*0.31 + kap*0.62 + oth*0.53;
-
-  // ONP dominance: when ONP overtakes the whole coalition it becomes the right-wing 2CP candidate.
-  // Leftists prefer ALP/IND/CA/LNP over ONP (ONP is further right on the spectrum).
-  if (onp > 0 && onp > coal) {
-    // CA vs ONP: centrist voters (GRN, ALP, IND) prefer CA strongly over far-right ONP
-    if (ca > 0 && ca > alp * 0.60) {
-      const caVsOnp = ca + alp*0.85 + grn*0.90 + coal*0.25 + kap*0.30 + oth*0.52 + ind*0.75;
-      const onpVsCa = onp + alp*0.15 + grn*0.10 + coal*0.75 + kap*0.70 + oth*0.48 + ind*0.25;
-      if (caVsOnp > onpVsCa) return 'CA';
-    }
-    // KAP vs ONP: rural incumbent (Katter) beats One Nation with centre+left preferences
-    if (kap > 0 && kap > alp * 0.80) {
-      const kapVsOnp = kap + alp*0.60 + grn*0.70 + coal*0.55 + oth*0.50 + ind*0.55 + ca*0.45;
-      const onpVsKap = onp + alp*0.40 + grn*0.30 + coal*0.45 + oth*0.50 + ind*0.45 + ca*0.55;
-      if (kapVsOnp > onpVsKap) return 'KAP';
-    }
-    // IND vs ONP: teal/progressive independents collect left preferences over ONP
-    if (ind > alp) {
-      const onpVsInd = onp + coal*0.72 + grn*0.07 + alp*0.12 + kap*0.58 + oth*0.48 + ca*0.10;
-      const indVsOnp = ind + alp*0.88 + grn*0.93 + coal*0.28 + kap*0.42 + oth*0.52 + ca*0.90;
-      if (onpVsInd > indVsOnp) return 'ONP';
-      return 'IND';
-    }
-    // Standard ALP vs ONP: spectrum-aligned — GRN/CA/IND give 90-95% to ALP over ONP
-    const onpVsAlp = onp + coal*0.78 + grn*0.05 + kap*0.65 + oth*0.45 + ind*0.20 + ca*0.10;
-    const alpVsOnp = alp + grn*0.95 + coal*0.22 + kap*0.35 + oth*0.55 + ind*0.80 + ca*0.90;
-    if (onpVsAlp > alpVsOnp) return 'ONP';
-    return 'ALP';
-  }
-
-  // IND vs Coalition (teal indie scenario — traditional seat structure)
-  if (ind > 0 && coal > alp) {
-    const ind2cp = ind + alp*0.80 + grn*0.80 + ca*0.65 + oth*0.50 + onp*0.18 + kap*0.22;
-    const coalVsInd = coal + alp*0.20 + grn*0.20 + ca*0.35 + oth*0.50 + onp*0.82 + kap*0.78;
-    if (ind2cp > coalVsInd && ind2cp > alp2cp) return 'IND';
-  }
-  // GRN wins when GRN leads ALP in first prefs AND the Coalition leads ALP (e.g. Ryan 2025).
-  // Brisbane: GRN < ALP first-prefs → ALP wins. Ryan: GRN > ALP → GRN wins.
-  if (grn > 0 && grn > alp && coal > alp) {
-    const grn2cp = grn + alp*0.85 + ca*0.65 + ind*0.65 + oth*0.55 + onp*0.12 + kap*0.15;
-    const coalVsGrn = coal + alp*0.15 + ca*0.35 + ind*0.35 + oth*0.45 + onp*0.88 + kap*0.85;
-    // alp2cp without GRN: if GRN is in the 2CP, GRN prefs go to GRN not ALP
-    const alp2cpNoGrn = alp + ca*0.61 + onp*0.24 + ind*0.69 + kap*0.38 + oth*0.47;
-    if (grn2cp > coalVsGrn && grn2cp > alp2cpNoGrn) return 'GRN';
-  }
-  // KAP: in far-north QLD strongholds, ALP/GRN voters prefer Katter over LNP
-  if (kap > 0 && kap > alp * 0.80) {
-    const kap2cp = kap + alp*0.65 + grn*0.70 + oth*0.55 + ind*0.60 + onp*0.55;
-    const coalVsKap = coal + alp*0.35 + grn*0.30 + oth*0.45 + ind*0.40 + onp*0.45;
-    const alpVsKap  = alp + grn*0.70 + ca*0.65 + oth*0.47;
-    if (kap2cp > coalVsKap && kap2cp > alpVsKap) return 'KAP';
-  }
-  if (ca > 0 && ca > alp * 0.80 && ca > coal * 0.50) {
-    const ca2cp = ca + alp*0.75 + grn*0.75 + oth*0.55 + ind*0.60 + onp*0.22;
-    const coalVsCa = coal + alp*0.25 + grn*0.25 + oth*0.45 + ind*0.40 + onp*0.78;
-    if (ca2cp > coalVsCa && ca2cp > alp2cp) return 'CA';
-  }
-  if (alp2cp >= coal2cp) return 'ALP';
-  if (lib >= nat && lib >= lnp) return 'LIB';
-  if (lnp >= nat) return 'LNP';
-  return 'NAT';
+  const total = Object.values(results).reduce((s, v) => s + (v ?? 0), 0);
+  if (total === 0 || validVotes === 0) return 'ALP';
+  return runIRV(results, validVotes).winner;
 }
 
 // ── TPP computation ─────────────────────────────────────────────────────────────
@@ -1758,7 +1775,8 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
   dark?: boolean;
 }) {
   const TW = 268;
-  const TH_EST = 110 + tooltip.parties.length * 22 + (tooltip.tpp ? 28 : 0);
+  const irvElimCount = tooltip.irvRounds.filter(r => r.eliminated !== null).length;
+  const TH_EST = 110 + tooltip.parties.length * 22 + (tooltip.tpp ? 28 : 0) + (irvElimCount > 0 ? 24 + irvElimCount * 52 : 0);
   const left = tooltip.x + 18 + TW > containerW ? tooltip.x - TW - 10 : tooltip.x + 18;
   const top  = Math.max(6, Math.min(tooltip.y - 20, containerH - TH_EST - 8));
   const tt = {
@@ -1803,6 +1821,75 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
             <p style={{ fontSize: 11, color: tt.dim, fontStyle: 'italic', margin: '4px 0' }}>No results — click a preset</p>
           )}
         </div>
+        {/* IRV preference count */}
+        {tooltip.irvRounds.length > 1 && (
+          <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '7px 12px 5px' }}>
+            <div style={{ fontSize: 8, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, textTransform: 'uppercase', letterSpacing: '0.10em', marginBottom: 6 }}>
+              Preference Count
+            </div>
+            {tooltip.irvRounds.slice(1).map((round, i) => {
+              const prevRound = tooltip.irvRounds[i];
+              const elim = round.eliminated!;
+              const elimVotes = prevRound.votes[elim] ?? 0;
+              const prevTotal = Object.values(prevRound.votes).reduce((s, v) => s + (v ?? 0), 0);
+              const elimPct = prevTotal > 0 ? elimVotes / prevTotal * 100 : 0;
+              const elimColor = AU_PARTY_MAP[elim]?.color ?? '#888888';
+
+              const flows = (Object.keys(round.votes) as AuPartyId[])
+                .map(pid => ({ pid, gained: (round.votes[pid] ?? 0) - (prevRound.votes[pid] ?? 0) }))
+                .filter(x => x.gained > 0)
+                .sort((a, b) => b.gained - a.gained);
+
+              const roundTotal = Object.values(round.votes).reduce((s, v) => s + (v ?? 0), 0);
+              const isLastRound = i === tooltip.irvRounds.length - 2;
+
+              return (
+                <div key={i} style={{ marginBottom: 7 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 3 }}>
+                    <span style={{ fontSize: 7.5, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, minWidth: 22 }}>Rd {i + 2}</span>
+                    <span style={{ width: 6, height: 6, borderRadius: '50%', background: elimColor, flexShrink: 0 }} />
+                    <span style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: elimColor }}>{elim}</span>
+                    <span style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: tt.muted }}>elim. ({elimPct.toFixed(1)}%)</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginLeft: 27, marginBottom: 2, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 8, fontFamily: '"JetBrains Mono",monospace', color: tt.dim }}>→</span>
+                    {flows.slice(0, 3).map(({ pid, gained }) => {
+                      const flowPct = elimVotes > 0 ? gained / elimVotes * 100 : 0;
+                      const c = AU_PARTY_MAP[pid]?.color ?? '#888';
+                      return (
+                        <span key={pid} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                          <span style={{ width: 5, height: 5, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                          <span style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', color: c, fontWeight: 600 }}>
+                            {pid} +{flowPct.toFixed(0)}%
+                          </span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  {isLastRound && roundTotal > 0 && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginLeft: 27, marginTop: 2, flexWrap: 'wrap' }}>
+                      {(Object.entries(round.votes) as [AuPartyId, number][]).sort(([, a], [, b]) => b - a).map(([pid, v]) => {
+                        const pct2cp = roundTotal > 0 ? v / roundTotal * 100 : 0;
+                        const c = AU_PARTY_MAP[pid]?.color ?? '#888';
+                        const isWinner = pct2cp > 50;
+                        return (
+                          <span key={pid} style={{ display: 'flex', alignItems: 'center', gap: 3 }}>
+                            {isWinner && <span style={{ fontSize: 9, color: c }}>✓</span>}
+                            <span style={{ width: 6, height: 6, borderRadius: '50%', background: c, flexShrink: 0 }} />
+                            <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: c }}>
+                              {pid} {pct2cp.toFixed(1)}%
+                            </span>
+                          </span>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {tooltip.tpp && (
           <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '7px 12px' }}>
             <div style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>2CP / TPP</div>
@@ -1892,7 +1979,7 @@ function BubbleLayer({
         const parties = (Object.entries(rawResults) as [AuPartyId, number][])
           .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a)
           .map(([pid, votes]) => ({ id: pid, votes, pct: totalReported > 0 ? Math.round((votes / totalReported) * 1000) / 10 : 0 }));
-        const tooltipWinner = parties.length > 0 ? determineWinner(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
+        const irvResult = parties.length > 0 ? runIRV(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
         const tpp = totalReported > 0 ? computeTPP(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
         setTooltip({
           x: e.originalEvent.clientX - rect.left,
@@ -1901,8 +1988,9 @@ function BubbleLayer({
           state: data.state,
           validVotes: data.validVotes,
           parties,
-          winner: tooltipWinner,
+          winner: irvResult?.winner ?? null,
           tpp,
+          irvRounds: irvResult?.rounds ?? [],
         });
       });
 
@@ -2220,7 +2308,7 @@ export default function AustraliaApp() {
       const parties = (Object.entries(rawResults) as [AuPartyId, number][])
         .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a)
         .map(([pid, votes]) => ({ id: pid, votes, pct: totalReported > 0 ? Math.round((votes / totalReported) * 1000) / 10 : 0 }));
-      const winner = parties.length > 0 && data ? determineWinner(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
+      const irvResult = parties.length > 0 && data ? runIRV(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
       const tpp = data && totalReported > 0 ? computeTPP(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
       setTooltip({
         x: e.originalEvent.clientX - rect.left,
@@ -2229,8 +2317,9 @@ export default function AustraliaApp() {
         state: data?.state ?? '',
         validVotes: data?.validVotes ?? 0,
         parties,
-        winner,
+        winner: irvResult?.winner ?? null,
         tpp,
+        irvRounds: irvResult?.rounds ?? [],
       });
     });
 
