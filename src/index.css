@@ -800,11 +800,6 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
   align-items: inherit;
 }
 
-.ni-group-tiles .cand-col {
-  width: auto;
-  min-width: 68px;
-}
-
 /* ═══════════════════════════════════════════════════════════════════════
    Dark mode — metallic midnight-blue theme
    Applied when <html class="dark"> is set.
