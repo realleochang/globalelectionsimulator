@@ -761,23 +761,17 @@ function ElectoratePanel({
     return p;
   }, [results2025, total]);
 
-  const projectedWinner = useMemo(() => {
-    const pcts = sliderPcts;
-    if (Object.keys(pcts).length === 0) return null;
-    const partial: Partial<Record<AuPartyId, number>> = {};
-    for (const [p, pct] of Object.entries(pcts)) {
-      if (pct > 1e-9) partial[p as AuPartyId] = Math.round((pct / 100) * total);
-    }
-    return determineWinner(partial, total);
-  }, [sliderPcts, total]);
-
-  const tppLocal = useMemo(() => {
+  const irvResult = useMemo(() => {
+    if (Object.keys(sliderPcts).length === 0) return null;
     const partial: Partial<Record<AuPartyId, number>> = {};
     for (const [p, pct] of Object.entries(sliderPcts)) {
       if (pct > 1e-9) partial[p as AuPartyId] = Math.round((pct / 100) * total);
     }
-    return computeTPP(partial, total);
+    return runIRV(partial, total);
   }, [sliderPcts, total]);
+
+  const projectedWinner = irvResult?.winner ?? null;
+  const [prefFlowOpen, setPrefFlowOpen] = useState(false);
 
   const sliderParties = AU_PARTIES.filter(p => {
     const hasCurrent = (sliderPcts[p.id] ?? 0) > 0.01;
@@ -788,7 +782,102 @@ function ElectoratePanel({
   const showSliders = total > 0 && (activePreset === 'baseline' || activePreset === 'polling2026' || activePreset === 'blank');
 
   return (
-    <aside className="w-72 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden panel-slide">
+    <aside className="w-72 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden panel-slide relative">
+
+      {/* ── Preference flow overlay ────────────────────────────────────── */}
+      {prefFlowOpen && irvResult && (
+        <div className="absolute inset-0 z-20 bg-white flex flex-col overflow-hidden">
+          <div className="px-3.5 pt-3 pb-2.5 border-b border-default shrink-0 flex items-center justify-between">
+            <div>
+              <h2 className="text-[13px] font-bold text-ink leading-tight">Preference Count</h2>
+              <p className="text-[9px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">{name} · preferential (IRV)</p>
+            </div>
+            <button onClick={() => setPrefFlowOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+          </div>
+          <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-4">
+            {irvResult.rounds.map((round, ri) => {
+              const isFirst = ri === 0;
+              const isLast  = ri === irvResult.rounds.length - 1;
+              const elimInNext = !isLast ? irvResult.rounds[ri + 1].eliminated : null;
+              const prevRound  = ri > 0 ? irvResult.rounds[ri - 1] : null;
+              const elim       = round.eliminated;
+              const roundTotal = Object.values(round.votes).reduce((s, v) => s + (v ?? 0), 0);
+
+              const parties = (Object.entries(round.votes) as [AuPartyId, number][])
+                .sort(([, a], [, b]) => b - a);
+              const maxVotes = parties[0]?.[1] ?? 1;
+
+              return (
+                <div key={ri}>
+                  {/* Round label */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[8px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3">
+                      {isFirst ? 'Round 1 — First Preferences' : `Round ${ri + 1}${elim ? ` — after ${AU_PARTY_MAP[elim]?.shortName ?? elim} eliminated` : ''}`}
+                    </span>
+                    {isLast && (
+                      <span className="ml-auto text-[8px] font-mono font-bold uppercase tracking-[0.10em] px-1.5 py-0.5 rounded"
+                        style={{ background: `${AU_PARTY_MAP[irvResult.winner]?.color ?? '#888'}22`, color: AU_PARTY_MAP[irvResult.winner]?.color ?? '#888' }}>
+                        Final
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Transfer note */}
+                  {!isFirst && elim && prevRound && (() => {
+                    const elimVotes = prevRound.votes[elim] ?? 0;
+                    return (
+                      <div className="mb-2 px-2 py-1.5 rounded-[4px] text-[9.5px] text-ink-2 leading-relaxed"
+                        style={{ background: `${AU_PARTY_MAP[elim]?.color ?? '#888'}11`, border: `1px solid ${AU_PARTY_MAP[elim]?.color ?? '#888'}33` }}>
+                        <span className="font-bold" style={{ color: AU_PARTY_MAP[elim]?.color ?? '#888' }}>
+                          {AU_PARTY_MAP[elim]?.shortName ?? elim}
+                        </span>
+                        {' '}eliminated — {elimVotes.toLocaleString()} votes redistributed
+                      </div>
+                    );
+                  })()}
+
+                  {/* Bar chart for this round */}
+                  <div className="space-y-1.5">
+                    {parties.map(([pid, votes]) => {
+                      const color  = AU_PARTY_MAP[pid]?.color ?? '#888888';
+                      const pct    = roundTotal > 0 ? votes / roundTotal * 100 : 0;
+                      const barW   = maxVotes > 0 ? votes / maxVotes * 100 : 0;
+                      const isWinner = isLast && pct > 50;
+                      const isNextElim = pid === elimInNext;
+                      const gained = prevRound ? (votes - (prevRound.votes[pid] ?? 0)) : 0;
+                      return (
+                        <div key={pid}>
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                            <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none" style={{ opacity: isNextElim ? 0.45 : 1 }}>
+                              {AU_PARTY_MAP[pid]?.shortName ?? pid}
+                            </span>
+                            {!isFirst && gained > 0 && (
+                              <span className="text-[8.5px] font-mono font-semibold" style={{ color }}>+{gained.toLocaleString()}</span>
+                            )}
+                            {isNextElim && (
+                              <span className="text-[7.5px] font-mono font-bold uppercase tracking-wide text-ink-3">elim →</span>
+                            )}
+                            {isWinner && (
+                              <span className="text-[8px] font-mono font-bold px-1 py-0.5 rounded" style={{ background: `${color}22`, color }}>✓ wins</span>
+                            )}
+                            <span className="text-[10px] font-mono font-bold tabular-nums shrink-0" style={{ color, opacity: isNextElim ? 0.45 : 1 }}>{pct.toFixed(1)}%</span>
+                          </div>
+                          <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: `${color}18` }}>
+                            <div style={{ width: `${barW}%`, height: '100%', background: color, borderRadius: 9999, opacity: isNextElim ? 0.35 : 1, transition: 'width 0.3s ease' }} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              );
+            })}
+            <div className="h-3" />
+          </div>
+        </div>
+      )}
+
       {/* Header */}
       <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0">
         <div className="flex items-start gap-2">
@@ -801,35 +890,17 @@ function ElectoratePanel({
           <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
         </div>
 
-        {/* Winner preview */}
+        {/* Winner preview — click to see full preference count */}
         {projectedWinner && (
-          <div className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-[4px] bg-[#f8f7f4] border border-default"
-            style={{ borderColor: `${AU_PARTY_MAP[projectedWinner]?.color ?? '#888'}33` }}>
+          <button
+            onClick={() => setPrefFlowOpen(v => !v)}
+            className="mt-2 w-full flex items-center gap-2 px-2 py-1.5 rounded-[4px] bg-[#f8f7f4] border border-default text-left hover:bg-hover transition-colors"
+            style={{ borderColor: `${AU_PARTY_MAP[projectedWinner]?.color ?? '#888'}44` }}
+          >
             <span className="w-2 h-2 rounded-full shrink-0" style={{ background: AU_PARTY_MAP[projectedWinner]?.color ?? '#888' }} />
             <span className="text-[11px] font-medium text-ink flex-1 truncate">{AU_PARTY_MAP[projectedWinner]?.name ?? projectedWinner}</span>
-            <span className="text-[9px] font-mono text-ink-3">wins (pref.)</span>
-          </div>
-        )}
-
-        {/* TPP bar */}
-        {showSliders && Object.keys(sliderPcts).length > 0 && (
-          <div className="mt-2">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-[9px] font-mono text-ink-3 uppercase tracking-wide">2CP / TPP</span>
-              <div className="flex gap-2">
-                <span className="text-[9px] font-mono font-bold" style={{ color: AU_PARTY_MAP['ALP'].color }}>
-                  ALP {(tppLocal.alp * 100).toFixed(1)}%
-                </span>
-                <span className="text-[9px] font-mono font-bold" style={{ color: AU_PARTY_MAP['LIB'].color }}>
-                  Coal {(tppLocal.coal * 100).toFixed(1)}%
-                </span>
-              </div>
-            </div>
-            <div className="flex h-2 rounded overflow-hidden">
-              <div style={{ width: `${tppLocal.alp * 100}%`, background: AU_PARTY_MAP['ALP'].color, transition: 'width 0.3s ease' }} />
-              <div style={{ flex: 1, background: AU_PARTY_MAP['LIB'].color }} />
-            </div>
-          </div>
+            <span className="text-[9px] font-mono text-ink-3">wins (pref.) ›</span>
+          </button>
         )}
       </div>
 
@@ -1778,7 +1849,7 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
 }) {
   const TW = 268;
   const irvElimCount = tooltip.irvRounds.filter(r => r.eliminated !== null).length;
-  const TH_EST = 110 + tooltip.parties.length * 22 + (tooltip.tpp ? 28 : 0) + (irvElimCount > 0 ? 24 + irvElimCount * 52 : 0);
+  const TH_EST = 110 + tooltip.parties.length * 22 + (irvElimCount > 0 ? 24 + irvElimCount * 52 : 0);
   const left = tooltip.x + 18 + TW > containerW ? tooltip.x - TW - 10 : tooltip.x + 18;
   const top  = Math.max(6, Math.min(tooltip.y - 20, containerH - TH_EST - 8));
   const tt = {
@@ -1892,19 +1963,6 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
           </div>
         )}
 
-        {tooltip.tpp && (
-          <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '7px 12px' }}>
-            <div style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, marginBottom: 4, textTransform: 'uppercase', letterSpacing: '0.08em' }}>2CP / TPP</div>
-            <div style={{ display: 'flex', height: 6, borderRadius: 3, overflow: 'hidden' }}>
-              <div style={{ width: `${tooltip.tpp.alp * 100}%`, background: AU_PARTY_MAP['ALP'].color }} />
-              <div style={{ flex: 1, background: AU_PARTY_MAP['LIB'].color }} />
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 3 }}>
-              <span style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: AU_PARTY_MAP['ALP'].color }}>ALP {(tooltip.tpp.alp * 100).toFixed(1)}%</span>
-              <span style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: AU_PARTY_MAP['LIB'].color }}>Coal {(tooltip.tpp.coal * 100).toFixed(1)}%</span>
-            </div>
-          </div>
-        )}
         <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '6px 14px' }}>
           <span style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: tt.dim }}>
             {tooltip.validVotes.toLocaleString()} votes cast
@@ -2016,7 +2074,7 @@ export default function AustraliaApp() {
   // ── Core state ───────────────────────────────────────────────────────────────
   const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
-  const [activePreset, setActivePreset] = useState<PresetId | null>('baseline');
+  const [activePreset, setActivePreset] = useState<PresetId | null>('polling2026');
   const [currentResults, setCurrentResults] = useState<Record<string, Partial<Record<AuPartyId, number>>>>(() => buildBaselineResults());
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2039,7 +2097,7 @@ export default function AustraliaApp() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // ── Bubble map ───────────────────────────────────────────────────────────────
-  const [bubbleMap, setBubbleMap] = useState(true);
+  const [bubbleMap, setBubbleMap] = useState(false);
 
   // ── Simulation ───────────────────────────────────────────────────────────────
   const [simRunning, setSimRunning] = useState(false);
