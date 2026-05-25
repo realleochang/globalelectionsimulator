@@ -1879,7 +1879,7 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
   dark?: boolean;
 }) {
   const TW = 268;
-  const TH_EST = 110 + tooltip.parties.length * 22 + (tooltip.irvRounds.length > 0 ? 80 : 0);
+  const TH_EST = 110 + tooltip.parties.length * 22 + (tooltip.irvRounds.length > 0 ? 60 : 0);
   const left = tooltip.x + 18 + TW > containerW ? tooltip.x - TW - 10 : tooltip.x + 18;
   const top  = Math.max(6, Math.min(tooltip.y - 20, containerH - TH_EST - 8));
   const tt = {
@@ -1909,22 +1909,29 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
           </div>
         </div>
         <div style={{ padding: '0 12px 8px' }}>
-          {tooltip.parties.length > 0 ? tooltip.parties.map(({ id, votes, pct }, i) => {
-            const color = AU_PARTY_MAP[id as AuPartyId]?.color ?? '#888888';
-            const name  = AU_PARTY_MAP[id as AuPartyId]?.shortName ?? id;
-            return (
-              <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: i < tooltip.parties.length - 1 ? 5 : 0 }}>
-                <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
-                <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, marginRight: 5 }}>{votes.toLocaleString()}</span>
-                <span style={{ fontSize: 12, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color, minWidth: 40, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
+          {tooltip.parties.length > 0 ? (
+            <>
+              <div style={{ fontSize: 8, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, textTransform: 'uppercase', letterSpacing: '0.10em', marginBottom: 5 }}>
+                First Preference
               </div>
-            );
-          }) : (
+              {tooltip.parties.map(({ id, votes, pct }, i) => {
+                const color = AU_PARTY_MAP[id as AuPartyId]?.color ?? '#888888';
+                const name  = AU_PARTY_MAP[id as AuPartyId]?.shortName ?? id;
+                return (
+                  <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: i < tooltip.parties.length - 1 ? 5 : 0 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                    <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, marginRight: 5 }}>{votes.toLocaleString()}</span>
+                    <span style={{ fontSize: 12, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color, minWidth: 40, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
+                  </div>
+                );
+              })}
+            </>
+          ) : (
             <p style={{ fontSize: 11, color: tt.dim, fontStyle: 'italic', margin: '4px 0' }}>No results — click a preset</p>
           )}
         </div>
-        {/* Final 2-candidate preference bar */}
+        {/* Final preference — same row style as first preference */}
         {tooltip.irvRounds.length > 0 && (() => {
           const finalRound = tooltip.irvRounds[tooltip.irvRounds.length - 1];
           const finalTotal = Object.values(finalRound.votes).reduce((s, v) => s + (v ?? 0), 0);
@@ -1933,42 +1940,24 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
             .sort(([, a], [, b]) => b - a)
             .slice(0, 2);
           if (finalPairs.length < 2 || finalTotal === 0) return null;
-          const [[pidA, votesA], [pidB, votesB]] = finalPairs;
-          const pctA = votesA / finalTotal * 100;
-          const pctB = votesB / finalTotal * 100;
-          const colorA = AU_PARTY_MAP[pidA]?.color ?? '#888';
-          const colorB = AU_PARTY_MAP[pidB]?.color ?? '#888';
-          const nameA  = AU_PARTY_MAP[pidA]?.shortName ?? pidA;
-          const nameB  = AU_PARTY_MAP[pidB]?.shortName ?? pidB;
           return (
             <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '8px 12px 10px' }}>
-              <div style={{ fontSize: 8, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, textTransform: 'uppercase', letterSpacing: '0.10em', marginBottom: 7 }}>
-                Final Preference — 2 Candidate
+              <div style={{ fontSize: 8, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, textTransform: 'uppercase', letterSpacing: '0.10em', marginBottom: 5 }}>
+                Final Preference
               </div>
-              {/* Top row: names + pcts */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: colorA, flexShrink: 0 }} />
-                  <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: colorA }}>{nameA}</span>
-                  <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 800, color: colorA }}>{pctA.toFixed(1)}%</span>
-                  {pctA > 50 && <span style={{ fontSize: 8, color: colorA, fontWeight: 700 }}>✓</span>}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-                  {pctB > 50 && <span style={{ fontSize: 8, color: colorB, fontWeight: 700 }}>✓</span>}
-                  <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 800, color: colorB }}>{pctB.toFixed(1)}%</span>
-                  <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: colorB }}>{nameB}</span>
-                  <span style={{ width: 7, height: 7, borderRadius: '50%', background: colorB, flexShrink: 0 }} />
-                </div>
-              </div>
-              {/* Split bar */}
-              <div style={{ display: 'flex', height: 8, borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{ width: `${pctA}%`, background: colorA, transition: 'width 0.3s ease' }} />
-                <div style={{ flex: 1, background: colorB }} />
-              </div>
-              {/* 50% tick */}
-              <div style={{ position: 'relative', height: 6, marginTop: 2 }}>
-                <div style={{ position: 'absolute', left: '50%', top: 0, width: 1, height: 5, background: tt.dim, transform: 'translateX(-50%)' }} />
-              </div>
+              {finalPairs.map(([pid, votes], i) => {
+                const color = AU_PARTY_MAP[pid as AuPartyId]?.color ?? '#888';
+                const name  = AU_PARTY_MAP[pid as AuPartyId]?.shortName ?? pid;
+                const pct   = votes / finalTotal * 100;
+                return (
+                  <div key={pid} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: i < finalPairs.length - 1 ? 5 : 0 }}>
+                    <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                    <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
+                    <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, marginRight: 5 }}>{votes.toLocaleString()}</span>
+                    <span style={{ fontSize: 12, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color, minWidth: 40, textAlign: 'right' }}>{pct.toFixed(1)}%</span>
+                  </div>
+                );
+              })}
             </div>
           );
         })()}
@@ -2554,24 +2543,6 @@ export default function AustraliaApp() {
           </button>
         </div>
 
-        {/* % Reporting strip — blank map / simulation */}
-        {activePreset === 'blank' && (
-          <div className="shrink-0 px-4 py-1.5 border-b border-default flex items-center gap-3" style={{ background: dark ? 'rgba(255,255,255,0.03)' : 'rgba(0,0,0,0.02)' }}>
-            <span className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-ink-3 shrink-0">% Reporting</span>
-            <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bar-track)' }}>
-              <div
-                className="h-full rounded-full transition-all duration-300"
-                style={{ width: `${(Object.keys(currentResults).length / 150) * 100}%`, background: '#c8a020' }}
-              />
-            </div>
-            <span className="text-[9px] font-mono font-semibold tabular-nums text-ink shrink-0">
-              {Object.keys(currentResults).length} / 150 declared
-            </span>
-            <span className="text-[9px] font-mono text-ink-3 shrink-0">
-              ({Math.round((Object.keys(currentResults).length / 150) * 100)}%)
-            </span>
-          </div>
-        )}
 
         {/* Map + panels row */}
         <div className="flex flex-1 min-h-0 relative">
