@@ -2191,8 +2191,8 @@ export default function AustraliaApp() {
     const borderColor = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)';
     if (bubbleMap) {
       layerRef.current.setStyle(() => ({
-        fillOpacity: 0, weight: 0.4,
-        color: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)', opacity: 0.6,
+        fillOpacity: 0, weight: 0.5,
+        color: dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)', opacity: 1,
       }));
       return;
     }
