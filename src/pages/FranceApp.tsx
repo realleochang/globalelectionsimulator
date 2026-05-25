@@ -2922,6 +2922,13 @@ export default function FranceApp() {
             {multiSelectMode ? 'Exit Select' : 'Multi-Select'}
           </button>
           <button
+            className={summaryOpen ? `${btnBase} bg-ink/8 border border-default text-ink` : btnMuted}
+            onClick={() => setSummaryOpen(v => !v)}
+            title="Regional summary"
+          >
+            Summary
+          </button>
+          <button
             className={bubbleMapMode
               ? `${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700`
               : btnMuted}
@@ -2929,13 +2936,6 @@ export default function FranceApp() {
             title="Toggle bubble margin map"
           >
             Bubble Map
-          </button>
-          <button
-            className={summaryOpen ? `${btnBase} bg-ink/8 border border-default text-ink` : btnMuted}
-            onClick={() => setSummaryOpen(v => !v)}
-            title="Regional summary"
-          >
-            Summary
           </button>
           <button
             onClick={() => {
