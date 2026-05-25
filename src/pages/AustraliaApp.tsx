@@ -509,13 +509,14 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(function CandTile(
 
 // ── Scoreboard ──────────────────────────────────────────────────────────────────
 function AuScoreboard({
-  tally, votePcts, rawVotes, activePreset, simRunning,
+  tally, votePcts, rawVotes, activePreset, simRunning, hiddenParties,
 }: {
   tally: Record<string, number>;
   votePcts: Record<string, number>;
   rawVotes: Record<string, number>;
   activePreset: PresetId | null;
   simRunning: boolean;
+  hiddenParties: Set<AuPartyId>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -545,24 +546,28 @@ function AuScoreboard({
   // Separate coalition from the rest; sort each group by seats.
   // Parties with 0 seats (except IND) are collapsed into the OTH tile.
   const { nonCoalParties, coalParties, othCombinedVotes, othCombinedPct } = useMemo(() => {
-    const coal = AU_PARTIES.filter(p => COALITION_IDS.includes(p.id as AuPartyId));
+    const isBlank = activePreset === 'blank';
+    const isHidden = (id: string) => isBlank && hiddenParties.has(id as AuPartyId);
+
+    const coal = AU_PARTIES.filter(p => COALITION_IDS.includes(p.id as AuPartyId) && !isHidden(p.id));
     coal.sort((a, b) => (tally[b.id] ?? 0) - (tally[a.id] ?? 0));
 
-    const nonCoalAll = AU_PARTIES.filter(p => p.id !== 'OTH' && !COALITION_IDS.includes(p.id as AuPartyId));
-    const isBlank = activePreset === 'blank';
-    // Blank map: show every party so the scoreboard is populated before data is entered.
+    const nonCoalAll = AU_PARTIES.filter(p => p.id !== 'OTH' && !COALITION_IDS.includes(p.id as AuPartyId) && !isHidden(p.id));
+    // Blank map: show every visible party so scoreboard is populated before data is entered.
     // Other presets: show parties with ≥1 seat, IND always.
     const visible = nonCoalAll.filter(p => isBlank || p.id === 'IND' || (tally[p.id] ?? 0) > 0);
     visible.sort((a, b) => (tally[b.id] ?? 0) - (tally[a.id] ?? 0));
 
-    // Blank map: each party shows its own votes/pcts — don't fold zero-seat parties into OTH.
+    // Blank map: don't fold zero-seat parties into OTH.
     const zeroIds = isBlank ? [] : nonCoalAll.filter(p => p.id !== 'IND' && (tally[p.id] ?? 0) === 0).map(p => p.id);
     const othCombinedVotes = ['OTH', ...zeroIds].reduce((s, id) => s + (rawVotes[id] ?? 0), 0);
     const othCombinedPct   = ['OTH', ...zeroIds].reduce((s, id) => s + (votePcts[id] ?? 0), 0);
 
     const oth = AU_PARTIES.find(p => p.id === 'OTH')!;
-    return { nonCoalParties: [...visible, oth], coalParties: coal, othCombinedVotes, othCombinedPct };
-  }, [tally, rawVotes, votePcts, activePreset]);
+    // Hide OTH card too if it's in hiddenParties
+    const showOth = !isHidden('OTH');
+    return { nonCoalParties: showOth ? [...visible, oth] : visible, coalParties: coal, othCombinedVotes, othCombinedPct };
+  }, [tally, rawVotes, votePcts, activePreset, hiddenParties]);
 
   // Find where to insert the coalition group (by total coalition seats)
   const coalInsertAt = (() => {
@@ -581,7 +586,7 @@ function AuScoreboard({
       : undefined,
   };
 
-  const renderCoalitionGroup = () => (
+  const renderCoalitionGroup = () => coalParties.length === 0 ? null : (
     <div key="coalition-group" className="ni-group" style={coalGroupStyle}>
       {isCoalitionMajority && (
         <div style={{
@@ -1734,15 +1739,13 @@ function AuParliamentPanel({
 
 // ── Party manager panel ─────────────────────────────────────────────────────────
 function AuPartyManagerPanel({
-  exiting, onClose, hiddenParties, onToggleParty, activePreset,
+  exiting, onClose, hiddenParties, onToggleParty,
 }: {
   exiting: boolean;
   onClose: () => void;
   hiddenParties: Set<AuPartyId>;
   onToggleParty: (id: AuPartyId) => void;
-  activePreset: PresetId | null;
 }) {
-  const canHide = activePreset === 'blank' || activePreset === null;
   return (
     <aside className={`w-72 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-default shrink-0">
@@ -1751,33 +1754,21 @@ function AuPartyManagerPanel({
       </div>
       <div className="flex-1 overflow-y-auto thin-scroll px-4 py-3">
         <p className="eyebrow mb-3">Show / hide parties</p>
-        {!canHide && (
-          <div className="mb-3 px-2.5 py-2 rounded-[4px] bg-amber-50 border border-amber-200 text-[9.5px] font-mono text-amber-700 leading-relaxed">
-            Switch to <strong>Blank Map</strong> to enable hiding parties.
-          </div>
-        )}
         <div className="space-y-1">
           {AU_PARTIES.map(p => {
             const hidden = hiddenParties.has(p.id);
             return (
               <button
                 key={p.id}
-                onClick={() => canHide && onToggleParty(p.id)}
-                disabled={!canHide}
-                className={`w-full flex items-center gap-3 px-2 py-2 rounded-[5px] transition-colors text-left
-                  ${canHide ? 'hover:bg-hover cursor-pointer' : 'cursor-default'}
-                  ${hidden ? 'opacity-40' : ''}`}
+                onClick={() => onToggleParty(p.id)}
+                className={`w-full flex items-center gap-3 px-2 py-2 rounded-[5px] transition-colors text-left hover:bg-hover cursor-pointer ${hidden ? 'opacity-40' : ''}`}
               >
                 <span className="w-3 h-3 rounded-full shrink-0" style={{ background: hidden ? '#aaa' : p.color }} />
                 <span className="text-[10px] font-mono font-bold text-ink-2 w-8 shrink-0">{p.id}</span>
                 <span className="text-[11px] text-ink flex-1 truncate">{p.name}</span>
-                {canHide && (
-                  <span className={`shrink-0 w-7 h-4 rounded-full transition-colors flex items-center px-0.5
-                    ${hidden ? 'bg-ink/15' : 'bg-emerald-500'}`}>
-                    <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform
-                      ${hidden ? 'translate-x-0' : 'translate-x-3'}`} />
-                  </span>
-                )}
+                <span className={`shrink-0 w-7 h-4 rounded-full transition-colors flex items-center px-0.5 ${hidden ? 'bg-ink/15' : 'bg-emerald-500'}`}>
+                  <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform ${hidden ? 'translate-x-0' : 'translate-x-3'}`} />
+                </span>
               </button>
             );
           })}
@@ -2414,6 +2405,7 @@ export default function AustraliaApp() {
     setCurrentResults(buildBaselineResults());
     setActivePreset('baseline');
     setSimRunning(false);
+    setRightPanel(p => p === 'parties' ? null : p);
     for (const t of simTimersRef.current) clearTimeout(t);
     simTimersRef.current = [];
   }, []);
@@ -2423,6 +2415,7 @@ export default function AustraliaApp() {
     setCurrentResults(buildPollingResults());
     setActivePreset('polling2026');
     setSimRunning(false);
+    setRightPanel(p => p === 'parties' ? null : p);
     for (const t of simTimersRef.current) clearTimeout(t);
     simTimersRef.current = [];
   }, []);
@@ -2597,7 +2590,9 @@ export default function AustraliaApp() {
           <button onClick={toggleMultiSelect} className={multiSelectMode ? btnActive : btnInactive}>
             {multiSelectMode ? `⊕ ${selectedIds.size} sel.` : 'Multi-select'}
           </button>
-          <button onClick={() => openPanel('parties')}   className={rightPanel === 'parties'   ? btnActive : btnInactive}>Parties</button>
+          {(activePreset === 'blank' || rightPanel === 'sim' || exitPanel === 'sim') && (
+            <button onClick={() => openPanel('parties')} className={rightPanel === 'parties' ? btnActive : btnInactive}>Parties</button>
+          )}
           <button onClick={() => openPanel('swing')}     className={rightPanel === 'swing'     ? btnActive : btnInactive}>Swing</button>
           <button onClick={() => openPanel('breakdown')} className={rightPanel === 'breakdown' ? btnActive : btnInactive}>Breakdown</button>
           <button onClick={toggleParliament}             className={parliamentOpen ? btnActive : btnInactive} disabled={!activePreset}>Parliament</button>
@@ -2694,6 +2689,7 @@ export default function AustraliaApp() {
                 rawVotes={rawVotes}
                 activePreset={activePreset}
                 simRunning={simRunning}
+                hiddenParties={hiddenParties}
               />
             </div>
           </div>
@@ -2852,7 +2848,6 @@ export default function AustraliaApp() {
               onClose={closePanel}
               hiddenParties={hiddenParties}
               onToggleParty={toggleParty}
-              activePreset={activePreset}
             />
           )}
 
