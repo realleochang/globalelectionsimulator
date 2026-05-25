@@ -24,7 +24,7 @@ function UKTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: 
     <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>
   );
   const Note = ({ children }: { children: React.ReactNode }) => (
-    <div className="bg-amber-50 border border-amber-200 rounded-[4px] px-2.5 py-2 text-[10px] text-amber-800 leading-relaxed mb-2">{children}</div>
+    <div className="tutorial-note rounded-[4px] px-2.5 py-2 text-[10px] leading-relaxed mb-2">{children}</div>
   );
   const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
     <div className="flex gap-2 mb-1.5">

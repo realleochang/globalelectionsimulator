@@ -2128,98 +2128,80 @@ const DATA_CA_2026: Record<string, Record<string, number>> = {
 };
 
 function CaTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting: boolean }) {
-  return (
-    <div className={`panel-slide${exiting ? ' panel-exit' : ''}`}
-      style={{ width: 320, flexShrink: 0, overflowY: 'auto', background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', zIndex: 400 }}>
-      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <span style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1f2937' }}>How to Play</span>
-        <button onClick={onClose} style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid #e5e7eb', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280', fontSize: 14, lineHeight: 1 }}>×</button>
-      </div>
-      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 18, flex: 1 }}>
-
-        {/* System */}
-        <div>
-          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>The System — FPTP</div>
-          <p style={{ fontSize: 11.5, color: '#374151', lineHeight: 1.65, margin: 0 }}>
-            Canada elects 343 Members of Parliament in single-member ridings using First Past the Post. The candidate with the most votes in each riding wins — no majority needed. The party with 172+ seats forms government.
-          </p>
-          <div style={{ marginTop: 9, display: 'flex', gap: 8 }}>
-            <div style={{ flex: 1, padding: '8px 10px', borderRadius: 7, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
-              <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 10, color: '#0369a1', marginBottom: 2 }}>343 ridings</div>
-              <div style={{ fontSize: 10, color: '#374151', lineHeight: 1.5 }}>Winner takes the seat — highest vote share wins</div>
-            </div>
-            <div style={{ flex: 1, padding: '8px 10px', borderRadius: 7, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
-              <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 10, color: '#15803d', marginBottom: 2 }}>172 majority</div>
-              <div style={{ fontSize: 10, color: '#374151', lineHeight: 1.5 }}>Needed for an outright parliamentary majority</div>
-            </div>
-          </div>
-          <div style={{ marginTop: 7, padding: '8px 10px', borderRadius: 7, background: '#fff7ed', border: '1px solid #fed7aa' }}>
-            <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 10, color: '#c2410c', marginBottom: 2 }}>Bloc Québécois</div>
-            <div style={{ fontSize: 10, color: '#374151', lineHeight: 1.5 }}>BQ only runs candidates in Quebec (78 ridings). Their seat count comes entirely from Quebec.</div>
-          </div>
-        </div>
-
-        {/* Map presets */}
-        <div>
-          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>Map Presets</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {[
-              { label: '2025 Election', desc: 'Official April 2025 results — LIB majority government' },
-              { label: '2026 Polling', desc: 'Hypothetical 2026 scenario based on polling averages' },
-              { label: 'Blank Map', desc: 'Start from scratch — set every riding manually' },
-              { label: 'Simulation', desc: 'Run a randomised election with current percentages' },
-            ].map(({ label, desc }) => (
-              <div key={label} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 4, padding: '2px 5px', marginTop: 1, whiteSpace: 'nowrap' }}>{label}</span>
-                <span style={{ fontSize: 10.5, color: '#374151', lineHeight: 1.5 }}>{desc}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Editing ridings */}
-        <div>
-          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>Editing Ridings</div>
-          <ol style={{ margin: 0, padding: '0 0 0 16px', display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {[
-              'Click any riding on the map to open its slider panel.',
-              'Drag the sliders to redistribute vote shares — totals always sum to 100%.',
-              'Use Multi-select to apply the same swing to many ridings at once.',
-              'Use the Swing panel for uniform national shifts across all ridings.',
-            ].map((s, i) => (
-              <li key={i} style={{ fontSize: 10.5, color: '#374151', lineHeight: 1.55 }}>{s}</li>
-            ))}
-          </ol>
-        </div>
-
-        {/* Scoreboard */}
-        <div>
-          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>Scoreboard</div>
-          <p style={{ fontSize: 11.5, color: '#374151', lineHeight: 1.65, margin: 0 }}>
-            Each card shows the party leader, abbreviation, current seat count, and national vote share. Cards are sorted by seat count. The seat-count bar scales to 172 (majority). A checkmark appears on the party holding a majority.
-          </p>
-        </div>
-
-        {/* Tools */}
-        <div>
-          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>Other Tools</div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
-            {[
-              { label: 'Breakdown', desc: 'Province-by-province seat and vote breakdown.' },
-              { label: 'Parliament', desc: 'Proportional arc diagram of the current seat tally.' },
-              { label: 'Bubble Map', desc: 'Switch from geographic to bubble layout — each riding is a circle sized by voter turnout.' },
-              { label: 'Simulation', desc: 'Auto-fills all ridings riding-by-riding, province by province, with animated results.' },
-            ].map(({ label, desc }) => (
-              <div key={label} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
-                <span style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9, color: '#374151', background: '#f3f4f6', borderRadius: 4, padding: '2px 5px', marginTop: 1, whiteSpace: 'nowrap' }}>{label}</span>
-                <span style={{ fontSize: 10.5, color: '#374151', lineHeight: 1.5 }}>{desc}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-      </div>
+  const H2 = ({ children }: { children: React.ReactNode }) => (
+    <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>
+  );
+  const P = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>
+  );
+  const Note = ({ children }: { children: React.ReactNode }) => (
+    <div className="tutorial-note rounded-[4px] px-2.5 py-2 text-[10px] leading-relaxed mb-2">{children}</div>
+  );
+  const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
+    <div className="flex gap-2 mb-1.5">
+      <span className="shrink-0 w-4 h-4 rounded-full bg-gold text-white text-[8px] font-bold flex items-center justify-center mt-0.5">{n}</span>
+      <span className="text-[11px] text-ink leading-relaxed">{children}</span>
     </div>
+  );
+  const Tag = ({ children, color = 'bg-ink/8 text-ink' }: { children: React.ReactNode; color?: string }) => (
+    <span className={`inline-block px-1.5 py-0.5 rounded-[3px] text-[9px] font-mono font-semibold ${color} mr-1`}>{children}</span>
+  );
+
+  return (
+    <aside className={`w-80 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Canadian Federal Election Guide</p>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
+
+        <H2>The Canadian System — FPTP</H2>
+        <P>Canada elects <strong>343 Members of Parliament</strong> in single-member ridings using <strong>First Past the Post</strong>. The candidate with the most votes wins — no majority needed. The party with <strong>172+ seats</strong> forms government.</P>
+        <div className="flex gap-2 mb-2">
+          <div className="flex-1 bg-muted-bg border border-default rounded-[4px] px-2.5 py-2">
+            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">343 ridings</div>
+            <div className="text-[10px] text-ink-2 leading-relaxed">Winner takes the seat — highest vote share wins</div>
+          </div>
+          <div className="flex-1 bg-muted-bg border border-default rounded-[4px] px-2.5 py-2">
+            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">172 majority</div>
+            <div className="text-[10px] text-ink-2 leading-relaxed">Seats needed for a parliamentary majority</div>
+          </div>
+        </div>
+        <Note>The <strong>Bloc Québécois</strong> only runs candidates in Quebec's 78 ridings — their seat count comes entirely from Quebec.</Note>
+
+        <H2>Map Presets</H2>
+        <div className="space-y-2 mb-2">
+          <div><Tag>2025 Election</Tag><span className="text-[10px] text-ink-2">Official April 2025 results — LIB majority government.</span></div>
+          <div><Tag>2026 Polling</Tag><span className="text-[10px] text-ink-2">Hypothetical 2026 scenario based on polling averages.</span></div>
+          <div><Tag>Blank Map</Tag><span className="text-[10px] text-ink-2">All ridings empty — project results manually as on election night.</span></div>
+          <div><Tag>Simulation</Tag><span className="text-[10px] text-ink-2">Auto-fill all ridings province by province with animated results.</span></div>
+        </div>
+
+        <H2>Editing a Riding</H2>
+        <P>Click any riding on the map to open its slider panel on the right.</P>
+        <Step n={1}>Drag a party's slider or click the percentage to type a value directly.</Step>
+        <Step n={2}>Adjusting one party redistributes the remaining share among unlocked parties.</Step>
+        <Step n={3}>Click the <strong>lock icon</strong> to fix a party's share while adjusting others.</Step>
+        <Step n={4}>Use <Tag>Multi-select</Tag> to apply the same swing to many ridings at once.</Step>
+
+        <H2>Reading the Scoreboard</H2>
+        <P>Cards are ordered left-to-right by seat count. Each shows the leader, abbreviation, seat total, and vote share. The bar scales to 172 (majority). A checkmark marks a majority government.</P>
+
+        <H2>Other Tools</H2>
+        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div><Tag>Swing</Tag> Apply a uniform national shift to all ridings at once.</div>
+          <div><Tag>Breakdown</Tag> Province-by-province seat and vote breakdown.</div>
+          <div><Tag>Parliament</Tag> Hemicycle view of all 343 seats arranged by party.</div>
+          <div><Tag>Bubble Map</Tag> Replace the map with circles sized by voter turnout.</div>
+        </div>
+
+        <div className="h-4" />
+      </div>
+    </aside>
   );
 }
 
@@ -2249,9 +2231,6 @@ export default function CanadaApp() {
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const [tutorialExiting, setTutorialExiting] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
-  const [hiddenParties, setHiddenParties] = useState<Set<string>>(new Set());
-  const [partiesOpen, setPartiesOpen] = useState(false);
-  const partiesDropRef = useRef<HTMLDivElement>(null);
   const simTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
   const stopSim = useCallback(() => {
@@ -2643,50 +2622,6 @@ export default function CanadaApp() {
             </svg>
             Simulation
           </button>
-          {(activePreset === 'blank' || simOpen) && (
-            <div ref={partiesDropRef} className="relative shrink-0">
-              <button
-                onClick={() => setPartiesOpen(o => !o)}
-                className={`${btnBase} flex items-center gap-1 ${partiesOpen ? 'border-[#c8a020] bg-[#c8a020] text-white' : btnInactive}`}
-              >
-                Parties
-                <svg width="8" height="8" viewBox="0 0 8 8" fill="currentColor" aria-hidden="true" style={{ marginTop: 1 }}>
-                  <path d="M1.5 2.5L4 5.5L6.5 2.5" stroke="currentColor" strokeWidth="1.3" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-              {partiesOpen && (
-                <>
-                  <div className="fixed inset-0 z-[99]" onClick={() => setPartiesOpen(false)} />
-                  <div className="absolute left-0 top-[calc(100%+6px)] z-[100] w-44 rounded-[8px] bg-white border border-default overflow-hidden shadow-md">
-                    <div className="px-3 py-2 border-b border-default">
-                      <span className="text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3">Toggle Parties</span>
-                    </div>
-                    <div className="py-1">
-                      {CA_PARTIES.map(p => {
-                        const hidden = hiddenParties.has(p.id);
-                        return (
-                          <label key={p.id} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-hover cursor-pointer">
-                            <input
-                              type="checkbox"
-                              checked={!hidden}
-                              onChange={() => setHiddenParties(prev => {
-                                const n = new Set(prev);
-                                if (n.has(p.id)) n.delete(p.id); else n.add(p.id);
-                                return n;
-                              })}
-                              className="w-3 h-3 rounded"
-                              style={{ accentColor: p.color }}
-                            />
-                            <span className="text-[11px] font-mono text-ink" style={{ color: p.color, fontWeight: 600 }}>{p.name}</span>
-                          </label>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
           <button
             onClick={() => {
               if (multiSelectMode) { setMultiSelectMode(false); setSelectedRidingIds(new Set()); }
@@ -2802,7 +2737,7 @@ export default function CanadaApp() {
             transition: 'grid-template-rows 280ms cubic-bezier(0.4,0,0.2,1)',
           }}>
             <div className="overflow-hidden">
-              <CanadaScoreboard tally={tally} votePcts={votePcts} rawVotes={rawVotes} activePreset={activePreset} hiddenParties={hiddenParties} />
+              <CanadaScoreboard tally={tally} votePcts={votePcts} rawVotes={rawVotes} activePreset={activePreset} />
             </div>
           </div>
           <button
@@ -2988,7 +2923,6 @@ export default function CanadaApp() {
               setSimRunning={setSimRunning}
               setSimProgress={setSimProgress}
               stopSim={stopSim}
-              hiddenParties={hiddenParties}
             />
           )}
 

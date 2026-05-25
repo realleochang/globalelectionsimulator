@@ -1760,7 +1760,7 @@ function FrSimulationPanel({
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2.5">
 
         {/* Realism warning */}
-        <div className="rounded-[5px] border border-amber-200 bg-amber-50 px-2.5 py-2 text-[9px] font-mono text-amber-800 leading-relaxed">
+        <div className="tutorial-note rounded-[5px] px-2.5 py-2 text-[9px] font-mono leading-relaxed">
           <span className="font-bold">Realistic scenarios only.</span> This is a serious election simulator using real circonscription data and swing modelling. Absurd inputs (e.g. RN 99%) will produce meaningless projections — garbage in, garbage out.
         </div>
 
@@ -2425,7 +2425,7 @@ function FrTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: 
     <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>
   );
   const Note = ({ children }: { children: React.ReactNode }) => (
-    <div className="bg-amber-50 border border-amber-200 rounded-[4px] px-2.5 py-2 text-[10px] text-amber-800 leading-relaxed mb-2">{children}</div>
+    <div className="tutorial-note rounded-[4px] px-2.5 py-2 text-[10px] leading-relaxed mb-2">{children}</div>
   );
   const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
     <div className="flex gap-2 mb-1.5">
