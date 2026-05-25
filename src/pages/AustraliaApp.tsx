@@ -97,10 +97,10 @@ const POLL_SWING_2026: Partial<Record<AuPartyId, number>> = {
 // These override the uniform swing for that seat (expressed as 0–1 fractions, must sum to 1)
 const SEAT_POLL_OVERRIDES_2026: Partial<Record<string, Partial<Record<AuPartyId, number>>>> = {
   // Farrer by-election 2026: ONP 39.53% / IND 28.08% / LIB 12.41% / NAT 9.78% (no ALP candidate)
-  // Adjusted for general election with ALP running: ALP absorbs ~10% from by-election IND/ONP vote
+  // Adjusted for general election with ALP running. Calibrated so ONP wins ~58% on final preferences.
   'Farrer': {
-    ALP: 0.100, LIB: 0.162, NAT: 0.098, GRN: 0.038,
-    ONP: 0.322, IND: 0.210, OTH: 0.070,
+    ALP: 0.090, LIB: 0.130, NAT: 0.090, GRN: 0.035,
+    ONP: 0.310, IND: 0.295, OTH: 0.050,
   },
 };
 
@@ -129,29 +129,30 @@ function enforceNoSmooth(layer: L.GeoJSON) {
 }
 
 // ── Preference flows: when a party is eliminated in IRV, where do votes go? ────
-// On party lines: ALP↔GRN very strong; LIB→ONP and ONP→LIB strong.
-// Values don't need to sum to 1 — runIRV normalises to remaining candidates.
+// Values don't need to sum to 1 — runIRV normalises to remaining candidates only.
+// Every party must appear in every other party's row (even if tiny) so no single
+// remaining candidate ever absorbs 100% of an eliminated party's votes.
 const PREF_FLOWS: Partial<Record<AuPartyId, Partial<Record<AuPartyId, number>>>> = {
-  // Greens voters → Labor almost entirely
-  GRN: { ALP: 0.93, CA: 0.03, IND: 0.02, OTH: 0.01, LIB: 0.005, LNP: 0.003, NAT: 0.002 },
-  // Labor voters → Greens first; small trickle to right so normalization works in LIB v ONP final
-  ALP: { GRN: 0.88, CA: 0.04, IND: 0.03, OTH: 0.02, LIB: 0.02, LNP: 0.01, NAT: 0.01, ONP: 0.005 },
-  // Centre Alliance → ALP/GRN heavily
-  CA:  { ALP: 0.68, GRN: 0.20, IND: 0.06, LIB: 0.03, ONP: 0.01, OTH: 0.01, NAT: 0.01 },
-  // Independents (teals) → ALP/GRN majority
-  IND: { ALP: 0.55, GRN: 0.22, CA: 0.10, LIB: 0.06, NAT: 0.03, ONP: 0.02, OTH: 0.01, LNP: 0.01 },
-  // Liberals → ONP nearly entirely (party-line preference)
-  LIB: { ONP: 0.83, NAT: 0.07, LNP: 0.04, ALP: 0.03, OTH: 0.02, KAP: 0.01 },
-  // Nationals → LIB/LNP first, then ONP
-  NAT: { LIB: 0.40, LNP: 0.22, ONP: 0.26, KAP: 0.06, ALP: 0.03, OTH: 0.03 },
-  // LNP → LIB/NAT first, then ONP
-  LNP: { LIB: 0.38, NAT: 0.25, ONP: 0.26, KAP: 0.06, ALP: 0.03, OTH: 0.02 },
-  // ONP → Coalition strongly (party-line, vice versa to LIB)
-  ONP: { LIB: 0.58, NAT: 0.12, LNP: 0.12, KAP: 0.08, ALP: 0.06, OTH: 0.03, GRN: 0.005, IND: 0.005, CA: 0.005 },
-  // Katter → LNP then ONP (far North Queensland rural)
-  KAP: { LNP: 0.38, ONP: 0.28, NAT: 0.15, ALP: 0.12, OTH: 0.05, GRN: 0.01, IND: 0.01 },
-  // Other → mixed
-  OTH: { ALP: 0.30, LIB: 0.20, GRN: 0.16, ONP: 0.12, NAT: 0.08, IND: 0.06, LNP: 0.05, CA: 0.02, KAP: 0.01 },
+  // Greens → Labor strongly, then teal IND, small right trickle
+  GRN: { ALP: 0.83, IND: 0.06, CA: 0.04, OTH: 0.03, LIB: 0.02, NAT: 0.01, LNP: 0.01, KAP: 0.005, ONP: 0.005 },
+  // Labor → Greens first, then centrists; KAP preferred over ONP (rural/regional, not far-right)
+  ALP: { GRN: 0.78, CA: 0.07, IND: 0.07, KAP: 0.03, OTH: 0.03, LIB: 0.02, NAT: 0.01, LNP: 0.01, ONP: 0.01 },
+  // Centre Alliance → ALP/GRN heavily, small right trickle
+  CA:  { ALP: 0.62, GRN: 0.18, IND: 0.08, LIB: 0.05, NAT: 0.03, OTH: 0.02, LNP: 0.01, KAP: 0.005, ONP: 0.005 },
+  // Independents (teals) → ALP/GRN majority; some to LIB/centrist, tiny ONP
+  IND: { ALP: 0.50, GRN: 0.20, CA: 0.10, LIB: 0.08, NAT: 0.04, OTH: 0.03, LNP: 0.02, KAP: 0.02, ONP: 0.01 },
+  // Liberals → lean ONP in 2026 but not exclusively; some to NAT/IND/ALP
+  LIB: { ONP: 0.62, NAT: 0.13, LNP: 0.09, KAP: 0.05, ALP: 0.04, OTH: 0.03, IND: 0.02, GRN: 0.01, CA: 0.005 },
+  // Nationals → Coalition partners first, ONP second, small ALP/IND trickle
+  NAT: { LIB: 0.34, LNP: 0.21, ONP: 0.22, KAP: 0.10, ALP: 0.06, OTH: 0.04, IND: 0.02, GRN: 0.005, CA: 0.005 },
+  // LNP (QLD) → similar to NAT/LIB mix
+  LNP: { LIB: 0.32, NAT: 0.24, ONP: 0.22, KAP: 0.10, ALP: 0.05, OTH: 0.03, IND: 0.02, GRN: 0.005, CA: 0.005 },
+  // ONP → Coalition strongly; small left trickle (not zero — some protest voters stay flexible)
+  ONP: { LIB: 0.46, NAT: 0.16, LNP: 0.15, KAP: 0.10, ALP: 0.07, OTH: 0.03, IND: 0.015, GRN: 0.01, CA: 0.005 },
+  // Katter → LNP/ONP/NAT first (far North QLD rural); ALP above LIB (social policy)
+  KAP: { LNP: 0.34, ONP: 0.26, NAT: 0.18, ALP: 0.12, OTH: 0.05, LIB: 0.02, IND: 0.015, GRN: 0.01, CA: 0.005 },
+  // Other → mixed; slight left lean overall
+  OTH: { ALP: 0.26, LIB: 0.18, GRN: 0.14, ONP: 0.14, NAT: 0.10, IND: 0.08, LNP: 0.05, KAP: 0.03, CA: 0.02 },
 };
 
 // ── Full IRV simulation — returns round-by-round elimination trace ──────────────
