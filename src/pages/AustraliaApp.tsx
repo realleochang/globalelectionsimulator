@@ -2188,11 +2188,11 @@ export default function AustraliaApp() {
   // ── Imperative map re-style ──────────────────────────────────────────────────
   useEffect(() => {
     if (!layerRef.current) return;
-    const baseStroke = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
+    const borderColor = dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)';
     if (bubbleMap) {
       layerRef.current.setStyle(() => ({
         fillOpacity: 0, weight: 0.4,
-        color: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)', opacity: 0.6,
+        color: borderColor, opacity: 0.6,
       }));
       return;
     }
@@ -2212,10 +2212,10 @@ export default function AustraliaApp() {
         if (res && data) fillColor = electorateFill(data.validVotes, res, dark);
       }
       path.setStyle({
-        fillColor, fillOpacity: 0.72,
-        color: isSelected ? '#c8a020' : baseStroke,
-        weight: isSelected ? 2 : 0.5,
-        opacity: 1,
+        fillColor, fillOpacity: 0.82,
+        color: isSelected ? '#c8a020' : borderColor,
+        weight: isSelected ? 2 : 0.4,
+        opacity: isSelected ? 1 : 0.6,
       });
     });
   }, [activePreset, currentResults, selectedId, selectedIds, dark, geojson, byIdMap, bubbleMap]);
@@ -2386,8 +2386,8 @@ export default function AustraliaApp() {
   }, [byIdMap]);
 
   const geoStyle = useCallback((): L.PathOptions => ({
-    fillColor: dark ? '#374151' : BLANK_COLOR, fillOpacity: 0.72,
-    color: dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)', weight: 0.5, opacity: 1,
+    fillColor: dark ? '#374151' : BLANK_COLOR, fillOpacity: 0.82,
+    color: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)', weight: 0.4, opacity: 0.6,
   }), [dark]);
 
   // ── Derived panel flags ──────────────────────────────────────────────────────
