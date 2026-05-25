@@ -197,27 +197,27 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
         <span className="cand-party-abbrev">{partyId}</span>
 
         {/* 4. Seat count */}
-        <div className="cand-seats">{seats}</div>
+        <span className="cand-seats">{seats}</span>
 
-        {/* 5. Party full name */}
-        <div className="cand-party-name" title={party?.name}>{party?.name ?? partyId}</div>
+        {/* 5. Party name */}
+        <span className="cand-party-name">{party?.name ?? partyId}</span>
 
-        {/* 6. VOTE row — Germany-style */}
-        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
-          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>Vote</span>
-          <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>
-            {votePct.toFixed(1)}%
-            {deltaEl}
+        {/* 6. Vote percentage */}
+        <div className="cand-pct">
+          <span className="pct-number" style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>
+            {votePct.toFixed(1)}%{deltaEl}
           </span>
         </div>
-        <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
-          <span className="cand-votes-full" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{votes.toLocaleString()}</span>
-          <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{fmtVotes(votes)}</span>
+
+        {/* 7. Raw vote count */}
+        <div style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870', lineHeight: 1, marginBottom: 3 }}>
+          <span className="cand-votes-full">{votes.toLocaleString()}</span>
+          <span className="cand-votes-compact">{fmtVotes(votes)}</span>
         </div>
 
-        {/* 7. Progress bar — scales to 50% max */}
+        {/* 8. Progress bar — scales to 55% max (matching Australia) */}
         <div className="cand-bar-track" style={{ width: '100%', height: 3, borderRadius: 2, background: 'var(--bar-track)' }}>
-          <div id={`cand-bar-${partyId}`} className="cand-bar-fill" style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min(votePct / 50 * 100, 100)}%`, transition: 'width 0.3s ease' }} />
+          <div id={`cand-bar-${partyId}`} className="cand-bar-fill" style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min(votePct / 55 * 100, 100)}%`, transition: 'width 0.3s ease' }} />
         </div>
       </div>
     );
