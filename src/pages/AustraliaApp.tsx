@@ -4,9 +4,7 @@ import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { hsl } from 'd3';
-import type { GeoJsonObject, Feature, FeatureCollection } from 'geojson';
-import { topology } from 'topojson-server';
-import { mesh } from 'topojson-client';
+import type { GeoJsonObject, Feature } from 'geojson';
 import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import {
   AU_PARTIES, AU_PARTY_MAP, AU_ELECTORATES, AU_TOTAL, AU_MAJORITY,
@@ -457,47 +455,6 @@ function AuGeoLayer({ geojson, style, onEachFeature, layerRef }: {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, geojson]);
-
-  return null;
-}
-
-// Renders only the shared interior borders (no coastal outlines) using a TopoJSON mesh.
-function AuBorderLayer({ geojson, dark }: { geojson: FeatureCollection; dark: boolean }) {
-  const map = useMap();
-  const layerRef = useRef<L.GeoJSON | null>(null);
-
-  // Compute interior-only mesh once per geojson
-  const innerMesh = useMemo(() => {
-    const topo = topology({ electorates: geojson } as any);
-    return mesh(topo, (topo.objects as any).electorates, (a: any, b: any) => a !== b);
-  }, [geojson]);
-
-  useEffect(() => {
-    const color = dark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)';
-    const layer = L.geoJSON(innerMesh as any, {
-      ...({ smoothFactor: 0 } as any),
-      renderer: L.svg({ padding: 0.5 }),
-      style: () => ({ color, weight: 0.5, fill: false, opacity: 0.8 }),
-    });
-    layer.addTo(map);
-    layerRef.current = layer;
-
-    const onZoomEnd = () => enforceNoSmooth(layer);
-    map.on('zoomend', onZoomEnd);
-    return () => {
-      map.off('zoomend', onZoomEnd);
-      layer.remove();
-      layerRef.current = null;
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, innerMesh]);
-
-  // Re-color when dark mode toggles
-  useEffect(() => {
-    if (!layerRef.current) return;
-    const color = dark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.22)';
-    layerRef.current.setStyle(() => ({ color, weight: 0.5, fill: false, opacity: 0.8 }));
-  }, [dark]);
 
   return null;
 }
@@ -2231,8 +2188,12 @@ export default function AustraliaApp() {
   // ── Imperative map re-style ──────────────────────────────────────────────────
   useEffect(() => {
     if (!layerRef.current) return;
+    const borderColor = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)';
     if (bubbleMap) {
-      layerRef.current.setStyle(() => ({ fillOpacity: 0, weight: 0, stroke: false }));
+      layerRef.current.setStyle(() => ({
+        fillOpacity: 0, weight: 0.4,
+        color: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)', opacity: 0.6,
+      }));
       return;
     }
     layerRef.current.eachLayer((layer: L.Layer) => {
@@ -2250,10 +2211,11 @@ export default function AustraliaApp() {
         const res = currentResultsRef.current[electDiv] ?? data?.results2025;
         if (res && data) fillColor = electorateFill(data.validVotes, res, dark);
       }
-      // Selection: gold stroke on top of the fill polygon (interior borders come from AuBorderLayer)
       path.setStyle({
-        fillColor, fillOpacity: isSelected ? 1 : 0.82,
-        color: '#c8a020', weight: isSelected ? 2 : 0, stroke: isSelected,
+        fillColor, fillOpacity: 0.82,
+        color: isSelected ? '#c8a020' : borderColor,
+        weight: isSelected ? 2 : 0.5,
+        opacity: 1,
       });
     });
   }, [activePreset, currentResults, selectedId, selectedIds, dark, geojson, byIdMap, bubbleMap]);
@@ -2425,7 +2387,7 @@ export default function AustraliaApp() {
 
   const geoStyle = useCallback((): L.PathOptions => ({
     fillColor: dark ? '#374151' : BLANK_COLOR, fillOpacity: 0.82,
-    weight: 0, stroke: false,
+    color: dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.28)', weight: 0.5, opacity: 1,
   }), [dark]);
 
   // ── Derived panel flags ──────────────────────────────────────────────────────
@@ -2613,9 +2575,6 @@ export default function AustraliaApp() {
                   onEachFeature={handleEachFeature}
                   layerRef={layerRef}
                 />
-                {!bubbleMap && (
-                  <AuBorderLayer geojson={geojson as FeatureCollection} dark={dark} />
-                )}
                 {bubbleMap && !!activePreset && (
                   <BubbleLayer
                     geojson={geojson} currentResults={currentResults} activePreset={activePreset} byIdMap={byIdMap}
