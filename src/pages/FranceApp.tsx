@@ -2501,7 +2501,7 @@ function FrTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: 
 // ── Main France App ───────────────────────────────────────────────────────────
 export default function FranceApp() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const [contributorsOpen, setContributorsOpen] = useState(false);
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [selectedDept, setSelectedDept] = useState<DeptInfo | null>(null);

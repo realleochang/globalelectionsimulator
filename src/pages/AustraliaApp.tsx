@@ -2175,7 +2175,7 @@ export default function AustraliaApp() {
   const navigate = useNavigate();
 
   // ── Core state ───────────────────────────────────────────────────────────────
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
   const [activePreset, setActivePreset] = useState<PresetId | null>('blank');
   const [currentResults, setCurrentResults] = useState<Record<string, Partial<Record<AuPartyId, number>>>>({});

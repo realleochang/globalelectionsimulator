@@ -2207,7 +2207,7 @@ function CaTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting: b
 
 export default function CanadaApp() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const [contributorsOpen, setContributorsOpen] = useState(false);
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
   const [ridingData, setRidingData] = useState<RidingData[]>([]);

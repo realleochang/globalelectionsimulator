@@ -2121,7 +2121,7 @@ function UsaSummaryPanel({ currentResults, exiting = false, onClose }: {
 // ── Main component ────────────────────────────────────────────────────────────
 export default function USAApp() {
   const navigate = useNavigate();
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
   const [currentResults, setCurrentResults] = useState<Record<string, Record<string, number>>>({});
   const [stateReporting, setStateReporting] = useState<Record<string, number>>({});

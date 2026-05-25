@@ -2057,7 +2057,7 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
 export default function GermanyApp() {
   const navigate = useNavigate();
 
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
+  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.setItem('darkMode', String(dark));
