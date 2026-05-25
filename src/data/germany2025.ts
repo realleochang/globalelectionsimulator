@@ -520,6 +520,48 @@ export function calcMMP(
   return { listSeats, constSeats, totalSeats, qualifyingParties: qualifying };
 }
 
+// ── 2025 actual awarded constituency seats by state ──────────────────────────
+// 276 of 299 constituencies awarded (23 "losing winners" not seated — 2023 reform)
+export const DIRECT_SEATS_2025_BY_STATE: Record<string, Partial<Record<DePartyId, number>>> = {
+  '01': { CDU: 8,  SPD: 1,  GRUE: 1 },                        // Schleswig-Holstein
+  '02': { SPD: 3,  CDU: 1,  GRUE: 2 },                        // Hamburg
+  '03': { SPD: 15, CDU: 15 },                                  // Niedersachsen
+  '04': { SPD: 1 },                                            // Bremen
+  '05': { SPD: 17, CDU: 44, GRUE: 3 },                        // Nordrhein-Westfalen
+  '06': { SPD: 2,  CDU: 15 },                                  // Hessen
+  '07': { SPD: 1,  CDU: 11 },                                  // Rheinland-Pfalz
+  '08': { CDU: 29, GRUE: 3 },                                  // Baden-Württemberg
+  '09': { CSU: 44 },                                           // Bayern
+  '10': { SPD: 2,  CDU: 2 },                                   // Saarland
+  '11': { SPD: 1,  CDU: 3,  GRUE: 3, AFD: 1,  LINKE: 4 },    // Berlin
+  '12': { SPD: 1,  AFD: 8 },                                   // Brandenburg
+  '13': { AFD: 5 },                                            // Mecklenburg-Vorpommern
+  '14': { AFD: 14, LINKE: 1 },                                 // Sachsen
+  '15': { AFD: 7 },                                            // Sachsen-Anhalt
+  '16': { AFD: 7,  LINKE: 1 },                                 // Thüringen
+};
+
+// ── 2025 actual list seats by state ──────────────────────────────────────────
+// 354 list seats total; source: Federal Returning Officer / Bundeswahlleiterin
+export const LIST_SEATS_2025_BY_STATE: Record<string, Partial<Record<DePartyId, number>>> = {
+  '01': { SPD: 4,  GRUE: 3,  AFD: 5,  LINKE: 2, SSW: 1 },    // SH: 15
+  '02': { CDU: 2,  GRUE: 1,  AFD: 2,  LINKE: 2 },             // HH: 7
+  '03': { SPD: 2,  CDU: 6,  GRUE: 8,  AFD: 13, LINKE: 6 },   // NI: 35
+  '04': { CDU: 1,  GRUE: 1,  AFD: 1,  LINKE: 1 },             // HB: 4
+  '05': { SPD: 14, CDU: 3,  GRUE: 16, AFD: 26, LINKE: 13 },  // NW: 72
+  '06': { SPD: 8,  GRUE: 7,  AFD: 9,  LINKE: 4 },             // HE: 28
+  '07': { SPD: 6,  GRUE: 4,  AFD: 7,  LINKE: 2 },             // RP: 19
+  '08': { SPD: 13, GRUE: 9,  AFD: 19, LINKE: 6 },             // BW: 47
+  '09': { SPD: 14, GRUE: 14, AFD: 22, LINKE: 7 },             // BY: 57
+  '10': { GRUE: 1,  AFD: 2,  LINKE: 1 },                      // SL: 4
+  '11': { SPD: 3,  CDU: 2,  GRUE: 2,  AFD: 3,  LINKE: 2 },   // B: 12
+  '12': { SPD: 3,  CDU: 4,  GRUE: 2,  LINKE: 3 },             // BB: 12
+  '13': { SPD: 2,  CDU: 3,  GRUE: 1,  LINKE: 2 },             // MV: 8
+  '14': { SPD: 3,  CDU: 7,  GRUE: 2,  LINKE: 3 },             // SN: 15
+  '15': { SPD: 2,  CDU: 4,  GRUE: 1,  LINKE: 2 },             // ST: 9
+  '16': { SPD: 2,  CDU: 4,  GRUE: 1,  AFD: 1,  LINKE: 2 },   // TH: 10
+};
+
 // ── State name map ─────────────────────────────────────────────────────────────
 export const STATE_NAMES: Record<string, string> = {
   '01': 'Schleswig-Holstein', '02': 'Hamburg', '03': 'Niedersachsen',

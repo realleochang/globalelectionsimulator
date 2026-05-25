@@ -10,6 +10,7 @@ import {
   calcBundestag, calcDirectSeats, calcMMP,
   BUNDESTAG_TOTAL, DIRECT_THRESHOLD, THRESHOLD_EXEMPT,
   ZWEITSTIMMEN_2025, ZWEIT_GRAND_TOTAL_2025,
+  DIRECT_SEATS_2025_BY_STATE, LIST_SEATS_2025_BY_STATE,
   type DePartyId, type DeWahlkreis,
 } from '../data/germany2025';
 
@@ -147,31 +148,40 @@ function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVot
       <span className="cand-seats">{totalSeats}</span>
       <span className="cand-party-name">{party.name}</span>
 
-      {/* Erststimme row */}
-      <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
-        <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>ERST</span>
-        <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>{pct.toFixed(1)}%</span>
-      </div>
-      <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
-        <span className="cand-votes-full" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{votes.toLocaleString()}</span>
-        <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{fmtN(votes)}</span>
-      </div>
-
-      {/* Zweitstimme row */}
-      {zweitPct !== undefined && <>
-        <div style={{ width: '100%', height: 1, background: hexToRgba(color, 0.14), marginBottom: 3 }} />
+      {/* Zweitstimme row (primary) */}
+      {zweitPct !== undefined ? (<>
         <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
           <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>LIST</span>
-          <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: hexToRgba(color, 0.65) }}>{zweitPct.toFixed(1)}%</span>
+          <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>{zweitPct.toFixed(1)}%</span>
         </div>
         <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
           <span className="cand-votes-full" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{(zweitRawVotes ?? 0).toLocaleString()}</span>
           <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{fmtN(zweitRawVotes ?? 0)}</span>
         </div>
-      </>}
+        <div style={{ width: '100%', height: 1, background: hexToRgba(color, 0.14), marginBottom: 3 }} />
+        {/* Erststimme row (secondary) */}
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
+          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>ERST</span>
+          <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: hexToRgba(color, 0.65) }}>{pct.toFixed(1)}%</span>
+        </div>
+        <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
+          <span className="cand-votes-full" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{votes.toLocaleString()}</span>
+          <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{fmtN(votes)}</span>
+        </div>
+      </>) : (<>
+        {/* Erststimme only (no list data) */}
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
+          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>ERST</span>
+          <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>{pct.toFixed(1)}%</span>
+        </div>
+        <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
+          <span className="cand-votes-full" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{votes.toLocaleString()}</span>
+          <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{fmtN(votes)}</span>
+        </div>
+      </>)}
 
       <div className="cand-bar-track" style={{ width: '100%', height: 3, borderRadius: 2, background: 'var(--bar-track)' }}>
-        <div className="cand-bar-fill" style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min(pct / 40 * 100, 100)}%`, transition: 'width 0.3s ease' }} />
+        <div className="cand-bar-fill" style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min((zweitPct ?? pct) / 40 * 100, 100)}%`, transition: 'width 0.3s ease' }} />
       </div>
     </div>
   );
@@ -241,15 +251,16 @@ function GermanyScoreboard({ wahlkreise, currentResults, zweitstimmen, directSea
   );
   const isUnionLeading = unionSeats > 0 && unionSeats >= maxEntitySeats;
 
-  // Non-union qualifying parties, sorted by seats desc
+  // Non-union parties with any votes (qualifying or not), sorted by Zweitstimme count
   const nonUnion = useMemo(() => DE_PARTIES
-    .filter(p => !UNION_IDS.includes(p.id) && p.id !== 'SONST' && qualifyingParties.has(p.id))
-    .sort((a, b) => (totalSeats[b.id] ?? 0) - (totalSeats[a.id] ?? 0)),
-    [totalSeats, qualifyingParties]
+    .filter(p => !UNION_IDS.includes(p.id) && p.id !== 'SONST' && ((popularVote[p.id] ?? 0) > 0 || qualifyingParties.has(p.id)))
+    .sort((a, b) => (zweitData[b.id] ?? 0) - (zweitData[a.id] ?? 0)),
+    [qualifyingParties, popularVote, zweitData]
   );
 
+  const unionZweit = UNION_IDS.reduce((s, id) => s + (zweitData[id] ?? 0), 0);
   const unionInsertAt = (() => {
-    const idx = nonUnion.findIndex(p => (totalSeats[p.id] ?? 0) < unionSeats);
+    const idx = nonUnion.findIndex(p => (zweitData[p.id] ?? 0) < unionZweit);
     return idx === -1 ? nonUnion.length : idx;
   })();
 
@@ -723,8 +734,10 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
     const newPcts = redistributePcts(pctsRef.current, id, val, locksRef.current);
     pctsRef.current = newPcts;
     setPcts(newPcts);
-    const newVotes = Object.fromEntries(sortedIds.map(cid => [cid, Math.round((newPcts[cid] ?? 0) * total / 100)]));
-    onUpdate(wk.nr, newVotes);
+    if (!isBlank) {
+      const newVotes = Object.fromEntries(sortedIds.map(cid => [cid, Math.round((newPcts[cid] ?? 0) * total / 100)]));
+      onUpdate(wk.nr, newVotes);
+    }
   }
 
   function toggleLock(id: DePartyId) {
@@ -834,14 +847,18 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
             </div>
           ) : (
             <button
-              onClick={onProject}
+              onClick={() => {
+                const newVotes = Object.fromEntries(sortedIds.map(cid => [cid, Math.round((pcts[cid] ?? 0) * total / 100)]));
+                onUpdate(wk.nr, newVotes);
+                onProject?.();
+              }}
               className="w-full py-2 text-[11px] font-mono font-bold rounded-[4px] bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
             >Project Result</button>
           )
         )}
         {!isProjected && (
           <button
-            onClick={() => { setPcts(toPcts(wk.erststimmen, ids)); setLocks(new Set()); setEditId(null); onUpdate(wk.nr, wk.erststimmen); }}
+            onClick={() => { setPcts(toPcts(wk.erststimmen, ids)); setLocks(new Set()); setEditId(null); if (!isBlank) onUpdate(wk.nr, wk.erststimmen); }}
             className="w-full py-1.5 text-[10px] font-mono rounded-[4px] border border-default text-ink-3 hover:bg-hover transition-colors"
           >Reset to 2025</button>
         )}
@@ -1061,39 +1078,6 @@ function SwingTab({ wahlkreise, currentResults }: {
   );
 }
 
-// ── Breakdown panel (kept for reference; not rendered) ─────────────────────────
-export function BreakdownPanel({ wahlkreise, currentResults, onClose, exiting, dark }: {
-  wahlkreise: DeWahlkreis[];
-  currentResults: Record<number, Partial<Record<DePartyId, number>>>;
-  onClose: () => void;
-  exiting?: boolean;
-  dark: boolean;
-}) {
-  const [tab, setTab] = useState<'seats' | 'states' | 'closest' | 'swing'>('seats');
-  return (
-    <aside className={`w-80 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-slide-out' : 'panel-slide'}`}>
-      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
-        <h2 className="text-[14px] font-bold text-ink">Bundestag Breakdown</h2>
-        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
-      </div>
-      <div className="flex border-b border-default shrink-0">
-        {([['seats','Seats'],['states','By State'],['closest','Closest'],['swing','Swing']] as const).map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            className={`flex-1 text-[9px] py-2.5 font-medium transition-colors whitespace-nowrap ${tab === id ? 'text-gold border-b-2 border-gold' : 'text-ink-3 hover:text-ink'}`}>
-            {label}
-          </button>
-        ))}
-      </div>
-      <div className="flex-1 overflow-y-auto thin-scroll">
-        {tab === 'seats'   && <SeatsTab   wahlkreise={wahlkreise} currentResults={currentResults} dark={dark} />}
-        {tab === 'states'  && <ByStateTab wahlkreise={wahlkreise} currentResults={currentResults} />}
-        {tab === 'closest' && <ClosestTab wahlkreise={wahlkreise} currentResults={currentResults} />}
-        {tab === 'swing'   && <SwingTab   wahlkreise={wahlkreise} currentResults={currentResults} />}
-      </div>
-    </aside>
-  );
-}
-
 // ── List Seats (Zweitstimmen) panel — percentage-based ────────────────────────
 function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting, dark }: {
   votes: Record<DePartyId, number>;
@@ -1296,6 +1280,389 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
             Reset to 2025 official
           </button>
         </div>
+      </div>
+    </aside>
+  );
+}
+
+// ── State breakdown panel ──────────────────────────────────────────────────────
+function BreakdownPanel({ wahlkreise, currentResults, zweitVotes, onClose, exiting, dark, isBaseline }: {
+  wahlkreise: DeWahlkreis[];
+  currentResults: Record<number, Partial<Record<DePartyId, number>>>;
+  zweitVotes: Record<DePartyId, number> | null;
+  onClose: () => void;
+  exiting?: boolean;
+  dark?: boolean;
+  isBaseline?: boolean;
+}) {
+  const { stateRows, activePids, grandTotals, grandDirect, grandList } = useMemo(() => {
+
+    // Group WKs by state (needed for all modes)
+    const stateMap = new Map<string, { name: string; wks: DeWahlkreis[] }>();
+    for (const wk of wahlkreise) {
+      if (!stateMap.has(wk.state)) stateMap.set(wk.state, { name: wk.stateName, wks: [] });
+      stateMap.get(wk.state)!.wks.push(wk);
+    }
+
+    // Per-state breakdown
+    const rows: {
+      stateCode: string; name: string; wkCount: number;
+      direct: Partial<Record<DePartyId, number>>;
+      list:   Partial<Record<DePartyId, number>>;
+      total:  Partial<Record<DePartyId, number>>;
+      directTotal: number; listTotal: number; stateTotal: number;
+      listIsExact: boolean;
+    }[] = [];
+
+    // Authoritative national totals (set in each branch)
+    let natTotal: Partial<Record<DePartyId, number>> = {};
+    let natList:  Partial<Record<DePartyId, number>> = {};
+    let natDirect: Partial<Record<DePartyId, number>> = {};
+
+    if (isBaseline) {
+      // ── Baseline: use actual 2025 awarded seats from static tables ──────────
+      for (const [stateCode, { name, wks }] of stateMap) {
+        const direct = { ...(DIRECT_SEATS_2025_BY_STATE[stateCode] ?? {}) };
+        const list   = { ...(LIST_SEATS_2025_BY_STATE[stateCode]   ?? {}) };
+        const total: Partial<Record<DePartyId, number>> = {};
+        for (const pid of new Set([...Object.keys(direct), ...Object.keys(list)]) as Set<DePartyId>) {
+          const t = (direct[pid] ?? 0) + (list[pid] ?? 0);
+          if (t > 0) total[pid] = t;
+        }
+        const directTotal = Object.values(direct).reduce((s, v) => s + (v ?? 0), 0);
+        const listTotal   = Object.values(list).reduce((s, v) => s + (v ?? 0), 0);
+        rows.push({ stateCode, name, wkCount: wks.length, direct, list, total, directTotal, listTotal, stateTotal: directTotal + listTotal, listIsExact: true });
+      }
+      // National totals = sum of static tables (already exact)
+      for (const row of rows) {
+        for (const [pid, v] of Object.entries(row.total)  as [DePartyId, number][]) natTotal[pid]  = (natTotal[pid]  ?? 0) + v;
+        for (const [pid, v] of Object.entries(row.direct) as [DePartyId, number][]) natDirect[pid] = (natDirect[pid] ?? 0) + v;
+        for (const [pid, v] of Object.entries(row.list)   as [DePartyId, number][]) natList[pid]   = (natList[pid]   ?? 0) + v;
+      }
+    } else {
+      // ── Non-baseline: compute direct from current results; estimate list seats ──
+      const directNational = calcDirectSeats(wahlkreise, currentResults);
+
+      let qualifyingParties: Set<DePartyId>;
+
+      if (zweitVotes && Object.values(zweitVotes).some(v => (v ?? 0) > 0)) {
+        const r = calcMMP(zweitVotes, directNational);
+        natTotal = r.totalSeats; natList = r.listSeats; qualifyingParties = r.qualifyingParties;
+      } else {
+        const r = calcBundestag(wahlkreise, currentResults);
+        natTotal = r.totalSeats; qualifyingParties = r.qualifyingParties;
+        const lst: Partial<Record<DePartyId, number>> = {};
+        for (const pid of qualifyingParties) {
+          const tot = natTotal[pid] ?? 0;
+          lst[pid] = Math.max(0, tot - Math.min(r.directSeats[pid] ?? 0, tot));
+        }
+        natList = lst;
+      }
+      // natDirect = natTotal - natList
+      for (const pid of Object.keys(natTotal) as DePartyId[]) {
+        natDirect[pid] = (natTotal[pid] ?? 0) - (natList[pid] ?? 0);
+      }
+
+      // National Erststimmen by party (proxy for distributing list seats to states)
+      const natErst: Partial<Record<DePartyId, number>> = {};
+      for (const wk of wahlkreise) {
+        const r = currentResults[wk.nr] ?? wk.erststimmen;
+        for (const [pid, v] of Object.entries(r) as [DePartyId, number][]) {
+          if ((v ?? 0) > 0) natErst[pid] = (natErst[pid] ?? 0) + v;
+        }
+      }
+
+      for (const [stateCode, { name, wks }] of stateMap) {
+        const direct: Partial<Record<DePartyId, number>> = {};
+        const erstInState: Partial<Record<DePartyId, number>> = {};
+
+        for (const wk of wks) {
+          const r = currentResults[wk.nr] ?? wk.erststimmen;
+          let winner: DePartyId | null = null, maxV = 0;
+          for (const [pid, v] of Object.entries(r) as [DePartyId, number][]) {
+            if ((v ?? 0) > maxV) { maxV = v; winner = pid as DePartyId; }
+            erstInState[pid as DePartyId] = (erstInState[pid as DePartyId] ?? 0) + (v ?? 0);
+          }
+          if (winner) direct[winner] = (direct[winner] ?? 0) + 1;
+        }
+
+        // Distribute each party's national list seats proportionally by state Erststimmen share
+        const list: Partial<Record<DePartyId, number>> = {};
+        for (const pid of qualifyingParties) {
+          const natPidErst   = natErst[pid] ?? 0;
+          const statePidErst = erstInState[pid] ?? 0;
+          const natPidList   = natList[pid] ?? 0;
+          if (natPidErst > 0 && natPidList > 0 && statePidErst > 0) {
+            list[pid] = Math.round(natPidList * statePidErst / natPidErst);
+          }
+        }
+
+        const total: Partial<Record<DePartyId, number>> = {};
+        for (const pid of new Set([...Object.keys(direct), ...Object.keys(list)]) as Set<DePartyId>) {
+          const t = (direct[pid] ?? 0) + (list[pid] ?? 0);
+          if (t > 0) total[pid] = t;
+        }
+
+        const directTotal = Object.values(direct).reduce((s, v) => s + (v ?? 0), 0);
+        const listTotal   = Object.values(list).reduce((s, v) => s + (v ?? 0), 0);
+        rows.push({ stateCode, name, wkCount: wks.length, direct, list, total, directTotal, listTotal, stateTotal: directTotal + listTotal, listIsExact: false });
+      }
+    }
+
+    rows.sort((a, b) => b.wkCount - a.wkCount);
+
+    // Grand totals: use authoritative national numbers (not per-state sums)
+    const grandTotals  = natTotal;
+    const grandDirect  = natDirect;
+    const grandList    = natList;
+
+    const activePids = DE_PARTIES
+      .filter(p => p.id !== 'SONST' && (grandTotals[p.id] ?? 0) > 0)
+      .sort((a, b) => (grandTotals[b.id] ?? 0) - (grandTotals[a.id] ?? 0))
+      .map(p => p.id);
+
+    return { stateRows: rows, activePids, grandTotals, grandDirect, grandList };
+  }, [wahlkreise, currentResults, zweitVotes, isBaseline]);
+
+  const grandTotal = Object.values(grandTotals).reduce((s, v) => s + (v ?? 0), 0);
+
+  return (
+    <aside className={`w-80 shrink-0 flex flex-col overflow-hidden border-l border-default ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} ${exiting ? 'panel-slide-out' : 'panel-slide'}`}>
+      {/* Header */}
+      <div className={`flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0`}>
+        <div>
+          <h2 className="text-[14px] font-bold text-ink leading-none">State Breakdown</h2>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">
+            {isBaseline ? 'Direct · List · Total per State (2025 Official)' : 'Direct · ~List (est.) · Total per State'}
+          </p>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      {/* National summary row */}
+      <div className={`px-3.5 py-2 border-b border-default shrink-0 ${dark ? 'bg-white/4' : 'bg-[#f8f7f4]'}`}>
+        <div className="flex items-center justify-between mb-1.5">
+          <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-ink-3">National Total — {grandTotal} seats</span>
+        </div>
+        <div className="flex flex-wrap gap-x-2.5 gap-y-1">
+          {activePids.map(pid => {
+            const color = partyColor(pid, dark ?? false);
+            return (
+              <div key={pid} className="flex items-center gap-1 text-[8.5px]">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                <span className="font-mono font-semibold text-ink">{pid}</span>
+                <span className="font-mono text-ink-3">{grandDirect[pid] ?? 0}+{grandList[pid] ?? 0}=<span className="font-bold text-ink">{grandTotals[pid] ?? 0}</span></span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Per-state cards */}
+      <div className="flex-1 overflow-y-auto thin-scroll divide-y divide-default">
+        {stateRows.map(({ stateCode, name, wkCount, direct, list, total, directTotal, listTotal, stateTotal, listIsExact }) => {
+          const directSorted = (Object.entries(direct) as [DePartyId, number][]).sort(([,a],[,b]) => b - a);
+          const listSorted   = (Object.entries(list)   as [DePartyId, number][]).sort(([,a],[,b]) => b - a);
+          const stateActive  = activePids.filter(pid => (total[pid] ?? 0) > 0);
+
+          return (
+            <div key={stateCode} className="px-3.5 py-2.5">
+              {/* State header */}
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-bold text-ink truncate pr-2">{name}</span>
+                <span className="text-[8px] font-mono text-ink-3 shrink-0">{wkCount} WKs · {stateTotal} seats</span>
+              </div>
+
+              {/* Direct bar */}
+              <div className="mb-1">
+                <div className="text-[7px] font-mono uppercase tracking-wider text-ink-3 mb-0.5">Direct ({directTotal})</div>
+                <div className="flex h-1.5 rounded overflow-hidden bg-black/8">
+                  {directSorted.map(([pid, n]) => (
+                    <div key={pid} title={`${pid}: ${n} direct`}
+                      style={{ width: `${(n / wkCount) * 100}%`, background: partyColor(pid, dark ?? false) }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* List bar */}
+              {listTotal > 0 && (
+                <div className="mb-1.5">
+                  <div className="text-[7px] font-mono uppercase tracking-wider text-ink-3 mb-0.5">
+                    {listIsExact ? `List ${listTotal}` : `~List ${listTotal}`}
+                  </div>
+                  <div className="flex h-1.5 rounded overflow-hidden bg-black/8">
+                    {listSorted.map(([pid, n]) => (
+                      <div key={pid} title={`${pid}: ${listIsExact ? '' : '~'}${n} list`}
+                        style={{ width: `${(n / Math.max(listTotal, 1)) * 100}%`, background: partyColor(pid, dark ?? false), opacity: 0.75 }} />
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Party totals grid */}
+              <div className="flex flex-wrap gap-x-2.5 gap-y-0.5">
+                {stateActive.map(pid => {
+                  const d = direct[pid] ?? 0;
+                  const l = list[pid]   ?? 0;
+                  const t = total[pid]  ?? 0;
+                  return (
+                    <div key={pid} className="flex items-center gap-0.5 text-[8px]">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: partyColor(pid, dark ?? false) }} />
+                      <span className="font-mono font-semibold text-ink">{pid}</span>
+                      <span className="font-mono text-ink-3">{d}+{l}=</span>
+                      <span className="font-mono font-bold text-ink">{t}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
+// ── Tutorial panel ─────────────────────────────────────────────────────────────
+function TutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: boolean }) {
+  const H2 = ({ children }: { children: React.ReactNode }) => (
+    <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>
+  );
+  const P = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>
+  );
+  const Note = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-amber-50 border border-amber-200 rounded-[4px] px-2.5 py-2 text-[10px] text-amber-800 leading-relaxed mb-2">{children}</div>
+  );
+  const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
+    <div className="flex gap-2 mb-1.5">
+      <span className="shrink-0 w-4 h-4 rounded-full bg-gold text-white text-[8px] font-bold flex items-center justify-center mt-0.5">{n}</span>
+      <span className="text-[11px] text-ink leading-relaxed">{children}</span>
+    </div>
+  );
+  const Tag = ({ children, color = 'bg-ink/8 text-ink' }: { children: React.ReactNode; color?: string }) => (
+    <span className={`inline-block px-1.5 py-0.5 rounded-[3px] text-[9px] font-mono font-semibold ${color} mr-1`}>{children}</span>
+  );
+
+  return (
+    <aside className={`w-80 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Bundestagswahl Guide</p>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
+
+        {/* ── The German system ── */}
+        <H2>The German Electoral System</H2>
+        <P>Germany uses <strong>Mixed-Member Proportional (MMP)</strong> representation. Every voter casts <strong>two votes</strong>:</P>
+        <div className="flex gap-2 mb-2">
+          <div className="flex-1 bg-[#f8f7f4] border border-default rounded-[4px] px-2.5 py-2">
+            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">Erststimme</div>
+            <div className="text-[10px] text-ink-2 leading-relaxed">Direct / constituency vote. Winner-takes-all in each of the 299 Wahlkreise.</div>
+          </div>
+          <div className="flex-1 bg-[#f8f7f4] border border-default rounded-[4px] px-2.5 py-2">
+            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">Zweitstimme</div>
+            <div className="text-[10px] text-ink-2 leading-relaxed">Party / list vote. Determines each party's <em>total</em> seat share. This is the decisive vote.</div>
+          </div>
+        </div>
+        <Note>The Zweitstimme decides parliament's composition. A party can win 50 constituencies and still get zero seats if it falls below 5% nationally with fewer than 3 direct wins.</Note>
+
+        {/* ── Seat calculation ── */}
+        <H2>How Seats Are Calculated</H2>
+        <P>Total Bundestag seats are allocated proportionally to the <strong>Zweitstimme</strong> using the <strong>Sainte-Laguë</strong> method — but only for parties that pass the <em>qualifying threshold</em>:</P>
+        <div className="bg-[#f8f7f4] border border-default rounded-[4px] px-2.5 py-2 mb-2 space-y-1">
+          <div className="flex items-start gap-2 text-[10px] text-ink-2">
+            <span className="text-emerald-600 font-bold shrink-0">✓</span>
+            <span><strong>≥ 5% nationwide</strong> Zweitstimme, OR</span>
+          </div>
+          <div className="flex items-start gap-2 text-[10px] text-ink-2">
+            <span className="text-emerald-600 font-bold shrink-0">✓</span>
+            <span>Won <strong>≥ 3 direct constituencies</strong> (Erststimme)</span>
+          </div>
+        </div>
+        <P>Under the <strong>2023 Wahlrechtsreform</strong>, the Bundestag is fixed at exactly <strong>630 seats</strong>. If a party wins more constituencies than its proportional share allows, those extra candidates — called <em>losing winners</em> — do <em>not</em> receive their seats. In 2025, 23 such candidates were not seated. There are no overhang or leveling seats.</P>
+        <Note>The CDU and CSU are <strong>sister parties</strong> — CDU runs in all states except Bavaria; CSU runs only in Bavaria. They always form a joint parliamentary group (Fraktion) and never compete against each other. The simulator groups them as <em>CDU/CSU</em> in the scoreboard and seat count.</Note>
+
+        {/* ── Presets ── */}
+        <H2>Map Presets</H2>
+        <div className="space-y-2 mb-2">
+          <div><Tag>2025 Baseline</Tag><span className="text-[10px] text-ink-2">The actual February 2025 Bundestagswahl results — a snapshot of what really happened.</span></div>
+          <div><Tag>2026 Polling</Tag><span className="text-[10px] text-ink-2">Current opinion polling estimates applied as a uniform national swing across all constituencies.</span></div>
+          <div><Tag>Blank Map</Tag><span className="text-[10px] text-ink-2">All constituencies empty — you fill in each result manually. See the Blank Map section below.</span></div>
+        </div>
+
+        {/* ── Clicking constituencies ── */}
+        <H2>Editing a Constituency</H2>
+        <P>Click any shaded area on the map to open its panel on the right.</P>
+        <Step n={1}>Drag a party's slider <em>or</em> click its percentage to type a value.</Step>
+        <Step n={2}>When you adjust one party, the remaining vote share is automatically redistributed among unlocked parties.</Step>
+        <Step n={3}>Click the <strong>lock icon</strong> next to a party to fix its share — it won't change when you adjust others.</Step>
+        <Step n={4}>Hit <Tag>Reset to 2025</Tag> to restore the constituency's actual 2025 result.</Step>
+        <P>Changes take effect immediately on the map and scoreboard (except in Blank Map mode — see below).</P>
+
+        {/* ── Blank map ── */}
+        <H2>Blank Map Mode</H2>
+        <Note>In Blank Map mode, nothing updates the map or scoreboard until you explicitly project it — this simulates an election-night experience where results come in gradually.</Note>
+        <Step n={1}>Click <Tag color="border border-gold text-gold bg-transparent">List Seats</Tag> first. The pulsing gold border is a reminder — the scoreboard stays hidden until you enter Zweitstimme data.</Step>
+        <Step n={2}>Enter a percentage for each party in the List Seats panel and close it. The scoreboard will appear showing seat projections.</Step>
+        <Step n={3}>Click a constituency on the map, adjust the sliders, then click <Tag color="bg-emerald-600 text-white">Project Result</Tag>. Only then does the map colour and dashboard update for that constituency.</Step>
+        <Step n={4}>Projected constituencies show a green <em>Projected</em> badge and their sliders lock.</Step>
+        <P>Use <strong>Multi-select</strong> or <strong>Simulation</strong> to project many constituencies at once.</P>
+
+        {/* ── List seats ── */}
+        <H2>List Seats Panel</H2>
+        <P>The <Tag>List Seats</Tag> panel lets you set each party's <strong>Zweitstimme percentage</strong>. Percentages are automatically renormalised to sum to 100% — enter any figures and the tool balances the rest.</P>
+        <P>The panel shows each party's allocated list seats in real time. Remember: a party below 5% that hasn't won 3 direct seats will show <strong>0 list seats</strong> even with non-zero votes — it is blocked by the threshold.</P>
+
+        {/* ── Multi-select ── */}
+        <H2>Multi-Select</H2>
+        <P>Click <Tag>Multi-select</Tag> in the toolbar, then click multiple constituencies on the map to select them. The panel shows a combined swing editor — enter a uniform shift (e.g. <em>CDU +5pp</em>) and it applies across all selected constituencies simultaneously.</P>
+
+        {/* ── Simulation ── */}
+        <H2>Election Night Simulation</H2>
+        <P>Click <Tag>▶ Simulation</Tag> to open the sim panel. Set target Zweitstimme percentages for each party and pick a duration (60 s – 10 min).</P>
+        <P>The simulator calls constituencies one by one in a random order, applying uncertainty modelled on the UNS swing from your targets. Watch the scoreboard update in real time as results come in — just like election night.</P>
+        <Note>Simulated results are driven by Zweitstimme targets. Constituency-level noise means the final map may deviate slightly from your target percentages.</Note>
+
+        {/* ── Scoreboard ── */}
+        <H2>Reading the Scoreboard</H2>
+        <P>Party cards are ordered left-to-right by <strong>Zweitstimme count</strong> (list vote share). Each card shows:</P>
+        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">LIST</span><span>Zweitstimme % and raw votes — the primary, decisive stat. The bar at the bottom tracks this.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">ERST</span><span>Erststimme % and raw votes — dimmed, shown below for reference.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">#</span><span>Total Bundestag seats (direct + list combined), shown in large type.</span></div>
+        </div>
+        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-gold mt-1" /><span><strong>Gold border</strong> — this party (or CDU/CSU bloc) has the most seats.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1" /><span><strong>Green shimmer</strong> — this entity has a majority (≥ 316 seats).</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-ink/20 mt-1" /><span>A party with <strong>votes but 0 seats</strong> fell below the 5% threshold and won fewer than 3 direct mandates.</span></div>
+        </div>
+        <P>Click the <em>Results</em> / <em>Hide</em> chevron at the bottom of the scoreboard to collapse it and get more map space.</P>
+
+        {/* ── State Breakdown ── */}
+        <H2>State Breakdown</H2>
+        <P>Click <Tag>Breakdown</Tag> to open the per-state panel. It shows direct seats and list seats awarded in each of Germany's 16 states, plus a national summary at the top.</P>
+        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink">Direct</span><span>Constituencies won outright (Erststimme winners who received seats).</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink">List N</span><span>Exact list seats (shown in 2025 Baseline mode, from official Federal Returning Officer data).</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink">~List N</span><span>Estimated list seats (in other modes — distributed proportionally by state Erststimme share).</span></div>
+        </div>
+        <Note>The national summary always matches the scoreboard exactly. Per-state list bars are approximate outside baseline mode.</Note>
+
+        {/* ── Parliament ── */}
+        <H2>Parliament View</H2>
+        <P>Click <Tag>Parliament</Tag> to open a hemicycle visualisation arranged left → right by ideology. Seats are coloured by party; the legend below shows each party's count.</P>
+
+        {/* ── Bubble map ── */}
+        <H2>Bubble Map</H2>
+        <P>Toggle <Tag color="bg-emerald-600 text-white">Bubble Map</Tag> to replace the choropleth fill with circles. Each circle is centred on its constituency, coloured by the winning party, and sized proportionally to the <strong>raw vote margin</strong> — a large circle means a big win by many votes, not just a high percentage.</P>
+        <P>This reveals geographic concentration: urban constituencies with high turnout show larger bubbles even at the same percentage margin as a sparse rural seat.</P>
+
+        <div className="h-4" />
       </div>
     </aside>
   );
@@ -1925,7 +2292,11 @@ export default function GermanyApp() {
       DE_PARTIES.map(p => [p.id, Math.round((POLL_2026_PCTS[p.id] ?? 0) / 100 * gt)])
     ) as Record<DePartyId, number>;
   });
-  const [bubbleMap, setBubbleMap]             = useState(false);
+  const [bubbleMap, setBubbleMap]               = useState(false);
+  const [tutorialOpen, setTutorialOpen]         = useState(false);
+  const [tutorialExiting, setTutorialExiting]   = useState(false);
+  const [breakdownOpen, setBreakdownOpen]       = useState(false);
+  const [breakdownExiting, setBreakdownExiting] = useState(false);
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [exitPanel, setExitPanel]             = useState<string | null>(null);
   const exitTimerRef                          = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1999,12 +2370,19 @@ export default function GermanyApp() {
     return () => el.removeEventListener('wheel', handler);
   }, []);
 
-  // Auto-show scoreboard when blank map gets its first results
+  // Auto-show scoreboard when blank map gets its first results (sim path)
   useEffect(() => {
     if (preset === 'blank' && (projectedNrs.size > 0 || simProgress > 0)) {
       setScoreboardVisible(true);
     }
   }, [preset, projectedNrs.size, simProgress]);
+
+  // Auto-show scoreboard once list seats have been filled in blank mode
+  useEffect(() => {
+    if (preset === 'blank' && zweitVotes && Object.values(zweitVotes).some(v => (v ?? 0) > 0)) {
+      setScoreboardVisible(true);
+    }
+  }, [preset, zweitVotes]);
 
   const triggerExit = useCallback((panel: string) => {
     if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
@@ -2028,10 +2406,22 @@ export default function GermanyApp() {
 
   const directSeats = useMemo(() => calcDirectSeats(DE_WAHLKREISE, resolvedResults), [resolvedResults]);
 
+  // For baseline, use the actual awarded direct seats (excludes 23 "losing winners")
+  const effectiveDirectSeats = useMemo<Partial<Record<DePartyId, number>>>(() => {
+    if (preset !== 'baseline') return directSeats;
+    const r: Partial<Record<DePartyId, number>> = {};
+    for (const stateSeats of Object.values(DIRECT_SEATS_2025_BY_STATE)) {
+      for (const [pid, n] of Object.entries(stateSeats) as [DePartyId, number][]) {
+        r[pid] = (r[pid] ?? 0) + n;
+      }
+    }
+    return r;
+  }, [preset, directSeats]);
+
   const parliSeats = useMemo<Partial<Record<DePartyId, number>>>(() => {
     if (!zweitVotes) return {};
-    return calcMMP(zweitVotes, directSeats).totalSeats;
-  }, [zweitVotes, directSeats]);
+    return calcMMP(zweitVotes, effectiveDirectSeats).totalSeats;
+  }, [zweitVotes, effectiveDirectSeats]);
 
   const selectedWk = selectedNr !== null ? DE_WAHLKREISE.find(w => w.nr === selectedNr) ?? null : null;
 
@@ -2105,9 +2495,32 @@ export default function GermanyApp() {
           >Parliament</button>
 
           <button
+            onClick={() => {
+              if (breakdownOpen) {
+                setBreakdownExiting(true);
+                setTimeout(() => { setBreakdownExiting(false); setBreakdownOpen(false); }, 280);
+              } else { setBreakdownOpen(true); }
+            }}
+            className={breakdownOpen ? btnActive : btnMuted}
+          >Breakdown</button>
+
+          <button
             onClick={() => setBubbleMap(v => !v)}
             className={bubbleMap ? `${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700` : btnMuted}
           >Bubble Map</button>
+
+          <button
+            onClick={() => {
+              if (tutorialOpen) {
+                setTutorialExiting(true);
+                setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280);
+              } else {
+                setTutorialOpen(true);
+              }
+            }}
+            className={tutorialOpen ? btnActive : btnMuted}
+            title="How to play"
+          >Tutorial</button>
         </div>
 
         {/* Right controls */}
@@ -2178,7 +2591,7 @@ export default function GermanyApp() {
                 wahlkreise={DE_WAHLKREISE}
                 currentResults={resolvedResults}
                 zweitstimmen={zweitVotes ?? undefined}
-                directSeats={zweitVotes ? directSeats : undefined}
+                directSeats={zweitVotes ? effectiveDirectSeats : undefined}
                 dark={dark}
                 leaders={preset === 'polling2026' || preset === 'blank' ? { ...DE_LEADERS, ...DE_LEADERS_2026 } : DE_LEADERS}
               />
@@ -2256,11 +2669,25 @@ export default function GermanyApp() {
               currentResults={resolvedResults}
             />
           )}
+          {(breakdownOpen || breakdownExiting) && (
+            <BreakdownPanel
+              wahlkreise={DE_WAHLKREISE}
+              currentResults={resolvedResults}
+              zweitVotes={zweitVotes}
+              onClose={() => {
+                setBreakdownExiting(true);
+                setTimeout(() => { setBreakdownExiting(false); setBreakdownOpen(false); }, 280);
+              }}
+              exiting={breakdownExiting}
+              dark={dark}
+              isBaseline={preset === 'baseline'}
+            />
+          )}
           {(showZweit || exitPanel === 'zweit') && zweitVotes && (
             <ZweitstimmenPanel
               votes={zweitVotes}
               onVotesChange={setZweitVotes}
-              directSeats={directSeats}
+              directSeats={effectiveDirectSeats}
               onClose={() => { setZweitOpen(false); triggerExit('zweit'); }}
               exiting={exitPanel === 'zweit'}
               dark={dark}
@@ -2277,6 +2704,16 @@ export default function GermanyApp() {
               simProgress={simProgress}
               stopSim={stopSim}
               dark={dark}
+            />
+          )}
+          {/* Tutorial panel — right side */}
+          {(tutorialOpen || tutorialExiting) && (
+            <TutorialPanel
+              onClose={() => {
+                setTutorialExiting(true);
+                setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280);
+              }}
+              exiting={tutorialExiting}
             />
           )}
         </div>
