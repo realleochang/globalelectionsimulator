@@ -193,12 +193,6 @@ export default function App() {
     setBreakdownOpen(true);
   }, [breakdownOpen, nationalSwingOpen, partyManagerOpen, setNationalSwingOpen, setBreakdownOpen, setPartyManagerOpen, triggerExit]);
 
-  const handlePartyManager = useCallback(() => {
-    if (partyManagerOpen) { setPartyManagerOpen(false); return; }
-    if (nationalSwingOpen) { setNationalSwingOpen(false); triggerExit('natSwing'); }
-    if (breakdownOpen)     { setBreakdownOpen(false);     triggerExit('breakdown'); }
-    setPartyManagerOpen(true);
-  }, [partyManagerOpen, nationalSwingOpen, breakdownOpen, setNationalSwingOpen, setBreakdownOpen, setPartyManagerOpen, triggerExit]);
 
   const [simulationOpen, setSimulationOpen] = useState(false);
   const [simulationKey,  setSimulationKey]  = useState(0);
