@@ -137,7 +137,7 @@ function FrCandTile({ cand, votes, votePct, isLeader, isWinner }: FrCandTileProp
   return (
     <div
       className={`cand-col${isLeader ? ' is-leader' : ''}${isWinner ? ' is-winner' : ''}`}
-      style={{ '--cand-color': color, '--cand-color-alpha': colorAlpha } as React.CSSProperties}
+      style={{ '--cand-color': color, '--cand-color-alpha': colorAlpha, width: 'auto', minWidth: 90 } as React.CSSProperties}
     >
       <div id={`cand-photo-${cand.id}`}>
         <div className="cand-circle-frame">
@@ -351,7 +351,7 @@ function Fr2027CandTile({ party, votes, votePct, isLeader, isWinner, isR1, picke
   return (
     <div
       className={`cand-col${isLeader ? ' is-leader' : ''}${isWinner ? ' is-winner' : ''}`}
-      style={{ '--cand-color': color, '--cand-color-alpha': colorAlpha } as React.CSSProperties}
+      style={{ '--cand-color': color, '--cand-color-alpha': colorAlpha, width: 'auto', minWidth: 90 } as React.CSSProperties}
     >
       <div id={`cand-photo-2027-${party.id}`}>
         <div className="cand-circle-frame">
