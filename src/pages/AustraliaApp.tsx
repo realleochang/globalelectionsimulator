@@ -11,6 +11,7 @@ import {
   COALITION_IDS, PREF_TO_ALP,
   type AuPartyId,
 } from '../data/australia2025';
+import { OFFICIAL_IRV_ROUNDS } from '../data/australia2025rounds';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type PresetId = 'baseline' | 'polling2026' | 'blank';
@@ -38,6 +39,8 @@ type TooltipState = {
   winner: AuPartyId | null;
   tpp: { alp: number; coal: number } | null;
   irvRounds: IrvRound[];
+  officialTCP?: Partial<Record<AuPartyId, number>>;
+  officialRounds?: IrvRound[];
 } | null;
 
 // ── Leaders ────────────────────────────────────────────────────────────────────
@@ -47,6 +50,7 @@ const AU_LEADERS: Record<AuPartyId, LeaderInfo> = {
   LIB: { lastName: 'Taylor',     wikiTitle: 'Angus_Taylor_(politician)' },
   NAT: { lastName: 'Canavan',    localImage: 'leaders/matt-canavan.jpg', objectPosition: 'center 15%' },
   LNP: { lastName: 'Crisafulli', wikiTitle: 'David_Crisafulli' },
+  CLP: { lastName: 'Finocchiaro', wikiTitle: 'Lia_Finocchiaro' },
   GRN: { lastName: 'Waters',     wikiTitle: 'Larissa_Waters' },
   KAP: { lastName: 'Katter',     wikiTitle: 'Bob_Katter' },
   CA:  { lastName: 'Sharkie',    wikiTitle: 'Rebekha_Sharkie' },
@@ -66,7 +70,7 @@ const AU_LEADERS_2025: Partial<Record<AuPartyId, LeaderInfo>> = {
 const AU_HEMI_ROWS = [22, 26, 30, 34, 38];
 const AU_HEMI_RADII = AU_HEMI_ROWS.map((_, i) => 68 + i * 13);
 const AU_HEMI_CX = 190, AU_HEMI_CY = 185, AU_HEMI_DOT_R = 2.8;
-const AU_POLITICAL_ORDER: AuPartyId[] = ['GRN', 'ALP', 'CA', 'IND', 'OTH', 'KAP', 'NAT', 'LNP', 'LIB', 'ONP'];
+const AU_POLITICAL_ORDER: AuPartyId[] = ['GRN', 'ALP', 'CA', 'IND', 'OTH', 'KAP', 'NAT', 'CLP', 'LNP', 'LIB', 'ONP'];
 const AU_HEMI_POSITIONS: { x: number; y: number }[] = (() => {
   const pts: { x: number; y: number; theta: number }[] = [];
   for (let row = 0; row < AU_HEMI_ROWS.length; row++) {
@@ -85,24 +89,8 @@ const STATE_TIMING_OFFSET: Record<string, number> = {
   NSW: 0, VIC: 0, TAS: 0, ACT: 0, QLD: 0.05, SA: 0.15, NT: 0.15, WA: 0.50,
 };
 
-// 2026 polling: ONP surges to ~28%, Coalition collapses, ALP retains majority
-// Targets: ALP ~76, ONP ~51, Coalition ~10-12, IND ~8-9
-// Calibrated via seat simulation; CA wins Mayo, KAP wins Kennedy on preferences
-const POLL_SWING_2026: Partial<Record<AuPartyId, number>> = {
-  ALP: +0.002, LIB: -0.108, NAT: -0.067, LNP: -0.093,
-  GRN: +0.010, ONP: +0.273, IND: -0.018, OTH: -0.004,
-};
-
-// Seat-specific target vote shares for seats with by-election / local data
-// These override the uniform swing for that seat (expressed as 0–1 fractions, must sum to 1)
-const SEAT_POLL_OVERRIDES_2026: Partial<Record<string, Partial<Record<AuPartyId, number>>>> = {
-  // Farrer by-election 2026: ONP 39.53% / IND 28.08% / LIB 12.41% / NAT 9.78% (no ALP candidate)
-  // Adjusted for general election with ALP running. Calibrated so ONP wins ~58% on final preferences.
-  'Farrer': {
-    ALP: 0.090, LIB: 0.130, NAT: 0.090, GRN: 0.035,
-    ONP: 0.310, IND: 0.295, OTH: 0.050,
-  },
-};
+// 2026 polling: ALP 29%, ONP 26%, Coalition 22%, GRN 12%, OTH 10%
+// First-preference results are precomputed per-seat with realistic regional swings (see results2026 field).
 
 const BLANK_COLOR = '#E5E7EB';
 
@@ -134,25 +122,27 @@ function enforceNoSmooth(layer: L.GeoJSON) {
 // remaining candidate ever absorbs 100% of an eliminated party's votes.
 const PREF_FLOWS: Partial<Record<AuPartyId, Partial<Record<AuPartyId, number>>>> = {
   // Greens → Labor strongly, then teal IND, small right trickle
-  GRN: { ALP: 0.83, IND: 0.06, CA: 0.04, OTH: 0.03, LIB: 0.02, NAT: 0.01, LNP: 0.01, KAP: 0.005, ONP: 0.005 },
+  GRN: { ALP: 0.83, IND: 0.06, CA: 0.04, OTH: 0.03, LIB: 0.02, NAT: 0.01, LNP: 0.01, KAP: 0.005, ONP: 0.005, CLP: 0.005 },
   // Labor → Greens first, then centrists; KAP preferred over ONP (rural/regional, not far-right)
-  ALP: { GRN: 0.78, CA: 0.07, IND: 0.07, KAP: 0.03, OTH: 0.03, LIB: 0.02, NAT: 0.01, LNP: 0.01, ONP: 0.01 },
+  ALP: { GRN: 0.78, CA: 0.07, IND: 0.07, KAP: 0.03, OTH: 0.03, LIB: 0.02, NAT: 0.01, LNP: 0.01, ONP: 0.01, CLP: 0.005 },
   // Centre Alliance → ALP/GRN heavily, small right trickle
-  CA:  { ALP: 0.62, GRN: 0.18, IND: 0.08, LIB: 0.05, NAT: 0.03, OTH: 0.02, LNP: 0.01, KAP: 0.005, ONP: 0.005 },
+  CA:  { ALP: 0.62, GRN: 0.18, IND: 0.08, LIB: 0.05, NAT: 0.03, OTH: 0.02, LNP: 0.01, KAP: 0.005, ONP: 0.005, CLP: 0.005 },
   // Independents (teals) → ALP/GRN majority; some to LIB/centrist, tiny ONP
-  IND: { ALP: 0.50, GRN: 0.20, CA: 0.10, LIB: 0.08, NAT: 0.04, OTH: 0.03, LNP: 0.02, KAP: 0.02, ONP: 0.01 },
+  IND: { ALP: 0.50, GRN: 0.20, CA: 0.10, LIB: 0.08, NAT: 0.04, OTH: 0.03, LNP: 0.02, KAP: 0.02, ONP: 0.01, CLP: 0.01 },
   // Liberals → lean ONP in 2026 but not exclusively; some to NAT/IND/ALP
-  LIB: { ONP: 0.62, NAT: 0.13, LNP: 0.09, KAP: 0.05, ALP: 0.04, OTH: 0.03, IND: 0.02, GRN: 0.01, CA: 0.005 },
+  LIB: { ONP: 0.62, NAT: 0.13, LNP: 0.09, KAP: 0.05, ALP: 0.04, OTH: 0.03, IND: 0.02, GRN: 0.01, CA: 0.005, CLP: 0.05 },
   // Nationals → Coalition partners first, ONP second, small ALP/IND trickle
-  NAT: { LIB: 0.34, LNP: 0.21, ONP: 0.22, KAP: 0.10, ALP: 0.06, OTH: 0.04, IND: 0.02, GRN: 0.005, CA: 0.005 },
+  NAT: { LIB: 0.34, LNP: 0.21, ONP: 0.22, KAP: 0.10, ALP: 0.06, OTH: 0.04, IND: 0.02, GRN: 0.005, CA: 0.005, CLP: 0.05 },
   // LNP (QLD) → similar to NAT/LIB mix
-  LNP: { LIB: 0.32, NAT: 0.24, ONP: 0.22, KAP: 0.10, ALP: 0.05, OTH: 0.03, IND: 0.02, GRN: 0.005, CA: 0.005 },
-  // ONP → Coalition strongly; small left trickle (not zero — some protest voters stay flexible)
-  ONP: { LIB: 0.46, NAT: 0.16, LNP: 0.15, KAP: 0.10, ALP: 0.07, OTH: 0.03, IND: 0.015, GRN: 0.01, CA: 0.005 },
+  LNP: { LIB: 0.32, NAT: 0.24, ONP: 0.22, KAP: 0.10, ALP: 0.05, OTH: 0.03, IND: 0.02, GRN: 0.005, CA: 0.005, CLP: 0.04 },
+  // CLP (NT) → strongly coalition-aligned; ONP second, ALP small trickle
+  CLP: { ONP: 0.48, LIB: 0.20, NAT: 0.12, LNP: 0.08, KAP: 0.05, ALP: 0.04, OTH: 0.02, IND: 0.01, GRN: 0.005, CA: 0.005 },
+  // ONP → Coalition strongly; small left trickle; CLP as minor NT target
+  ONP: { LIB: 0.46, NAT: 0.16, LNP: 0.15, KAP: 0.10, ALP: 0.07, OTH: 0.03, CLP: 0.06, IND: 0.015, GRN: 0.01, CA: 0.005 },
   // Katter → LNP/ONP/NAT first (far North QLD rural); ALP above LIB (social policy)
-  KAP: { LNP: 0.34, ONP: 0.26, NAT: 0.18, ALP: 0.12, OTH: 0.05, LIB: 0.02, IND: 0.015, GRN: 0.01, CA: 0.005 },
+  KAP: { LNP: 0.34, ONP: 0.26, NAT: 0.18, ALP: 0.12, OTH: 0.05, LIB: 0.02, CLP: 0.02, IND: 0.015, GRN: 0.01, CA: 0.005 },
   // Other → mixed; slight left lean overall
-  OTH: { ALP: 0.26, LIB: 0.18, GRN: 0.14, ONP: 0.14, NAT: 0.10, IND: 0.08, LNP: 0.05, KAP: 0.03, CA: 0.02 },
+  OTH: { ALP: 0.26, LIB: 0.18, GRN: 0.14, ONP: 0.14, NAT: 0.10, IND: 0.08, LNP: 0.05, KAP: 0.03, CLP: 0.03, CA: 0.02 },
 };
 
 // ── Full IRV simulation — returns round-by-round elimination trace ──────────────
@@ -222,9 +212,9 @@ function determineWinner(results: Partial<Record<AuPartyId, number>>, validVotes
 function computeTPP(results: Partial<Record<AuPartyId, number>>, validVotes: number): { alp: number; coal: number } {
   if (validVotes === 0) return { alp: 0.5, coal: 0.5 };
   const r = results as Record<AuPartyId, number>;
-  const alp = r.ALP ?? 0, lib = r.LIB ?? 0, nat = r.NAT ?? 0, lnp = r.LNP ?? 0;
+  const alp = r.ALP ?? 0, lib = r.LIB ?? 0, nat = r.NAT ?? 0, lnp = r.LNP ?? 0, clp = r.CLP ?? 0;
   const grn = r.GRN ?? 0, ind = r.IND ?? 0, ca = r.CA ?? 0, onp = r.ONP ?? 0, kap = r.KAP ?? 0, oth = r.OTH ?? 0;
-  const coal = lib + nat + lnp;
+  const coal = lib + nat + lnp + clp;
   const alp2cp  = alp  + grn*PREF_TO_ALP.GRN + ca*PREF_TO_ALP.CA   + onp*PREF_TO_ALP.ONP + ind*PREF_TO_ALP.IND + kap*PREF_TO_ALP.KAP + oth*PREF_TO_ALP.OTH;
   const coal2cp = coal + grn*(1-PREF_TO_ALP.GRN) + ca*(1-PREF_TO_ALP.CA) + onp*(1-PREF_TO_ALP.ONP) + ind*(1-PREF_TO_ALP.IND) + kap*(1-PREF_TO_ALP.KAP) + oth*(1-PREF_TO_ALP.OTH);
   const t = alp2cp + coal2cp;
@@ -233,11 +223,11 @@ function computeTPP(results: Partial<Record<AuPartyId, number>>, validVotes: num
 }
 
 // ── Coloring ────────────────────────────────────────────────────────────────────
-function electorateFill(validVotes: number, results: Partial<Record<AuPartyId, number>>, dark = false): string {
+function electorateFill(validVotes: number, results: Partial<Record<AuPartyId, number>>, dark = false, winnerOverride?: AuPartyId): string {
   const sorted = (Object.entries(results) as [AuPartyId, number][])
     .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
   if (sorted.length === 0) return dark ? '#374151' : BLANK_COLOR;
-  const winner = determineWinner(results, validVotes);
+  const winner = winnerOverride ?? determineWinner(results, validVotes);
   const winnerVotes = results[winner] ?? sorted[0][1];
   const runnerUpVotes = sorted.filter(([p]) => p !== winner)[0]?.[1] ?? 0;
   const margin = Math.max(0, ((winnerVotes - runnerUpVotes) / validVotes) * 100);
@@ -258,39 +248,7 @@ function buildBaselineResults(): Record<string, Partial<Record<AuPartyId, number
 
 function buildPollingResults(): Record<string, Partial<Record<AuPartyId, number>>> {
   const r: Record<string, Partial<Record<AuPartyId, number>>> = {};
-  const addParties = (Object.keys(POLL_SWING_2026) as AuPartyId[]).filter(p => (POLL_SWING_2026[p] ?? 0) > 0);
-  for (const e of AU_ELECTORATES) {
-    // Seat-specific override: apply target shares directly (no uniform swing)
-    const override = SEAT_POLL_OVERRIDES_2026[e.id];
-    if (override) {
-      const newRes: Partial<Record<AuPartyId, number>> = {};
-      for (const [pid, share] of Object.entries(override) as [AuPartyId, number][]) {
-        if (share > 0) newRes[pid] = Math.round(share * e.validVotes);
-      }
-      r[e.id] = newRes;
-      continue;
-    }
-    // Uniform swing: apply POLL_SWING_2026 per party, inject new parties with positive swings
-    const newRes: Partial<Record<AuPartyId, number>> = {};
-    let totalPct = 0;
-    const parties = new Set<AuPartyId>([
-      ...(Object.keys(e.results2025) as AuPartyId[]),
-      ...addParties,
-    ]);
-    for (const pid of parties) {
-      const votes = e.results2025[pid] ?? 0;
-      const pct = votes / e.validVotes;
-      const swing = POLL_SWING_2026[pid] ?? 0;
-      const newPct = Math.max(0, pct + swing);
-      if (newPct > 0) { newRes[pid] = newPct; totalPct += newPct; }
-    }
-    if (totalPct > 0) {
-      for (const pid of Object.keys(newRes) as AuPartyId[]) {
-        newRes[pid] = Math.round(((newRes[pid] ?? 0) / totalPct) * e.validVotes);
-      }
-    }
-    r[e.id] = newRes;
-  }
+  for (const e of AU_ELECTORATES) r[e.id] = { ...e.results2026 };
   return r;
 }
 
@@ -306,7 +264,7 @@ const POLLING_SHARES_2026: Record<AuPartyId, number> = (() => {
       grand += v;
     }
   }
-  const r: Record<AuPartyId, number> = { ALP:0, LIB:0, NAT:0, LNP:0, GRN:0, KAP:0, CA:0, ONP:0, IND:0, OTH:0 };
+  const r: Record<AuPartyId, number> = { ALP:0, LIB:0, NAT:0, LNP:0, CLP:0, GRN:0, KAP:0, CA:0, ONP:0, IND:0, OTH:0 };
   if (grand > 0) for (const pid of Object.keys(r) as AuPartyId[]) r[pid] = ((totals[pid] ?? 0) / grand) * 100;
   return r;
 })();
@@ -324,7 +282,7 @@ function bellCurveTimes(n: number, totalMs: number): number[] {
 }
 
 // State-locked parties can't gain votes in electorates where they didn't run in 2025
-const STATE_LOCKED_PARTIES: Set<AuPartyId> = new Set(['LNP', 'KAP', 'CA']);
+const STATE_LOCKED_PARTIES: Set<AuPartyId> = new Set(['LNP', 'KAP', 'CA', 'CLP']);
 
 // baseResults: if provided, use as the swing baseline (e.g. 2026 polling);
 // otherwise falls back to each electorate's 2025 actual results.
@@ -572,7 +530,7 @@ function AuScoreboard({
     return () => el.removeEventListener('wheel', h);
   }, []);
 
-  const coalitionSeats = (tally['LIB'] ?? 0) + (tally['NAT'] ?? 0) + (tally['LNP'] ?? 0);
+  const coalitionSeats = (tally['LIB'] ?? 0) + (tally['NAT'] ?? 0) + (tally['LNP'] ?? 0) + (tally['CLP'] ?? 0);
   const isCoalitionMajority = coalitionSeats >= AU_MAJORITY;
   const hasData = !!activePreset;
   const coalColor = AU_PARTY_MAP['LIB']?.color ?? '#1C4F9C';
@@ -584,15 +542,27 @@ function AuScoreboard({
   ) : 0;
   const isCoalitionLeading = hasData && coalitionSeats > 0 && coalitionSeats >= maxEntitySeats;
 
-  // Separate coalition from the rest; sort each group by seats
-  const { nonCoalParties, coalParties } = useMemo(() => {
-    const nonCoal = AU_PARTIES.filter(p => p.id !== 'OTH' && !COALITION_IDS.includes(p.id as AuPartyId));
-    nonCoal.sort((a, b) => (tally[b.id] ?? 0) - (tally[a.id] ?? 0));
+  // Separate coalition from the rest; sort each group by seats.
+  // Parties with 0 seats (except IND) are collapsed into the OTH tile.
+  const { nonCoalParties, coalParties, othCombinedVotes, othCombinedPct } = useMemo(() => {
     const coal = AU_PARTIES.filter(p => COALITION_IDS.includes(p.id as AuPartyId));
     coal.sort((a, b) => (tally[b.id] ?? 0) - (tally[a.id] ?? 0));
+
+    const nonCoalAll = AU_PARTIES.filter(p => p.id !== 'OTH' && !COALITION_IDS.includes(p.id as AuPartyId));
+    const isBlank = activePreset === 'blank';
+    // Blank map: show every party so the scoreboard is populated before data is entered.
+    // Other presets: show parties with ≥1 seat, IND always.
+    const visible = nonCoalAll.filter(p => isBlank || p.id === 'IND' || (tally[p.id] ?? 0) > 0);
+    visible.sort((a, b) => (tally[b.id] ?? 0) - (tally[a.id] ?? 0));
+
+    // Blank map: each party shows its own votes/pcts — don't fold zero-seat parties into OTH.
+    const zeroIds = isBlank ? [] : nonCoalAll.filter(p => p.id !== 'IND' && (tally[p.id] ?? 0) === 0).map(p => p.id);
+    const othCombinedVotes = ['OTH', ...zeroIds].reduce((s, id) => s + (rawVotes[id] ?? 0), 0);
+    const othCombinedPct   = ['OTH', ...zeroIds].reduce((s, id) => s + (votePcts[id] ?? 0), 0);
+
     const oth = AU_PARTIES.find(p => p.id === 'OTH')!;
-    return { nonCoalParties: [...nonCoal, oth], coalParties: coal };
-  }, [tally]);
+    return { nonCoalParties: [...visible, oth], coalParties: coal, othCombinedVotes, othCombinedPct };
+  }, [tally, rawVotes, votePcts, activePreset]);
 
   // Find where to insert the coalition group (by total coalition seats)
   const coalInsertAt = (() => {
@@ -648,6 +618,7 @@ function AuScoreboard({
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
           {nonCoalParties.map((p, i) => {
+            const isOth = p.id === 'OTH';
             const partySeats = tally[p.id] ?? 0;
             const isLeader = hasData && !isCoalitionLeading && partySeats > 0 && partySeats >= maxEntitySeats;
             const isWinner = hasData && partySeats >= AU_MAJORITY;
@@ -658,8 +629,8 @@ function AuScoreboard({
                   key={p.id}
                   partyId={p.id as AuPartyId}
                   seats={partySeats}
-                  pct={votePcts[p.id]}
-                  votes={rawVotes[p.id]}
+                  pct={isOth ? othCombinedPct : votePcts[p.id]}
+                  votes={isOth ? othCombinedVotes : rawVotes[p.id]}
                   isLeader={isLeader}
                   isWinner={isWinner}
                   leaderOverride={activePreset === 'baseline' ? AU_LEADERS_2025[p.id as AuPartyId] : undefined}
@@ -1071,7 +1042,7 @@ function AuSimPanel({ onClose, onStart, onStop, running, progress, declared }: A
 
   // Vote-share % inputs — initialised from 2026 polling so zero-swing = 2026 scenario
   const [shares, setShares] = useState<Record<AuPartyId, string>>(() => {
-    const init: Record<AuPartyId, string> = { ALP:'',LIB:'',NAT:'',LNP:'',GRN:'',KAP:'',CA:'',ONP:'',IND:'',OTH:'' };
+    const init: Record<AuPartyId, string> = { ALP:'',LIB:'',NAT:'',LNP:'',CLP:'',GRN:'',KAP:'',CA:'',ONP:'',IND:'',OTH:'' };
     for (const { id } of SIM_EDITABLE_PARTIES) init[id] = POLLING_SHARES_2026[id].toFixed(1);
     return init;
   });
@@ -1082,7 +1053,7 @@ function AuSimPanel({ onClose, onStart, onStop, running, progress, declared }: A
   const sumOk = Math.abs(totalPct - 100) < 0.15;
 
   const handleStart = () => {
-    const swings: Record<AuPartyId, number> = { ALP:0,LIB:0,NAT:0,LNP:0,GRN:0,KAP:0,CA:0,ONP:0,IND:0,OTH:0 };
+    const swings: Record<AuPartyId, number> = { ALP:0,LIB:0,NAT:0,LNP:0,CLP:0,GRN:0,KAP:0,CA:0,ONP:0,IND:0,OTH:0 };
     for (const { id } of SIM_EDITABLE_PARTIES) {
       const target = parseFloat(shares[id]) || 0;
       // Swings are relative to 2026 polling baseline (not 2025)
@@ -1208,7 +1179,7 @@ function AuSwingPanel({
   onClose: () => void;
 }) {
   const [inputs, setInputs] = useState<Record<AuPartyId, string>>({
-    ALP: '', LIB: '', NAT: '', LNP: '', GRN: '', KAP: '', CA: '', ONP: '', IND: '', OTH: '',
+    ALP: '', LIB: '', NAT: '', LNP: '', CLP: '', GRN: '', KAP: '', CA: '', ONP: '', IND: '', OTH: '',
   });
 
   const disabled = !activePreset || activePreset === 'blank';
@@ -1705,7 +1676,7 @@ function AuParliamentPanel({
     return seats.slice(0, AU_TOTAL);
   }, [tally]);
 
-  const coalitionSeats = (tally['LIB'] ?? 0) + (tally['NAT'] ?? 0) + (tally['LNP'] ?? 0);
+  const coalitionSeats = (tally['LIB'] ?? 0) + (tally['NAT'] ?? 0) + (tally['LNP'] ?? 0) + (tally['CLP'] ?? 0);
   const alpSeats = tally['ALP'] ?? 0;
 
   return (
@@ -1879,7 +1850,8 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
   dark?: boolean;
 }) {
   const TW = 268;
-  const TH_EST = 110 + tooltip.parties.length * 22 + (tooltip.irvRounds.length > 0 ? 60 : 0);
+  const hasFinalSection = !!(tooltip.officialRounds?.length || tooltip.irvRounds.length > 0 || tooltip.officialTCP);
+  const TH_EST = 110 + tooltip.parties.length * 22 + (hasFinalSection ? 60 : 0);
   const left = tooltip.x + 18 + TW > containerW ? tooltip.x - TW - 10 : tooltip.x + 18;
   const top  = Math.max(6, Math.min(tooltip.y - 20, containerH - TH_EST - 8));
   const tt = {
@@ -1931,26 +1903,39 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
             <p style={{ fontSize: 11, color: tt.dim, fontStyle: 'italic', margin: '4px 0' }}>No results — click a preset</p>
           )}
         </div>
-        {/* Final preference — same row style as first preference */}
-        {tooltip.irvRounds.length > 0 && (() => {
-          const finalRound = tooltip.irvRounds[tooltip.irvRounds.length - 1];
-          const finalTotal = Object.values(finalRound.votes).reduce((s, v) => s + (v ?? 0), 0);
-          const finalPairs = (Object.entries(finalRound.votes) as [AuPartyId, number][])
-            .filter(([, v]) => (v ?? 0) > 0)
-            .sort(([, a], [, b]) => b - a)
-            .slice(0, 2);
+        {/* Final preference — officialTCP is authoritative; fall back to last officialRound, then irvRounds */}
+        {(tooltip.officialTCP || tooltip.officialRounds || tooltip.irvRounds.length > 0) ? (() => {
+          let finalPairs: [AuPartyId, number][];
+          let finalTotal: number;
+          let isEstimate = false;
+          if (tooltip.officialTCP) {
+            finalPairs = (Object.entries(tooltip.officialTCP) as [AuPartyId, number][])
+              .filter(([, v]) => (v ?? 0) > 0).sort(([, a], [, b]) => b - a).slice(0, 2);
+            finalTotal = finalPairs.reduce((s, [, v]) => s + v, 0);
+          } else if (tooltip.officialRounds) {
+            const finalRound = tooltip.officialRounds[tooltip.officialRounds.length - 1];
+            finalPairs = (Object.entries(finalRound.votes) as [AuPartyId, number][])
+              .filter(([, v]) => (v ?? 0) > 0).sort(([, a], [, b]) => b - a).slice(0, 2);
+            finalTotal = finalPairs.reduce((s, [, v]) => s + v, 0);
+          } else {
+            isEstimate = true;
+            const finalRound = tooltip.irvRounds[tooltip.irvRounds.length - 1];
+            finalTotal = Object.values(finalRound.votes).reduce((s, v) => s + (v ?? 0), 0);
+            finalPairs = (Object.entries(finalRound.votes) as [AuPartyId, number][])
+              .filter(([, v]) => (v ?? 0) > 0).sort(([, a], [, b]) => b - a).slice(0, 2);
+          }
           if (finalPairs.length < 2 || finalTotal === 0) return null;
           return (
-            <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '8px 12px 10px' }}>
+            <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '7px 12px 9px' }}>
               <div style={{ fontSize: 8, fontFamily: '"JetBrains Mono",monospace', color: tt.dim, textTransform: 'uppercase', letterSpacing: '0.10em', marginBottom: 5 }}>
-                Final Preference
+                {isEstimate ? 'Final Preference (est.)' : 'Final Preference'}
               </div>
               {finalPairs.map(([pid, votes], i) => {
                 const color = AU_PARTY_MAP[pid as AuPartyId]?.color ?? '#888';
                 const name  = AU_PARTY_MAP[pid as AuPartyId]?.shortName ?? pid;
                 const pct   = votes / finalTotal * 100;
                 return (
-                  <div key={pid} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: i < finalPairs.length - 1 ? 5 : 0 }}>
+                  <div key={pid} style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: i < finalPairs.length - 1 ? 4 : 0 }}>
                     <span style={{ width: 7, height: 7, borderRadius: '50%', background: color, flexShrink: 0 }} />
                     <span style={{ flex: 1, minWidth: 0, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</span>
                     <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, marginRight: 5 }}>{votes.toLocaleString()}</span>
@@ -1960,7 +1945,7 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
               })}
             </div>
           );
-        })()}
+        })() : null}
 
         <div style={{ borderTop: `1px solid ${tt.divider}`, padding: '6px 14px' }}>
           <span style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: tt.dim }}>
@@ -1975,7 +1960,7 @@ function MapTooltip({ tooltip, containerW, containerH, dark = false }: {
 // ── Bubble overlay ──────────────────────────────────────────────────────────────
 function BubbleLayer({
   geojson, currentResults, activePreset, byIdMap,
-  containerRef, setTooltip, currentResultsRef, activePresetRef, onSelect,
+  containerRef, setTooltip, currentResultsRef, activePresetRef, modifiedIdsRef, onSelect,
 }: {
   geojson: GeoJsonObject;
   currentResults: Record<string, Partial<Record<AuPartyId, number>>>;
@@ -1985,6 +1970,7 @@ function BubbleLayer({
   setTooltip: (t: TooltipState) => void;
   currentResultsRef: React.MutableRefObject<Record<string, Partial<Record<AuPartyId, number>>>>;
   activePresetRef: React.MutableRefObject<PresetId | null>;
+  modifiedIdsRef: React.MutableRefObject<Set<string>>;
   onSelect?: (id: string) => void;
 }) {
   const map = useMap();
@@ -2038,8 +2024,11 @@ function BubbleLayer({
         const parties = (Object.entries(rawResults) as [AuPartyId, number][])
           .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a)
           .map(([pid, votes]) => ({ id: pid, votes, pct: totalReported > 0 ? Math.round((votes / totalReported) * 1000) / 10 : 0 }));
-        const irvResult = parties.length > 0 ? runIRV(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
+        const isBaselineUnedited = preset === 'baseline' && !modifiedIdsRef.current.has(electDiv);
+        const officialRounds = isBaselineUnedited ? (OFFICIAL_IRV_ROUNDS[data.name] as IrvRound[] | undefined) : undefined;
+        const irvResult = !officialRounds && parties.length > 0 ? runIRV(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
         const tpp = totalReported > 0 ? computeTPP(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
+        const officialTCP = isBaselineUnedited ? data.tcp2025 : undefined;
         setTooltip({
           x: e.originalEvent.clientX - rect.left,
           y: e.originalEvent.clientY - rect.top,
@@ -2047,9 +2036,11 @@ function BubbleLayer({
           state: data.state,
           validVotes: data.validVotes,
           parties,
-          winner: irvResult?.winner ?? null,
+          winner: officialRounds ? (officialRounds[officialRounds.length - 1].votes as Record<AuPartyId, number> | undefined) ? Object.entries(officialRounds[officialRounds.length - 1].votes).sort(([,a],[,b])=>b-a)[0]?.[0] as AuPartyId ?? null : null : irvResult?.winner ?? null,
           tpp,
           irvRounds: irvResult?.rounds ?? [],
+          officialTCP,
+          officialRounds,
         });
       });
 
@@ -2066,6 +2057,119 @@ function BubbleLayer({
   return null;
 }
 
+// ── Tutorial panel ─────────────────────────────────────────────────────────────
+function AuTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: boolean }) {
+  const H2 = ({ children }: { children: React.ReactNode }) => (
+    <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>
+  );
+  const P = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>
+  );
+  const Note = ({ children }: { children: React.ReactNode }) => (
+    <div className="tutorial-note rounded-[4px] px-2.5 py-2 text-[10px] leading-relaxed mb-2">{children}</div>
+  );
+  const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
+    <div className="flex gap-2 mb-1.5">
+      <span className="shrink-0 w-4 h-4 rounded-full bg-gold text-white text-[8px] font-bold flex items-center justify-center mt-0.5">{n}</span>
+      <span className="text-[11px] text-ink leading-relaxed">{children}</span>
+    </div>
+  );
+  const Tag = ({ children, color = 'bg-ink/8 text-ink' }: { children: React.ReactNode; color?: string }) => (
+    <span className={`inline-block px-1.5 py-0.5 rounded-[3px] text-[9px] font-mono font-semibold ${color} mr-1`}>{children}</span>
+  );
+
+  return (
+    <aside className={`w-80 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Australian Federal Election Guide</p>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
+
+        {/* ── The system ── */}
+        <H2>The Australian Electoral System</H2>
+        <P>Australia's House of Representatives uses <strong>preferential voting</strong> (Instant Runoff Voting). Voters rank all candidates; if nobody wins an outright majority of first-preference votes, the lowest candidate is eliminated and their ballots flow to the next preference — repeating until one candidate holds a majority.</P>
+        <P>There are <strong>151 seats</strong> in the House. A party or coalition needs <strong>76 seats</strong> for a majority government.</P>
+        <Note>The <strong>Coalition</strong> (Liberal + National + LNP + CLP) always governs as a bloc. Their combined seat count is what matters for reaching 76.</Note>
+
+        {/* ── Presets ── */}
+        <H2>Map Presets</H2>
+        <div className="space-y-2 mb-2">
+          <div><Tag>2025 Baseline</Tag><span className="text-[10px] text-ink-2">The actual May 2025 federal election results — first-preference votes and official two-candidate preferred counts for all 151 electorates.</span></div>
+          <div><Tag>2026 Polling</Tag><span className="text-[10px] text-ink-2">Current opinion polling applied as a uniform national swing across all electorates. A starting point for "what if" scenarios.</span></div>
+          <div><Tag>Blank Map</Tag><span className="text-[10px] text-ink-2">All electorates empty — you fill in every result yourself, simulating an election night.</span></div>
+        </div>
+
+        {/* ── Clicking electorates ── */}
+        <H2>Editing an Electorate</H2>
+        <P>Click any shaded area on the map to open its panel on the right.</P>
+        <Step n={1}>Drag a party's slider <em>or</em> click its percentage to type a value directly.</Step>
+        <Step n={2}>Adjusting one party's share automatically redistributes the remainder among unlocked parties.</Step>
+        <Step n={3}>Click the <strong>lock icon</strong> next to any party to pin its share — it won't move when others are adjusted.</Step>
+        <Step n={4}>Hit <Tag>Reset to 2025</Tag> to restore the electorate's real 2025 result.</Step>
+        <P>Changes take effect immediately on the map and scoreboard.</P>
+
+        {/* ── Tooltip ── */}
+        <H2>Reading the Hover Tooltip</H2>
+        <P>Hovering an electorate shows two sections:</P>
+        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-24">First Pref.</span><span>Each party's raw first-preference vote share. This is what voters put "1" against.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-24">Final Pref.</span><span>The two-candidate preferred (2CP) result after all preference distributions — who actually won the seat.</span></div>
+        </div>
+        <Note>On the <Tag>2025 Baseline</Tag>, Final Preference comes from the Australian Electoral Commission's official distribution of preferences. On polling or edited maps it is estimated by the simulator's IRV engine.</Note>
+
+        {/* ── Scoreboard ── */}
+        <H2>Reading the Scoreboard</H2>
+        <P>Party cards are ordered left-to-right by current seat count. Each card shows the party leader, seat total, and first-preference vote share and count.</P>
+        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-gold mt-1" /><span><strong>Gold border</strong> — this party (or the Coalition bloc) is leading in seats.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1" /><span><strong>Green shimmer</strong> — this entity has reached 76 seats (majority).</span></div>
+        </div>
+        <P>Click the <em>Results / Hide</em> chevron at the bottom of the scoreboard to collapse it for more map space.</P>
+
+        {/* ── Blank map ── */}
+        <H2>Blank Map Mode</H2>
+        <Note>In Blank Map mode, nothing updates the map or scoreboard until you explicitly declare it — just like an election night where results come in seat by seat.</Note>
+        <Step n={1}>Click an electorate on the map and enter results using the sliders.</Step>
+        <Step n={2}>Click <Tag color="bg-emerald-600 text-white">Declare Seat</Tag> to lock in that result. The map colours and the scoreboard update only after declaring.</Step>
+        <Step n={3}>Use <strong>Multi-select</strong> or <strong>Simulation</strong> to declare many seats at once.</Step>
+
+        {/* ── Multi-select ── */}
+        <H2>Multi-Select</H2>
+        <P>Click <Tag>Multi-select</Tag> in the toolbar, then click multiple electorates on the map to select them. The swing editor applies a uniform shift (e.g. <em>ALP +3pp</em>) across all selected electorates simultaneously.</P>
+
+        {/* ── Simulation ── */}
+        <H2>Election Night Simulation</H2>
+        <P>Click <Tag>▶ Simulation</Tag> to open the sim panel. Set a target swing for each party and pick a duration. The simulator then calls electorates one by one in a random order — watch the scoreboard fill up in real time.</P>
+        <Note>During the simulation, clicking electorates on the map is disabled. The sim will pause or stop if you click <Tag>Stop</Tag>.</Note>
+
+        {/* ── Swing panel ── */}
+        <H2>National Swing Panel</H2>
+        <P>Click <Tag>Swing</Tag> to apply a uniform percentage-point shift to every electorate at once. Great for quickly testing "ALP +5pp nationally" scenarios without editing each seat individually.</P>
+
+        {/* ── Breakdown ── */}
+        <H2>State Breakdown</H2>
+        <P>Click <Tag>Breakdown</Tag> to open a per-state seat tally. It shows how many seats each party holds in NSW, VIC, QLD, WA, SA, TAS, ACT, and NT — useful for spotting geographic patterns.</P>
+
+        {/* ── Parliament ── */}
+        <H2>Parliament View</H2>
+        <P>Click <Tag>Parliament</Tag> to open a hemicycle visualisation of the 151-seat House of Representatives. Seats are arranged left → right by ideology and coloured by party. The Coalition parties are grouped on the right.</P>
+
+        {/* ── Bubble map ── */}
+        <H2>Bubble Map</H2>
+        <P>Toggle <Tag color="bg-emerald-600 text-white">Bubble Map</Tag> to overlay circles on the choropleth. Each circle is centred on its electorate and sized by the <strong>raw vote margin</strong> — a large bubble means a big win by many votes, not just a high percentage.</P>
+        <P>Urban electorates with high enrolment show larger bubbles than sparse rural seats at the same percentage margin, revealing where votes are actually concentrated.</P>
+
+        <div className="h-4" />
+      </div>
+    </aside>
+  );
+}
+
 // ── Main component ──────────────────────────────────────────────────────────────
 export default function AustraliaApp() {
   const navigate = useNavigate();
@@ -2073,7 +2177,7 @@ export default function AustraliaApp() {
   // ── Core state ───────────────────────────────────────────────────────────────
   const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
-  const [activePreset, setActivePreset] = useState<PresetId | null>('polling2026');
+  const [activePreset, setActivePreset] = useState<PresetId | null>('baseline');
   const [currentResults, setCurrentResults] = useState<Record<string, Partial<Record<AuPartyId, number>>>>(() => buildBaselineResults());
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -2089,6 +2193,8 @@ export default function AustraliaApp() {
   // ── Left panel (parliament) ──────────────────────────────────────────────────
   const [parliamentOpen, setParliamentOpen] = useState(false);
   const [parliamentExiting, setParliamentExiting] = useState(false);
+  const [tutorialOpen, setTutorialOpen]         = useState(false);
+  const [tutorialExiting, setTutorialExiting]   = useState(false);
   const parliTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Multi-select ─────────────────────────────────────────────────────────────
@@ -2136,6 +2242,11 @@ export default function AustraliaApp() {
     const t: Record<string, number> = {};
     if (!activePreset) return t;
     for (const e of AU_ELECTORATES) {
+      // On the baseline preset, use the official AEC winner — not simulated IRV
+      if (activePreset === 'baseline') {
+        t[e.winner2025] = (t[e.winner2025] ?? 0) + 1;
+        continue;
+      }
       const results = currentResults[e.id] ?? (activePreset !== 'blank' ? e.results2025 : undefined);
       if (!results) continue;
       const winner = determineWinner(results, e.validVotes);
@@ -2209,7 +2320,9 @@ export default function AustraliaApp() {
           fillColor = electorateFill(data.validVotes, res, dark);
       } else if (preset) {
         const res = currentResultsRef.current[electDiv] ?? data?.results2025;
-        if (res && data) fillColor = electorateFill(data.validVotes, res, dark);
+        const isUnedited = preset === 'baseline' && !modifiedIdsRef.current.has(electDiv);
+        const winnerOverride = isUnedited ? data?.winner2025 : undefined;
+        if (res && data) fillColor = electorateFill(data.validVotes, res, dark, winnerOverride);
       }
       path.setStyle({
         fillColor, fillOpacity: 0.82,
@@ -2259,6 +2372,7 @@ export default function AustraliaApp() {
 
   // ── Preset handlers ──────────────────────────────────────────────────────────
   const loadBaseline = useCallback(() => {
+    modifiedIdsRef.current = new Set();
     setCurrentResults(buildBaselineResults());
     setActivePreset('baseline');
     setSimRunning(false);
@@ -2267,6 +2381,7 @@ export default function AustraliaApp() {
   }, []);
 
   const loadPolling = useCallback(() => {
+    modifiedIdsRef.current = new Set();
     setCurrentResults(buildPollingResults());
     setActivePreset('polling2026');
     setSimRunning(false);
@@ -2284,7 +2399,9 @@ export default function AustraliaApp() {
     simTimersRef.current = [];
   }, []);
 
+  const modifiedIdsRef = useRef<Set<string>>(new Set());
   const handleResultsChange = useCallback((elecId: string, newResults: Partial<Record<AuPartyId, number>>) => {
+    modifiedIdsRef.current.add(elecId);
     setCurrentResults(prev => ({ ...prev, [elecId]: newResults }));
   }, []);
 
@@ -2367,8 +2484,11 @@ export default function AustraliaApp() {
       const parties = (Object.entries(rawResults) as [AuPartyId, number][])
         .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a)
         .map(([pid, votes]) => ({ id: pid, votes, pct: totalReported > 0 ? Math.round((votes / totalReported) * 1000) / 10 : 0 }));
-      const irvResult = parties.length > 0 && data ? runIRV(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
+      const isBaselineUnedited = preset === 'baseline' && !modifiedIdsRef.current.has(electDiv);
+      const officialRounds = isBaselineUnedited ? (OFFICIAL_IRV_ROUNDS[data?.name ?? ''] as IrvRound[] | undefined) : undefined;
+      const irvResult = !officialRounds && parties.length > 0 && data ? runIRV(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
       const tpp = data && totalReported > 0 ? computeTPP(rawResults as Partial<Record<AuPartyId, number>>, data.validVotes) : null;
+      const officialTCP = isBaselineUnedited ? data?.tcp2025 : undefined;
       setTooltip({
         x: e.originalEvent.clientX - rect.left,
         y: e.originalEvent.clientY - rect.top,
@@ -2376,9 +2496,11 @@ export default function AustraliaApp() {
         state: data?.state ?? '',
         validVotes: data?.validVotes ?? 0,
         parties,
-        winner: irvResult?.winner ?? null,
+        winner: officialRounds ? Object.entries(officialRounds[officialRounds.length - 1].votes).sort(([,a],[,b])=>b-a)[0]?.[0] as AuPartyId ?? null : irvResult?.winner ?? null,
         tpp,
         irvRounds: irvResult?.rounds ?? [],
+        officialTCP,
+        officialRounds,
       });
     });
 
@@ -2446,6 +2568,17 @@ export default function AustraliaApp() {
             title="Toggle bubble margin map">
             Bubble Map
           </button>
+          <button
+            onClick={() => {
+              if (tutorialOpen) {
+                setTutorialExiting(true);
+                setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280);
+              } else {
+                setTutorialOpen(true);
+              }
+            }}
+            className={tutorialOpen ? btnActive : btnMuted}
+          >Tutorial</button>
         </div>
 
         {/* Right controls */}
@@ -2580,6 +2713,7 @@ export default function AustraliaApp() {
                     geojson={geojson} currentResults={currentResults} activePreset={activePreset} byIdMap={byIdMap}
                     containerRef={containerRef} setTooltip={setTooltip}
                     currentResultsRef={currentResultsRef} activePresetRef={activePresetRef}
+                    modifiedIdsRef={modifiedIdsRef}
                     onSelect={id => { setSelectedId(id); setRightPanel(null); }}
                   />
                 )}
@@ -2676,6 +2810,17 @@ export default function AustraliaApp() {
             <AuPartyManagerPanel
               exiting={exitPanel === 'parties'}
               onClose={closePanel}
+            />
+          )}
+
+          {/* Tutorial panel */}
+          {(tutorialOpen || tutorialExiting) && (
+            <AuTutorialPanel
+              onClose={() => {
+                setTutorialExiting(true);
+                setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280);
+              }}
+              exiting={tutorialExiting}
             />
           )}
         </div>

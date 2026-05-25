@@ -31,7 +31,8 @@ const USA_NOMINEES_2024: NomineeRecord = {
 };
 const USA_NOMINEES_2026: NomineeRecord = {
   ...USA_NOMINEES_2024,
-  GOP: { name: 'JD Vance', lastName: 'Vance', photo: 'leaders/vance.jpg' },
+  GOP: { name: 'JD Vance',       lastName: 'Vance',  photo: 'leaders/vance.jpg' },
+  LIB: { name: 'Thomas Massie',  lastName: 'Massie', photo: 'leaders/massie.jpg' },
 };
 
 // ── Blank map 2024 candidate options (DEM + GOP) ──────────────────────────────
@@ -592,6 +593,7 @@ interface UsaBubbleLayerProps {
   stateReportingRef: React.MutableRefObject<Record<string, number>>;
   multiSelectModeRef: React.MutableRefObject<boolean>;
   activePresetRef: React.MutableRefObject<string | null>;
+  simRunningRef: React.MutableRefObject<boolean>;
   setTooltip: (t: any) => void;
   setSelectedFips: (fn: (prev: string | null) => string | null) => void;
   setSelectedFipsSet: (fn: (prev: Set<string>) => Set<string>) => void;
@@ -600,7 +602,7 @@ interface UsaBubbleLayerProps {
 function UsaBubbleLayer({
   geojson, currentResults, dark,
   containerRef, blankSliderMemoryRef, blankReportingMemoryRef,
-  currentResultsRef, stateReportingRef, multiSelectModeRef, activePresetRef,
+  currentResultsRef, stateReportingRef, multiSelectModeRef, activePresetRef, simRunningRef,
   setTooltip, setSelectedFips, setSelectedFipsSet,
 }: UsaBubbleLayerProps) {
   const map = useMap();
@@ -644,6 +646,7 @@ function UsaBubbleLayer({
       }).addTo(map);
 
       marker.on('click', () => {
+        if (simRunningRef.current) return;
         if (multiSelectModeRef.current) {
           setSelectedFipsSet(prev => { const n = new Set(prev); n.has(fips) ? n.delete(fips) : n.add(fips); return n; });
           return;
@@ -654,8 +657,11 @@ function UsaBubbleLayer({
       marker.on('mousemove', (e: L.LeafletMouseEvent) => {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
-        const isBlank = activePresetRef.current === 'blank';
+        const preset  = activePresetRef.current;
+        const isBlank = preset === 'blank';
+        const isSim   = preset === 'sim';
         const blankRptPct = isBlank ? (parseFloat(blankReportingMemoryRef.current[fips] ?? '') || 0) : 0;
+        const simRptPct   = isSim   ? (stateReportingRef.current[fips] ?? 0) : 0;
         const blankPcts = isBlank ? blankSliderMemoryRef.current[fips] : undefined;
         setTooltip({
           x: e.originalEvent.clientX - rect.left,
@@ -667,10 +673,14 @@ function UsaBubbleLayer({
             : currentResultsRef.current[fips] ?? {},
           stateVotes: isBlank
             ? (blankRptPct > 0 ? Math.round((STATE_VOTES[fips] ?? 0) * blankRptPct / 100) : 0)
-            : (STATE_VOTES[fips] ?? 0),
+            : isSim
+              ? (simRptPct > 0 ? Math.round((STATE_VOTES[fips] ?? 0) * simRptPct / 100) : 0)
+              : (STATE_VOTES[fips] ?? 0),
           reportingPct: isBlank
             ? (blankRptPct > 0 ? blankRptPct : undefined)
-            : stateReportingRef.current[fips],
+            : isSim
+              ? (simRptPct > 0 ? simRptPct : undefined)
+              : stateReportingRef.current[fips],
         });
       });
 
@@ -1697,6 +1707,7 @@ function UsaSimulationPanel({
   setSimRunning,
   setSimProgress,
   stopSim,
+  nominees,
 }: {
   exiting?: boolean;
   onApplyResults: (r: Record<string, Record<string, number>>) => void;
@@ -1709,6 +1720,7 @@ function UsaSimulationPanel({
   setSimRunning: (v: boolean) => void;
   setSimProgress: React.Dispatch<React.SetStateAction<number>>;
   stopSim: () => void;
+  nominees: NomineeRecord;
 }) {
   const [inputs, setInputs] = useState<Record<UsaPartyId, string>>(
     () => Object.fromEntries(ALL_PIDS.map(p => [p, ''])) as Record<UsaPartyId, string>
@@ -1801,10 +1813,24 @@ function UsaSimulationPanel({
           <div className="mb-3 rounded-[5px] border border-amber-200 bg-amber-50 px-2.5 py-2 text-[9px] font-mono text-amber-800 leading-relaxed">
             <span className="font-bold">Realistic inputs only.</span> This simulator uses real 2024 state-level data to project results via swing modelling. Absurd vote shares (e.g. Libertarian 99%) will produce meaningless projections — garbage in, garbage out.
           </div>
+          {/* Candidate matchup */}
+          <div className="mb-3 flex items-center justify-center gap-2">
+            <div className="flex items-center gap-1.5">
+              <UsaNomineePhoto partyId="DEM" size={28} nominees={nominees} isWinner={false} />
+              <span className="text-[9.5px] font-mono font-bold" style={{ color: '#232066' }}>{nominees.DEM.lastName}</span>
+            </div>
+            <span className="text-[8px] font-mono text-ink-3">vs</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9.5px] font-mono font-bold" style={{ color: '#BF0A30' }}>{nominees.GOP.lastName}</span>
+              <UsaNomineePhoto partyId="GOP" size={28} nominees={nominees} isWinner={false} />
+            </div>
+          </div>
           {USA_PARTIES.map(p => (
             <div key={p.id} className="flex items-center gap-2 mb-2">
               <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: p.color }} />
-              <span className="flex-1 text-[10.5px] font-medium text-ink leading-none truncate">{p.name}</span>
+              <span className="flex-1 text-[10.5px] font-medium text-ink leading-none truncate">
+                {p.id === 'DEM' ? nominees.DEM.lastName : p.id === 'GOP' ? nominees.GOP.lastName : p.name}
+              </span>
               <input type="number" min="0" max="100" step="0.1"
                 value={inputs[p.id as UsaPartyId]} disabled={simRunning}
                 onChange={e => setInputs(prev => ({ ...prev, [p.id]: e.target.value }))}
@@ -2110,7 +2136,7 @@ export default function USAApp() {
   const [blankDemIdx, setBlankDemIdx] = useState(0);
   const [blankGopIdx, setBlankGopIdx] = useState(0);
   const blankNominees = useMemo<NomineeRecord>(() => ({
-    ...USA_NOMINEES_2024,
+    ...USA_NOMINEES_2026,
     DEM: BLANK_DEM_CANDIDATES[blankDemIdx],
     GOP: BLANK_GOP_CANDIDATES[blankGopIdx],
   }), [blankDemIdx, blankGopIdx]);
@@ -2118,7 +2144,9 @@ export default function USAApp() {
   const [simExiting, setSimExiting] = useState(false);
   const [simRunning, setSimRunning] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
+  const [simNominees, setSimNominees] = useState<NomineeRecord | null>(null);
   const simTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const simRunningRef = useRef(false);
   const [hiddenParties, setHiddenParties] = useState<Set<UsaPartyId>>(new Set());
   const [partiesOpen, setPartiesOpen] = useState(false);
   const [multiSelectMode, setMultiSelectMode] = useState(false);
@@ -2139,6 +2167,7 @@ export default function USAApp() {
   useEffect(() => { bubbleModeRef.current = bubbleMapMode; }, [bubbleMapMode]);
   useEffect(() => { multiSelectModeRef.current = multiSelectMode; }, [multiSelectMode]);
   useEffect(() => { activePresetRef.current = activePreset; }, [activePreset]);
+  useEffect(() => { simRunningRef.current = simRunning; }, [simRunning]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -2368,6 +2397,7 @@ export default function USAApp() {
     const name = props.NAME ?? '';
 
     layer.on('click', () => {
+      if (simRunningRef.current) return;
       if (multiSelectModeRef.current) {
         setSelectedFipsSet(prev => {
           const next = new Set(prev);
@@ -2383,8 +2413,11 @@ export default function USAApp() {
       if (bubbleModeRef.current) { setTooltip(null); return; }
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const isBlank = activePresetRef.current === 'blank';
+      const preset = activePresetRef.current;
+      const isBlank = preset === 'blank';
+      const isSim   = preset === 'sim';
       const blankReportingPct = isBlank ? (parseFloat(blankReportingMemoryRef.current[fips] ?? '') || 0) : 0;
+      const simReportingPct   = isSim   ? (stateReportingRef.current[fips] ?? 0) : 0;
       const blankPcts = isBlank ? blankSliderMemoryRef.current[fips] : undefined;
       setTooltip({
         x: e.originalEvent.clientX - rect.left,
@@ -2395,10 +2428,14 @@ export default function USAApp() {
           : currentResultsRef.current[fips] ?? {},
         stateVotes: isBlank
           ? (blankReportingPct > 0 ? Math.round((STATE_VOTES[fips] ?? 0) * blankReportingPct / 100) : 0)
-          : (STATE_VOTES[fips] ?? 0),
+          : isSim
+            ? (simReportingPct > 0 ? Math.round((STATE_VOTES[fips] ?? 0) * simReportingPct / 100) : 0)
+            : (STATE_VOTES[fips] ?? 0),
         reportingPct: isBlank
           ? (blankReportingPct > 0 ? blankReportingPct : undefined)
-          : stateReportingRef.current[fips],
+          : isSim
+            ? (simReportingPct > 0 ? simReportingPct : undefined)
+            : stateReportingRef.current[fips],
       });
     });
 
@@ -2553,7 +2590,7 @@ export default function USAApp() {
             <div className="overflow-hidden">
               <UsaScoreboard
                 tally={tally} votePcts={votePcts} rawVotes={rawVotes} activePreset={activePreset}
-                nominees={activePreset === 'blank' ? blankNominees : undefined}
+                nominees={activePreset === 'blank' ? blankNominees : activePreset === 'sim' ? (simNominees ?? blankNominees) : undefined}
                 blankDemIdx={blankDemIdx} blankGopIdx={blankGopIdx}
                 onChangeBlankCandidate={(pid, idx) => { if (pid === 'DEM') setBlankDemIdx(idx); else setBlankGopIdx(idx); }}
                 hiddenParties={hiddenParties}
@@ -2631,6 +2668,7 @@ export default function USAApp() {
                       stateReportingRef={stateReportingRef}
                       multiSelectModeRef={multiSelectModeRef}
                       activePresetRef={activePresetRef}
+                      simRunningRef={simRunningRef}
                       setTooltip={setTooltip}
                       setSelectedFips={setSelectedFips}
                       setSelectedFipsSet={setSelectedFipsSet}
@@ -2664,7 +2702,7 @@ export default function USAApp() {
           {(simOpen || simExiting) && (
             <UsaSimulationPanel
               exiting={simExiting}
-              onApplyResults={(r) => { setCurrentResults(r); setStateReporting({}); setActivePreset('sim'); setSelectedFips(null); setSelectedFipsSet(new Set()); setMultiSelectMode(false); }}
+              onApplyResults={(r) => { setSimNominees(blankNominees); setCurrentResults(r); setStateReporting({}); setActivePreset('sim'); setSelectedFips(null); setSelectedFipsSet(new Set()); setMultiSelectMode(false); }}
               onUpdateState={handleResultsChange}
               onUpdateReporting={(fips, pct) => setStateReporting(prev => ({ ...prev, [fips]: pct }))}
               onClose={toggleSim}
@@ -2674,6 +2712,7 @@ export default function USAApp() {
               setSimRunning={setSimRunning}
               setSimProgress={setSimProgress}
               stopSim={stopSim}
+              nominees={blankNominees}
             />
           )}
           {swingOpen && (activePreset === '2024' || activePreset === '2026') && (
