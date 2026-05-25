@@ -193,3 +193,36 @@ export const AU_ELECTORATES: AuElectorate[] = [
   { id: "Wills", name: "Wills", state: "VIC", validVotes: 109781, results2025: {"OTH":13915,"ALP":39069,"LIB":14121,"GRN":38834,"ONP":3842}, winner2025: "ALP", tcp2025: {"ALP":56459,"GRN":53322}, results2026: {"ALP":36697,"LIB":10163,"GRN":42757,"ONP":9054,"OTH":11110} },
   { id: "Wright", name: "Wright", state: "QLD", validVotes: 116880, results2025: {"ONP":18998,"GRN":11128,"OTH":17237,"LNP":39809,"ALP":29708}, winner2025: "LNP", tcp2025: {"LNP":67764,"ALP":49116}, results2026: {"ALP":21723,"LNP":23983,"GRN":9538,"ONP":50923,"OTH":10713} },
 ];
+
+// Which states each party contested in 2025 (derived from results data)
+export const PARTY_STATES: Partial<Record<AuPartyId, string[]>> = (() => {
+  const map: Record<string, Set<string>> = {};
+  for (const e of AU_ELECTORATES) {
+    for (const [pid, v] of Object.entries(e.results2025)) {
+      if ((v ?? 0) > 0) {
+        if (!map[pid]) map[pid] = new Set();
+        map[pid].add(e.state);
+      }
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(map).map(([k, v]) => [k, [...v]])
+  ) as Partial<Record<AuPartyId, string[]>>;
+})();
+
+// Max possible national vote share (%) for regional parties — the cap they can never exceed
+// because they don't contest seats outside their region.
+// Only set for parties that miss > 5% of total national votes (i.e. are meaningfully regional).
+export const PARTY_NATIONAL_MAX_PCT: Partial<Record<AuPartyId, number>> = (() => {
+  const totalVotes = AU_ELECTORATES.reduce((s, e) => s + e.validVotes, 0);
+  const result: Partial<Record<AuPartyId, number>> = {};
+  for (const pid of Object.keys(AU_PARTY_MAP) as AuPartyId[]) {
+    const contestedVotes = AU_ELECTORATES
+      .filter(e => (e.results2025[pid] ?? 0) > 0)
+      .reduce((s, e) => s + e.validVotes, 0);
+    if (contestedVotes < totalVotes * 0.95) {
+      result[pid] = Math.ceil((contestedVotes / totalVotes) * 100 * 10) / 10;
+    }
+  }
+  return result;
+})();

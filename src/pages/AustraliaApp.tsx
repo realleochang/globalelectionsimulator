@@ -8,7 +8,7 @@ import type { GeoJsonObject, Feature } from 'geojson';
 import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import {
   AU_PARTIES, AU_PARTY_MAP, AU_ELECTORATES, AU_TOTAL, AU_MAJORITY,
-  COALITION_IDS, PREF_TO_ALP,
+  COALITION_IDS, PREF_TO_ALP, PARTY_STATES, PARTY_NATIONAL_MAX_PCT,
   type AuPartyId,
 } from '../data/australia2025';
 import { OFFICIAL_IRV_ROUNDS } from '../data/australia2025rounds';
@@ -678,13 +678,22 @@ function ElectoratePanel({
   const [editValue, setEditValue] = useState('');
   const [reportingPct, setReportingPct] = useState(100);
 
+  // Parties that actually contest seats in this electorate's state
+  const stateParties = useMemo(
+    () => AU_PARTIES.filter(p => {
+      const ps = PARTY_STATES[p.id];
+      return !ps || ps.includes(state);
+    }),
+    [state]
+  );
+
   useEffect(() => {
     if (total === 0) { setSliderPcts({}); return; }
     if (!results) {
       if (activePreset === 'blank') {
-        const share = 100 / AU_PARTIES.length;
+        const share = 100 / stateParties.length;
         const pcts: Record<string, number> = {};
-        for (const p of AU_PARTIES) pcts[p.id] = share;
+        for (const p of stateParties) pcts[p.id] = share;
         setSliderPcts(pcts);
         setProjected(false);
       } else setSliderPcts({});
@@ -696,7 +705,7 @@ function ElectoratePanel({
     }
     setSliderPcts(pcts);
     if (activePreset === 'blank') setProjected(true);
-  }, [id, results, total, activePreset]);
+  }, [id, results, total, activePreset, stateParties]);
 
   useEffect(() => { setLocked(new Set()); setReportingPct(100); }, [id]);
 
@@ -736,13 +745,15 @@ function ElectoratePanel({
   const handleMakeProjection = useCallback(() => {
     if (!onResultsChange || total === 0) return;
     const factor = activePreset === 'blank' ? reportingPct / 100 : 1;
+    const statePartyIds = new Set(stateParties.map(p => p.id));
     const nr: Partial<Record<AuPartyId, number>> = {};
     for (const [p, pct] of Object.entries(sliderPcts)) {
-      if (pct > 1e-9) nr[p as AuPartyId] = Math.round((pct / 100) * total * factor);
+      if (pct > 1e-9 && statePartyIds.has(p as AuPartyId))
+        nr[p as AuPartyId] = Math.round((pct / 100) * total * factor);
     }
     onResultsChange(id, nr);
     setProjected(true);
-  }, [sliderPcts, id, total, onResultsChange, activePreset, reportingPct]);
+  }, [sliderPcts, stateParties, id, total, onResultsChange, activePreset, reportingPct]);
 
   const commitEdit = useCallback((pid: string, raw: string) => {
     const num = parseFloat(raw);
@@ -771,7 +782,7 @@ function ElectoratePanel({
   const projectedWinner = irvResult?.winner ?? null;
   const [prefFlowOpen, setPrefFlowOpen] = useState(false);
 
-  const sliderParties = AU_PARTIES.filter(p => {
+  const sliderParties = stateParties.filter(p => {
     const hasCurrent = (sliderPcts[p.id] ?? 0) > 0.01;
     const has2025 = (pct2025[p.id] ?? 0) > 0.01;
     return hasCurrent || has2025 || p.id === 'ALP' || p.id === 'LIB' || p.id === 'LNP';
@@ -1077,15 +1088,19 @@ function AuSimPanel({ onClose, onStart, onStop, running, progress, declared }: A
           <div className="space-y-1.5">
             {SIM_EDITABLE_PARTIES.map(({ id, note }) => {
               const color = AU_PARTY_MAP[id]?.color ?? '#888';
+              const cap = PARTY_NATIONAL_MAX_PCT[id];
+              const overCap = cap !== undefined && (parseFloat(shares[id]) || 0) > cap;
               return (
                 <div key={id} className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
                   <span className="text-[10px] font-mono text-ink-2 w-8 shrink-0">{id}</span>
-                  <input type="number" step={0.1} min={0} max={100}
+                  <input type="number" step={0.1} min={0} max={cap ?? 100}
                     value={shares[id]} disabled={running}
                     onChange={e => setShares(prev => ({ ...prev, [id]: e.target.value }))}
-                    className="flex-1 h-6 text-[11px] font-mono rounded-[4px] border border-default bg-white text-ink px-2 text-center focus:outline-none focus:border-strong disabled:opacity-40" />
-                  <span className="text-[8px] font-mono text-ink-3 w-12 shrink-0 text-right">{note ?? ''}</span>
+                    className={`flex-1 h-6 text-[11px] font-mono rounded-[4px] border bg-white text-ink px-2 text-center focus:outline-none disabled:opacity-40 ${overCap ? 'border-amber-400 focus:border-amber-500' : 'border-default focus:border-strong'}`} />
+                  <span className="text-[8px] font-mono text-ink-3 w-14 shrink-0 text-right leading-tight">
+                    {cap !== undefined ? `≤${cap.toFixed(1)}%` : (note ?? '')}
+                  </span>
                 </div>
               );
             })}
