@@ -328,7 +328,7 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
   align-items: center;
   flex-shrink: 0;
   padding: 10px 8px 8px;
-  min-width: 90px;
+  width: 90px;
   border-radius: 6px;
   background: #fff;
   border: 1px solid var(--vh-border);
@@ -798,6 +798,11 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
   display: flex;
   gap: 6px;
   align-items: inherit;
+}
+
+.ni-group-tiles .cand-col {
+  width: auto;
+  min-width: 68px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
