@@ -2127,6 +2127,102 @@ const DATA_CA_2026: Record<string, Record<string, number>> = {
   '62001':{CON:0.2006,GRN:0.0175,LIB:0.3915,NDP:0.3294,OTH:0.0082,PPC:0.0527},
 };
 
+function CaTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting: boolean }) {
+  return (
+    <div className={`panel-slide${exiting ? ' panel-exit' : ''}`}
+      style={{ width: 320, flexShrink: 0, overflowY: 'auto', background: '#fff', borderLeft: '1px solid #e5e7eb', display: 'flex', flexDirection: 'column', zIndex: 400 }}>
+      <div style={{ padding: '14px 16px 10px', borderBottom: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <span style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 11, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#1f2937' }}>How to Play</span>
+        <button onClick={onClose} style={{ width: 22, height: 22, borderRadius: 4, border: '1px solid #e5e7eb', background: 'transparent', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6b7280', fontSize: 14, lineHeight: 1 }}>×</button>
+      </div>
+      <div style={{ padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: 18, flex: 1 }}>
+
+        {/* System */}
+        <div>
+          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>The System — FPTP</div>
+          <p style={{ fontSize: 11.5, color: '#374151', lineHeight: 1.65, margin: 0 }}>
+            Canada elects 343 Members of Parliament in single-member ridings using First Past the Post. The candidate with the most votes in each riding wins — no majority needed. The party with 172+ seats forms government.
+          </p>
+          <div style={{ marginTop: 9, display: 'flex', gap: 8 }}>
+            <div style={{ flex: 1, padding: '8px 10px', borderRadius: 7, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+              <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 10, color: '#0369a1', marginBottom: 2 }}>343 ridings</div>
+              <div style={{ fontSize: 10, color: '#374151', lineHeight: 1.5 }}>Winner takes the seat — highest vote share wins</div>
+            </div>
+            <div style={{ flex: 1, padding: '8px 10px', borderRadius: 7, background: '#f0fdf4', border: '1px solid #bbf7d0' }}>
+              <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 10, color: '#15803d', marginBottom: 2 }}>172 majority</div>
+              <div style={{ fontSize: 10, color: '#374151', lineHeight: 1.5 }}>Needed for an outright parliamentary majority</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 7, padding: '8px 10px', borderRadius: 7, background: '#fff7ed', border: '1px solid #fed7aa' }}>
+            <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 10, color: '#c2410c', marginBottom: 2 }}>Bloc Québécois</div>
+            <div style={{ fontSize: 10, color: '#374151', lineHeight: 1.5 }}>BQ only runs candidates in Quebec (78 ridings). Their seat count comes entirely from Quebec.</div>
+          </div>
+        </div>
+
+        {/* Map presets */}
+        <div>
+          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>Map Presets</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {[
+              { label: '2025 Election', desc: 'Official April 2025 results — LIB majority government' },
+              { label: '2026 Polling', desc: 'Hypothetical 2026 scenario based on polling averages' },
+              { label: 'Blank Map', desc: 'Start from scratch — set every riding manually' },
+              { label: 'Simulation', desc: 'Run a randomised election with current percentages' },
+            ].map(({ label, desc }) => (
+              <div key={label} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9, color: '#6366f1', background: '#eef2ff', borderRadius: 4, padding: '2px 5px', marginTop: 1, whiteSpace: 'nowrap' }}>{label}</span>
+                <span style={{ fontSize: 10.5, color: '#374151', lineHeight: 1.5 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Editing ridings */}
+        <div>
+          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>Editing Ridings</div>
+          <ol style={{ margin: 0, padding: '0 0 0 16px', display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {[
+              'Click any riding on the map to open its slider panel.',
+              'Drag the sliders to redistribute vote shares — totals always sum to 100%.',
+              'Use Multi-select to apply the same swing to many ridings at once.',
+              'Use the Swing panel for uniform national shifts across all ridings.',
+            ].map((s, i) => (
+              <li key={i} style={{ fontSize: 10.5, color: '#374151', lineHeight: 1.55 }}>{s}</li>
+            ))}
+          </ol>
+        </div>
+
+        {/* Scoreboard */}
+        <div>
+          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>Scoreboard</div>
+          <p style={{ fontSize: 11.5, color: '#374151', lineHeight: 1.65, margin: 0 }}>
+            Each card shows the party leader, abbreviation, current seat count, and national vote share. Cards are sorted by seat count. The seat-count bar scales to 172 (majority). A checkmark appears on the party holding a majority.
+          </p>
+        </div>
+
+        {/* Tools */}
+        <div>
+          <div style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9.5, letterSpacing: '0.10em', textTransform: 'uppercase', color: '#9ca3af', marginBottom: 7 }}>Other Tools</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
+            {[
+              { label: 'Breakdown', desc: 'Province-by-province seat and vote breakdown.' },
+              { label: 'Parliament', desc: 'Proportional arc diagram of the current seat tally.' },
+              { label: 'Bubble Map', desc: 'Switch from geographic to bubble layout — each riding is a circle sized by voter turnout.' },
+              { label: 'Simulation', desc: 'Auto-fills all ridings riding-by-riding, province by province, with animated results.' },
+            ].map(({ label, desc }) => (
+              <div key={label} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                <span style={{ fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, fontSize: 9, color: '#374151', background: '#f3f4f6', borderRadius: 4, padding: '2px 5px', marginTop: 1, whiteSpace: 'nowrap' }}>{label}</span>
+                <span style={{ fontSize: 10.5, color: '#374151', lineHeight: 1.5 }}>{desc}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+      </div>
+    </div>
+  );
+}
+
 export default function CanadaApp() {
   const navigate = useNavigate();
   const [dark, setDark] = useState(() => localStorage.getItem('darkMode') === 'true');
@@ -2150,6 +2246,8 @@ export default function CanadaApp() {
   const [simOpen, setSimOpen] = useState(false);
   const [simExiting, setSimExiting] = useState(false);
   const [simRunning, setSimRunning] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialExiting, setTutorialExiting] = useState(false);
   const [simProgress, setSimProgress] = useState(0);
   const [hiddenParties, setHiddenParties] = useState<Set<string>>(new Set());
   const [partiesOpen, setPartiesOpen] = useState(false);
@@ -2604,6 +2702,10 @@ export default function CanadaApp() {
           <button onClick={toggleBreakdown} className={breakdownOpen ? `${btnBase} border-[#c8a020] bg-[#c8a020] text-white` : btnMuted}>Breakdown</button>
           <button onClick={toggleParliament} disabled={!dataReady} className={parliamentOpen ? `${btnBase} border-[#c8a020] bg-[#c8a020] text-white` : btnMuted}>Parliament</button>
           <button onClick={() => setBubbleMapMode(v => !v)} className={btnBubbleClass}>Bubble Map</button>
+          <button
+            onClick={() => setTutorialOpen(v => !v)}
+            className={tutorialOpen ? `${btnBase} border-[#c8a020] bg-[#c8a020] text-white` : btnMuted}
+          >Tutorial</button>
         </div>
 
         <div className="shrink-0 flex items-center gap-2.5 pr-4">
@@ -2887,6 +2989,13 @@ export default function CanadaApp() {
               setSimProgress={setSimProgress}
               stopSim={stopSim}
               hiddenParties={hiddenParties}
+            />
+          )}
+
+          {(tutorialOpen || tutorialExiting) && (
+            <CaTutorialPanel
+              onClose={() => { setTutorialExiting(true); setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280); }}
+              exiting={tutorialExiting}
             />
           )}
         </div>

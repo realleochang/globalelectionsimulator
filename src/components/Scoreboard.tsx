@@ -119,8 +119,6 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
     // Suppress dropdown in 2024 baseline — leaders are fixed to election-day names.
     const hasAlt     = !isBaseline && !isDash && (party?.alternativeLeaders.length ?? 0) > 0;
     const options    = hasAlt ? [party!.defaultLeader, ...party!.alternativeLeaders] : [leader];
-    const barPct     = Math.min(Math.max(votePct, 0), 100);
-
     const stateClasses = `${isLeader ? ' is-leader' : ''}${isWinner ? ' is-winner' : ''}`;
 
     // ── Percentage delta animation ─────────────────────────────────────
@@ -163,12 +161,16 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
       <div
         ref={ref}
         className={`cand-col${stateClasses}`}
-        style={{ '--cand-color': color, '--cand-color-alpha': colorAlpha } as React.CSSProperties}
+        style={{
+          '--cand-color': color,
+          '--cand-color-alpha': colorAlpha,
+          borderColor: (isLeader || isWinner) ? color : hexToRgba(color, 0.30),
+        } as React.CSSProperties}
         draggable
       >
         {/* 1. Avatar bubble */}
-        <div id={`cand-photo-${partyId}`}>
-          <div className="cand-circle-frame">
+        <div style={{ position: 'relative' }}>
+          <div id={`cand-photo-${partyId}`} className="cand-circle-frame">
             {photoUrl
               ? <img src={photoUrl} alt={leader} onError={() => setPhotoUrl(null)} />
               : <span className="cand-initials">{initials}</span>
@@ -184,15 +186,15 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
           )}
         </div>
 
-        {/* 2. Party abbreviation */}
-        <span className="cand-party-abbrev">{partyId}</span>
-
-        {/* 3. Leader name or dropdown */}
+        {/* 2. Leader name (last name only) */}
         {hasAlt ? (
           <LeaderDropdown options={options} value={leader} color={color} onChange={v => setLeader(partyId, v)} />
         ) : (
-          <span className="cand-leader-name" title={leader}>{isDash ? '' : leader}</span>
+          <span className="cand-leader-name" title={leader}>{isDash ? '' : leader.trim().split(/\s+/).pop() ?? leader}</span>
         )}
+
+        {/* 3. Party abbreviation */}
+        <span className="cand-party-abbrev">{partyId}</span>
 
         {/* 4. Seat count */}
         <div className="cand-seats">{seats}</div>
@@ -200,21 +202,22 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
         {/* 5. Party full name */}
         <div className="cand-party-name" title={party?.name}>{party?.name ?? partyId}</div>
 
-        {/* 6. Vote percentage + delta */}
-        <div className="cand-pct">
-          <span className="pct-number">{votePct.toFixed(1)}%</span>
-          {deltaEl}
+        {/* 6. VOTE row — Germany-style */}
+        <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
+          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>Vote</span>
+          <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>
+            {votePct.toFixed(1)}%
+            {deltaEl}
+          </span>
+        </div>
+        <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
+          <span className="cand-votes-full" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{votes.toLocaleString()}</span>
+          <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{fmtVotes(votes)}</span>
         </div>
 
-        {/* 7. Raw votes */}
-        <div className="cand-votes">
-          <span className="cand-votes-full">{votes.toLocaleString()} votes</span>
-          <span className="cand-votes-compact">{fmtVotes(votes)} votes</span>
-        </div>
-
-        {/* 8. Progress bar */}
-        <div className="cand-bar-track">
-          <div id={`cand-bar-${partyId}`} className="cand-bar-fill" style={{ width: `${barPct}%` }} />
+        {/* 7. Progress bar — scales to 50% max */}
+        <div className="cand-bar-track" style={{ width: '100%', height: 3, borderRadius: 2, background: 'var(--bar-track)' }}>
+          <div id={`cand-bar-${partyId}`} className="cand-bar-fill" style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min(votePct / 50 * 100, 100)}%`, transition: 'width 0.3s ease' }} />
         </div>
       </div>
     );

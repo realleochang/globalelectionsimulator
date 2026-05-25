@@ -2416,6 +2416,88 @@ function FrSummaryPanel({ deptResults, getCandInfo, roundLabel, onClose }: FrSum
   );
 }
 
+// ── Tutorial panel ────────────────────────────────────────────────────────────
+function FrTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: boolean }) {
+  const H2 = ({ children }: { children: React.ReactNode }) => (
+    <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>
+  );
+  const P = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>
+  );
+  const Note = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-amber-50 border border-amber-200 rounded-[4px] px-2.5 py-2 text-[10px] text-amber-800 leading-relaxed mb-2">{children}</div>
+  );
+  const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
+    <div className="flex gap-2 mb-1.5">
+      <span className="shrink-0 w-4 h-4 rounded-full bg-gold text-white text-[8px] font-bold flex items-center justify-center mt-0.5">{n}</span>
+      <span className="text-[11px] text-ink leading-relaxed">{children}</span>
+    </div>
+  );
+  const Tag = ({ children, color = 'bg-ink/8 text-ink' }: { children: React.ReactNode; color?: string }) => (
+    <span className={`inline-block px-1.5 py-0.5 rounded-[3px] text-[9px] font-mono font-semibold ${color} mr-1`}>{children}</span>
+  );
+
+  return (
+    <aside className={`w-80 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Élections Législatives Guide</p>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
+
+        <H2>The French Two-Round System</H2>
+        <P>French legislative elections use a <strong>two-round majority system</strong> across 577 constituencies (circonscriptions).</P>
+        <div className="flex gap-2 mb-2">
+          <div className="flex-1 bg-[#f8f7f4] border border-default rounded-[4px] px-2.5 py-2">
+            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">Round 1</div>
+            <div className="text-[10px] text-ink-2 leading-relaxed">All candidates compete. A candidate wins outright only with an absolute majority and &gt;25% of registered voters.</div>
+          </div>
+          <div className="flex-1 bg-[#f8f7f4] border border-default rounded-[4px] px-2.5 py-2">
+            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">Round 2</div>
+            <div className="text-[10px] text-ink-2 leading-relaxed">Top-2 qualify automatically; others qualify if they cleared ≥12.5% of registered voters. Plurality wins.</div>
+          </div>
+        </div>
+        <Note>Candidates who qualify for R2 but choose to stand down (<em>se désister</em>) drive the "republican front" dynamic — left and centre parties withdrawing to block the far-right, or vice versa.</Note>
+
+        <H2>Map Presets</H2>
+        <div className="space-y-2 mb-2">
+          <div><Tag>2022 R1</Tag><span className="text-[10px] text-ink-2">Actual first-round results from the June 2022 législatives.</span></div>
+          <div><Tag>2022 R2</Tag><span className="text-[10px] text-ink-2">Actual second-round results — who actually won each seat.</span></div>
+          <div><Tag>2027 R1</Tag><span className="text-[10px] text-ink-2">Blank canvas for the next election — fill in R1 by department.</span></div>
+          <div><Tag>2027 R2</Tag><span className="text-[10px] text-ink-2">Projects R2 runoffs based on your R1 inputs and transfer flows.</span></div>
+        </div>
+
+        <H2>Editing a Department</H2>
+        <P>Click any department on the map to open its result panel on the right.</P>
+        <Step n={1}>Drag sliders or click a percentage to type a value for each candidate.</Step>
+        <Step n={2}>Adjusting one candidate redistributes shares among unlocked candidates.</Step>
+        <Step n={3}>In <strong>2027 R1</strong>, click <Tag color="bg-emerald-600 text-white">Project</Tag> to commit the result and advance candidates to R2.</Step>
+        <Step n={4}>Toggle <strong>2022 R1 Reference</strong> to compare your inputs against historical results side-by-side.</Step>
+
+        <H2>Candidate Selection (2027)</H2>
+        <P>Some parties for 2027 allow you to pick which candidate leads them — click the <strong>chevron</strong> next to a leader's name in the scoreboard to choose from alternatives. This affects Wikipedia photo fetching and label display only; vote shares are set independently.</P>
+
+        <H2>Round 2 Transfer Model</H2>
+        <P>When you move to <Tag>2027 R2</Tag>, the simulator automatically calculates runoff outcomes using a transfer-flow model: voters from eliminated R1 candidates redistribute to R2 candidates based on ideological proximity, with abstention modelled per bloc distance.</P>
+        <Note>The transfer model covers all cross-group runoff scenarios (left vs right, centre vs far-right, same-bloc runoffs). Departments you haven't projected in R1 use 2022 R1 as the base.</Note>
+
+        <H2>Simulation</H2>
+        <P>Click <Tag>▶ Sim</Tag> to open the simulation panel. Run R1 or R2 automatically — departments are projected one by one in a random order with modelled uncertainty, mimicking election-night results coming in.</P>
+
+        <H2>Reading the Scoreboard</H2>
+        <P>The scoreboard shows each candidate/party's vote share and seat count. In <strong>R1</strong>, parties with an <Tag color="bg-blue-600 text-white">ADVANCE</Tag> badge are projected to qualify for R2. In <strong>R2</strong>, the winner gets a checkmark ✓.</P>
+        <Note>277 seats are needed for an absolute majority in the Assemblée nationale.</Note>
+
+        <div className="h-4" />
+      </div>
+    </aside>
+  );
+}
+
 // ── Main France App ───────────────────────────────────────────────────────────
 export default function FranceApp() {
   const navigate = useNavigate();
@@ -2441,6 +2523,8 @@ export default function FranceApp() {
   const [showSimPanel, setShowSimPanel] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
   const [bubbleMapMode, setBubbleMapMode] = useState(false);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const [tutorialExiting, setTutorialExiting] = useState(false);
   const [simState, setSimState] = useState<SimState>('idle');
   const [simProgress, setSimProgress] = useState(0);
   const [simTotal, setSimTotal] = useState(0);
@@ -2853,6 +2937,16 @@ export default function FranceApp() {
           >
             Summary
           </button>
+          <button
+            onClick={() => {
+              if (tutorialOpen) {
+                setTutorialExiting(true);
+                setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280);
+              } else { setTutorialOpen(true); }
+            }}
+            className={tutorialOpen ? `${btnBase} bg-ink/8 border border-default text-ink` : btnMuted}
+            title="How to play"
+          >Tutorial</button>
         </div>
 
         {/* Right controls */}
@@ -3180,6 +3274,12 @@ export default function FranceApp() {
               />
             </>
           )
+        )}
+        {(tutorialOpen || tutorialExiting) && (
+          <FrTutorialPanel
+            onClose={() => { setTutorialExiting(true); setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280); }}
+            exiting={tutorialExiting}
+          />
         )}
       </div>
 

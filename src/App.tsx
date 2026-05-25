@@ -15,6 +15,91 @@ import { useElectionStore } from './store/useElectionStore';
 import type { PartyId } from './data/parties';
 import type { Constituency } from './types';
 
+// ── Tutorial panel ─────────────────────────────────────────────────────────────
+function UKTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: boolean }) {
+  const H2 = ({ children }: { children: React.ReactNode }) => (
+    <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>
+  );
+  const P = ({ children }: { children: React.ReactNode }) => (
+    <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>
+  );
+  const Note = ({ children }: { children: React.ReactNode }) => (
+    <div className="bg-amber-50 border border-amber-200 rounded-[4px] px-2.5 py-2 text-[10px] text-amber-800 leading-relaxed mb-2">{children}</div>
+  );
+  const Step = ({ n, children }: { n: number; children: React.ReactNode }) => (
+    <div className="flex gap-2 mb-1.5">
+      <span className="shrink-0 w-4 h-4 rounded-full bg-gold text-white text-[8px] font-bold flex items-center justify-center mt-0.5">{n}</span>
+      <span className="text-[11px] text-ink leading-relaxed">{children}</span>
+    </div>
+  );
+  const Tag = ({ children, color = 'bg-ink/8 text-ink' }: { children: React.ReactNode; color?: string }) => (
+    <span className={`inline-block px-1.5 py-0.5 rounded-[3px] text-[9px] font-mono font-semibold ${color} mr-1`}>{children}</span>
+  );
+
+  return (
+    <aside className={`w-80 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Westminster Election Guide</p>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
+
+        <H2>The UK Electoral System</H2>
+        <P>The UK uses <strong>First Past the Post (FPTP)</strong>. Each of the <strong>650 constituencies</strong> returns one MP — whoever gets the most votes wins, no matter how small the margin.</P>
+        <Note>A party can win the popular vote nationally and still lose in seats. In 2024 Labour won 33.7% of the vote but 63% of seats; Reform won 14.3% but just 5 seats.</Note>
+
+        <H2>The 2024 Election</H2>
+        <P>Labour won a landslide majority with <strong>412 seats</strong>, the Conservatives collapsed to <strong>121</strong>, and the Liberal Democrats surged to <strong>72</strong> — mostly from former blue-wall seats. Reform UK came fourth in votes but fifth in seats.</P>
+
+        <H2>Map Presets</H2>
+        <div className="space-y-2 mb-2">
+          <div><Tag>2024 Baseline</Tag><span className="text-[10px] text-ink-2">Actual July 2024 general election results.</span></div>
+          <div><Tag>2026 Polling</Tag><span className="text-[10px] text-ink-2">Current polling applied as a uniform national swing across all constituencies.</span></div>
+          <div><Tag>Blank Map</Tag><span className="text-[10px] text-ink-2">All constituencies empty — project results manually as on election night.</span></div>
+        </div>
+
+        <H2>Editing a Constituency</H2>
+        <P>Click any shaded constituency on the map to open its panel on the right.</P>
+        <Step n={1}>Drag a party's slider or click the percentage to type a value directly.</Step>
+        <Step n={2}>Adjusting one party redistributes the remaining share among unlocked parties.</Step>
+        <Step n={3}>Click the <strong>lock icon</strong> to fix a party's share while you adjust others.</Step>
+        <Step n={4}>Click <Tag>Reset to 2024</Tag> to restore the official result for that seat.</Step>
+
+        <H2>National Swing</H2>
+        <P>Click <Tag>Swing</Tag> to apply a <strong>uniform national swing</strong> across all constituencies at once — enter a ±pp shift per party and it applies everywhere proportionally.</P>
+
+        <H2>Multi-Select</H2>
+        <P>Click <Tag>Multi-select</Tag> then click several constituencies on the map. The panel lets you apply a swing to all selected seats simultaneously.</P>
+
+        <H2>Simulation</H2>
+        <P>Click <Tag>▶ Simulation</Tag> to enter election-night mode on a blank map. Results are called constituency by constituency in random order, modelled on your target national swing. Watch the seat count update live.</P>
+
+        <H2>Other Tools</H2>
+        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div><Tag>Breakdown</Tag> Seats by region — South East, Midlands, Scotland, etc.</div>
+          <div><Tag>Parliament</Tag> Hemicycle view of all 650 seats arranged by party.</div>
+          <div><Tag>Parties</Tag> Show/hide parties or add custom ones with your own colour.</div>
+          <div><Tag>Bubble Map</Tag> Replace the choropleth with circles sized by raw vote margin.</div>
+        </div>
+
+        <H2>Reading the Scoreboard</H2>
+        <P>Cards are ordered left-to-right by seat count. Each card shows the leader's name, party abbreviation, seat total, and vote share (%).</P>
+        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-gold mt-1" /><span><strong>Gold border</strong> — this party has the most seats.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1" /><span><strong>Green shimmer + checkmark</strong> — this party has a majority (≥ 326 seats).</span></div>
+        </div>
+        <Note>Northern Ireland parties (DUP, Sinn Féin, SDLP, UUP, Alliance, TUV) are grouped separately in the scoreboard as they only contest NI constituencies.</Note>
+
+        <div className="h-4" />
+      </div>
+    </aside>
+  );
+}
+
 export default function App() {
   const navigate = useNavigate();
   // ── Dark mode ─────────────────────────────────────────────────────
@@ -119,6 +204,8 @@ export default function App() {
   const [simulationOpen, setSimulationOpen] = useState(false);
   const [simulationKey,  setSimulationKey]  = useState(0);
   const [bubbleMapMode,  setBubbleMapMode]  = useState(false);
+  const [tutorialOpen,   setTutorialOpen]   = useState(false);
+  const [tutorialExiting, setTutorialExiting] = useState(false);
 
   const showConstituencyPanel  = !!selectedId && !nationalSwingOpen && !multiSelectMode && !breakdownOpen && !partyManagerOpen && !simulationOpen;
   const showNationalSwingPanel = nationalSwingOpen;
@@ -276,6 +363,16 @@ export default function App() {
           >
             Bubble Map
           </button>
+          <button
+            onClick={() => {
+              if (tutorialOpen) {
+                setTutorialExiting(true);
+                setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280);
+              } else { setTutorialOpen(true); }
+            }}
+            className={tutorialOpen ? btnActive : btnInactive}
+            title="How to play"
+          >Tutorial</button>
 
         </div>
 
@@ -414,6 +511,12 @@ export default function App() {
           {(showNationalSwingPanel || exitPanel === 'natSwing')    && <NationalSwingPanel  exiting={exitPanel === 'natSwing'} />}
           {(showBreakdownDrawer   || exitPanel === 'breakdown')   && <BreakdownDrawer     exiting={exitPanel === 'breakdown'} />}
           {(showPartyManagerPanel || exitPanel === 'partyManager') && <PartyManagerPanel  exiting={exitPanel === 'partyManager'} />}
+          {(tutorialOpen || tutorialExiting) && (
+            <UKTutorialPanel
+              onClose={() => { setTutorialExiting(true); setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280); }}
+              exiting={tutorialExiting}
+            />
+          )}
         </div>
 
         {/* Branding stamp for PNG capture */}
