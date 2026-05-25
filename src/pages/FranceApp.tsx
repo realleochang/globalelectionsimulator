@@ -2505,7 +2505,7 @@ export default function FranceApp() {
   const [contributorsOpen, setContributorsOpen] = useState(false);
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [selectedDept, setSelectedDept] = useState<DeptInfo | null>(null);
-  const [activeElection, setActiveElection] = useState<ElectionKey>('2027R1');
+  const [activeElection, setActiveElection] = useState<ElectionKey>('2022R1');
   const [overrides, setOverrides] = useState<Record<ElectionKey, Record<string, Partial<Record<string, number>>>>>({
     '2022R1': {}, '2022R2': {}, '2027R1': {}, '2027R2': {},
   });
