@@ -85,12 +85,12 @@ const STATE_TIMING_OFFSET: Record<string, number> = {
   NSW: 0, VIC: 0, TAS: 0, ACT: 0, QLD: 0.05, SA: 0.15, NT: 0.15, WA: 0.50,
 };
 
-// 2026 polling: ONP surges to ~31%, Coalition collapses, ALP retains majority
+// 2026 polling: ONP surges to ~28%, Coalition collapses, ALP retains majority
 // Targets: ALP ~76, ONP ~51, Coalition ~10-12, IND ~8-9
 // Calibrated via seat simulation; CA wins Mayo, KAP wins Kennedy on preferences
 const POLL_SWING_2026: Partial<Record<AuPartyId, number>> = {
-  ALP: -0.028, LIB: -0.108, NAT: -0.067, LNP: -0.093,
-  GRN: +0.010, ONP: +0.303, IND: -0.018, OTH: -0.004,
+  ALP: +0.002, LIB: -0.108, NAT: -0.067, LNP: -0.093,
+  GRN: +0.010, ONP: +0.273, IND: -0.018, OTH: -0.004,
 };
 
 // Seat-specific target vote shares for seats with by-election / local data
