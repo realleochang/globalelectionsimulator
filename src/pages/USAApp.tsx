@@ -610,6 +610,9 @@ function UsaBubbleLayer({
     for (const m of markersRef.current) m.remove();
     markersRef.current = [];
 
+    // First pass: collect data and raw vote margins
+    type BubbleEntry = { fips: string; name: string; center: [number,number]; rawMarginVotes: number; color: string };
+    const entries: BubbleEntry[] = [];
     for (const feature of (geojson as any).features ?? []) {
       const fips: string = feature.properties?.STATE ?? '';
       const name: string = feature.properties?.NAME ?? '';
@@ -619,10 +622,17 @@ function UsaBubbleLayer({
       const total = sorted.reduce((s, v) => s + v, 0);
       if (sorted.length === 0 || total === 0) continue;
       const marginShare = sorted.length >= 2 ? sorted[0] - sorted[1] : sorted[0];
-      const marginPct = (marginShare / total) * 100;
-      const radius = 3 + Math.min(marginPct / 30, 1) * 10;
+      const stateTotalVotes = (fips.includes('-') ? CD_VOTES[fips] : STATE_VOTES[fips]) ?? 0;
+      const rawMarginVotes = (marginShare / total) * stateTotalVotes;
       const color = stateFill(results, dark);
       const center: [number, number] = CENTROID_OVERRIDES[fips] ?? computeCentroid(feature.geometry);
+      entries.push({ fips, name, center, rawMarginVotes, color });
+    }
+
+    // Second pass: radius directly proportional to raw vote margin
+    const maxRaw = Math.max(1, ...entries.map(e => e.rawMarginVotes));
+    for (const { fips, name, center, rawMarginVotes, color } of entries) {
+      const radius = 2 + (rawMarginVotes / maxRaw) * 11;
 
       const marker = L.circleMarker(center, {
         radius,

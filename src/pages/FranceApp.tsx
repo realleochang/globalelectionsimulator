@@ -1485,6 +1485,67 @@ const FR_TRANSFER: Record<string, [number, number]> = {
   '3-1-2': [0.15, 0.68],
   '4-1-2': [0.05, 0.78],
   '5-1-2': [0.04, 0.52],
+
+  // ── Same-group runoffs ────────────────────────────────────────────────────────
+  // When both R2 candidates are in the same ideological group, voters from
+  // distant blocs abstain heavily; adjacent voters split between the two.
+  // leftId = lower ideology score (more left within the group)
+  // rightId = higher ideology score (more right within the group)
+
+  // G5 vs G5: two far-right (e.g. RN=16 left vs R!=17 right)
+  // Far-left to center voters abstain massively; when they do vote they lean RN
+  // because Le Pen has softened her image relative to Zemmour's harder line.
+  '0-5-5': [0.10, 0.03],  // Far-left  → 87% abstain; grudging RN preference
+  '1-5-5': [0.12, 0.04],  // LFI       → 84% abstain; RN slightly less extreme
+  '2-5-5': [0.20, 0.07],  // PS/LE     → 73% abstain; lean RN ("normalized" far-right)
+  '3-5-5': [0.32, 0.12],  // Center    → 56% abstain; RN clearly preferred over R!
+  '4-5-5': [0.50, 0.22],  // LR/NF     → 28% abstain; lean RN (mainstream right)
+  '5-5-5': [0.52, 0.40],  // DLF/DIV   → 8% abstain; slight RN preference
+
+  // G4 vs G4: two center-right (e.g. NF=12 left vs LR=13 right)
+  // Left-wing voters mostly abstain; far-right voters lean LR (slightly more right).
+  '0-4-4': [0.15, 0.12],  // Far-left  → 73% abstain; near-equal, tiny NF preference
+  '1-4-4': [0.18, 0.08],  // LFI       → 74% abstain; slight NF preference
+  '2-4-4': [0.30, 0.15],  // PS        → 55% abstain; lean NF (lower score)
+  '3-4-4': [0.38, 0.30],  // Center    → 32% abstain; modest NF preference
+  '4-4-4': [0.45, 0.48],  // NE/other CR → 7% abstain; slight LR preference
+  '5-4-4': [0.20, 0.58],  // RN/R!     → 22% abstain; prefer LR (further right within G4)
+
+  // G3 vs G3: two centrists (e.g. RE=8 left vs HOR=10 right)
+  // Left abstains with modest preference for RE; right abstains less and prefers HOR.
+  '0-3-3': [0.22, 0.10],  // Far-left  → 68% abstain; slight RE preference
+  '1-3-3': [0.18, 0.10],  // LFI       → 72% abstain; slight RE preference
+  '2-3-3': [0.35, 0.22],  // PS        → 43% abstain; lean RE
+  '3-3-3': [0.52, 0.40],  // LFH/BE/MD → 8% abstain; slight RE preference
+  '4-3-3': [0.32, 0.55],  // LR/NF     → 13% abstain; prefer HOR (more right-center)
+  '5-3-3': [0.10, 0.38],  // RN/R!     → 52% abstain; prefer HOR over RE
+
+  // G2 vs G2: two left (e.g. PS=5 left vs LE=7 right)
+  // Far-left and LFI lean PS; center and right prefer LE (greens, more moderate).
+  '0-2-2': [0.50, 0.30],  // Far-left  → 20% abstain; prefer PS (more socialist)
+  '1-2-2': [0.42, 0.35],  // LFI       → 23% abstain; lean PS
+  '2-2-2': [0.55, 0.38],  // PP/other left → 7% abstain; slight PS preference
+  '3-2-2': [0.22, 0.45],  // Center    → 33% abstain; prefer LE (greens, less statist)
+  '4-2-2': [0.08, 0.30],  // LR        → 62% abstain; prefer LE (less radical than PS)
+  '5-2-2': [0.04, 0.15],  // RN        → 81% abstain; marginal preference for LE
+
+  // G1 vs G1: two radical-left (e.g. LFI=3 left vs D!=4 right)
+  // Far-left and PS lean LFI; right prefers D! (more nationalist-populist overlap).
+  '0-1-1': [0.55, 0.25],  // Far-left  → 20% abstain; prefer LFI (more radical)
+  '1-1-1': [0.60, 0.32],  // Other G1  → 8% abstain; lean LFI
+  '2-1-1': [0.42, 0.28],  // PS        → 30% abstain; lean LFI (known quantity)
+  '3-1-1': [0.18, 0.25],  // Center    → 57% abstain; slight D! preference (less radical)
+  '4-1-1': [0.08, 0.32],  // LR        → 60% abstain; prefer D! (more sovereignist)
+  '5-1-1': [0.05, 0.22],  // RN        → 73% abstain; prefer D! (nationalist overlap)
+
+  // G0 vs G0: two far-left (e.g. LO=0 left vs NPA=1 right)
+  // All non-far-left blocs abstain heavily; LFI slightly prefers LO (more radical).
+  '0-0-0': [0.40, 0.52],  // PCF/other G0 → 8% abstain; slight NPA preference (broader movement)
+  '1-0-0': [0.42, 0.35],  // LFI       → 23% abstain; lean LO (more radical)
+  '2-0-0': [0.28, 0.30],  // PS        → 42% abstain; near-equal, slight NPA preference
+  '3-0-0': [0.12, 0.18],  // Center    → 70% abstain; marginal NPA preference
+  '4-0-0': [0.05, 0.12],  // LR        → 83% abstain; slight NPA preference
+  '5-0-0': [0.03, 0.07],  // RN        → 90% abstain
 };
 
 // Fallback: pure inverse-distance weighting with abstention scaling
