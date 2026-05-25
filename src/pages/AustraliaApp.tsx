@@ -665,10 +665,11 @@ interface ElectoratePanelProps {
   activePreset: PresetId | null;
   onClose: () => void;
   onResultsChange?: (id: string, newResults: Partial<Record<AuPartyId, number>>) => void;
+  hiddenParties?: Set<AuPartyId>;
 }
 
 function ElectoratePanel({
-  id, name, state, results, results2025, validVotes, activePreset, onClose, onResultsChange,
+  id, name, state, results, results2025, validVotes, activePreset, onClose, onResultsChange, hiddenParties,
 }: ElectoratePanelProps) {
   const total = validVotes ?? 0;
   const [sliderPcts, setSliderPcts] = useState<Record<string, number>>({});
@@ -691,9 +692,10 @@ function ElectoratePanel({
     if (total === 0) { setSliderPcts({}); return; }
     if (!results) {
       if (activePreset === 'blank') {
-        const share = 100 / stateParties.length;
+        const visibleParties = stateParties.filter(p => !hiddenParties?.has(p.id));
+        const share = 100 / visibleParties.length;
         const pcts: Record<string, number> = {};
-        for (const p of stateParties) pcts[p.id] = share;
+        for (const p of visibleParties) pcts[p.id] = share;
         setSliderPcts(pcts);
         setProjected(false);
       } else setSliderPcts({});
@@ -783,6 +785,7 @@ function ElectoratePanel({
   const [prefFlowOpen, setPrefFlowOpen] = useState(false);
 
   const sliderParties = stateParties.filter(p => {
+    if (activePreset === 'blank' && hiddenParties?.has(p.id)) return false;
     const hasCurrent = (sliderPcts[p.id] ?? 0) > 0.01;
     const has2025 = (pct2025[p.id] ?? 0) > 0.01;
     return hasCurrent || has2025 || p.id === 'ALP' || p.id === 'LIB' || p.id === 'LNP';
@@ -1030,9 +1033,10 @@ interface AuSimPanelProps {
   running: boolean;
   progress: number;
   declared: number;
+  hiddenParties: Set<AuPartyId>;
 }
 
-function AuSimPanel({ onClose, onStart, onStop, running, progress, declared }: AuSimPanelProps) {
+function AuSimPanel({ onClose, onStart, onStop, running, progress, declared, hiddenParties }: AuSimPanelProps) {
   const btnBase = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const [duration, setDuration] = useState(60_000);
 
@@ -1043,14 +1047,15 @@ function AuSimPanel({ onClose, onStart, onStop, running, progress, declared }: A
     return init;
   });
 
-  const editableSum = SIM_EDITABLE_PARTIES.reduce((s, { id }) => s + (parseFloat(shares[id]) || 0), 0);
+  const visibleSimParties = SIM_EDITABLE_PARTIES.filter(({ id }) => !hiddenParties.has(id));
+  const editableSum = visibleSimParties.reduce((s, { id }) => s + (parseFloat(shares[id]) || 0), 0);
   const othRemainder = Math.max(0, 100 - editableSum);
   const totalPct = editableSum + othRemainder;
   const sumOk = Math.abs(totalPct - 100) < 0.15;
 
   const handleStart = () => {
     const swings: Record<AuPartyId, number> = { ALP:0,LIB:0,NAT:0,LNP:0,CLP:0,GRN:0,KAP:0,CA:0,ONP:0,IND:0,OTH:0 };
-    for (const { id } of SIM_EDITABLE_PARTIES) {
+    for (const { id } of visibleSimParties) {
       const target = parseFloat(shares[id]) || 0;
       // Swings are relative to 2026 polling baseline (not 2025)
       swings[id] = (target - POLLING_SHARES_2026[id]) / 100;
@@ -1086,7 +1091,7 @@ function AuSimPanel({ onClose, onStart, onStop, running, progress, declared }: A
         <section>
           <p className="eyebrow mb-2">National vote share (%)</p>
           <div className="space-y-1.5">
-            {SIM_EDITABLE_PARTIES.map(({ id, note }) => {
+            {visibleSimParties.map(({ id, note }) => {
               const color = AU_PARTY_MAP[id]?.color ?? '#888';
               const cap = PARTY_NATIONAL_MAX_PCT[id];
               const overCap = cap !== undefined && (parseFloat(shares[id]) || 0) > cap;
@@ -1729,11 +1734,15 @@ function AuParliamentPanel({
 
 // ── Party manager panel ─────────────────────────────────────────────────────────
 function AuPartyManagerPanel({
-  exiting, onClose,
+  exiting, onClose, hiddenParties, onToggleParty, activePreset,
 }: {
   exiting: boolean;
   onClose: () => void;
+  hiddenParties: Set<AuPartyId>;
+  onToggleParty: (id: AuPartyId) => void;
+  activePreset: PresetId | null;
 }) {
+  const canHide = activePreset === 'blank' || activePreset === null;
   return (
     <aside className={`w-72 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-default shrink-0">
@@ -1741,20 +1750,41 @@ function AuPartyManagerPanel({
         <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-hover text-ink-3 hover:text-ink text-lg">×</button>
       </div>
       <div className="flex-1 overflow-y-auto thin-scroll px-4 py-3">
-        <p className="eyebrow mb-3">Australian parties</p>
-        <div className="space-y-2">
-          {AU_PARTIES.map(p => (
-            <div key={p.id} className="flex items-center gap-3 py-1.5 border-b border-default last:border-0">
-              <span className="w-3 h-3 rounded-full shrink-0" style={{ background: p.color }} />
-              <span className="text-[10px] font-mono font-bold text-ink-2 w-8 shrink-0">{p.id}</span>
-              <span className="text-[11px] text-ink flex-1 truncate">{p.name}</span>
-            </div>
-          ))}
+        <p className="eyebrow mb-3">Show / hide parties</p>
+        {!canHide && (
+          <div className="mb-3 px-2.5 py-2 rounded-[4px] bg-amber-50 border border-amber-200 text-[9.5px] font-mono text-amber-700 leading-relaxed">
+            Switch to <strong>Blank Map</strong> to enable hiding parties.
+          </div>
+        )}
+        <div className="space-y-1">
+          {AU_PARTIES.map(p => {
+            const hidden = hiddenParties.has(p.id);
+            return (
+              <button
+                key={p.id}
+                onClick={() => canHide && onToggleParty(p.id)}
+                disabled={!canHide}
+                className={`w-full flex items-center gap-3 px-2 py-2 rounded-[5px] transition-colors text-left
+                  ${canHide ? 'hover:bg-hover cursor-pointer' : 'cursor-default'}
+                  ${hidden ? 'opacity-40' : ''}`}
+              >
+                <span className="w-3 h-3 rounded-full shrink-0" style={{ background: hidden ? '#aaa' : p.color }} />
+                <span className="text-[10px] font-mono font-bold text-ink-2 w-8 shrink-0">{p.id}</span>
+                <span className="text-[11px] text-ink flex-1 truncate">{p.name}</span>
+                {canHide && (
+                  <span className={`shrink-0 w-7 h-4 rounded-full transition-colors flex items-center px-0.5
+                    ${hidden ? 'bg-ink/15' : 'bg-emerald-500'}`}>
+                    <span className={`w-3 h-3 rounded-full bg-white shadow transition-transform
+                      ${hidden ? 'translate-x-0' : 'translate-x-3'}`} />
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
         <div className="mt-4 p-3 rounded-[6px] bg-[#f8f7f4] border border-default">
           <p className="text-[9px] font-mono text-ink-3 leading-relaxed">
-            Australia uses preferential (IRV) voting. Winners are determined by first-preference votes plus preference flows.<br /><br />
-            Coalition = LIB + NAT + LNP combined. 76 seats needed for majority.
+            Hidden parties are removed from electorate sliders and the simulation panel in Blank Map mode. Coalition = LIB + NAT + LNP. 76 seats needed for majority.
           </p>
         </div>
       </div>
@@ -2195,6 +2225,14 @@ export default function AustraliaApp() {
   const [parliamentExiting, setParliamentExiting] = useState(false);
   const [tutorialOpen, setTutorialOpen]         = useState(false);
   const [tutorialExiting, setTutorialExiting]   = useState(false);
+  const [hiddenParties, setHiddenParties] = useState<Set<AuPartyId>>(new Set());
+  const toggleParty = useCallback((id: AuPartyId) => {
+    setHiddenParties(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  }, []);
   const parliTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Multi-select ─────────────────────────────────────────────────────────────
@@ -2758,6 +2796,7 @@ export default function AustraliaApp() {
               activePreset={activePreset}
               onClose={() => setSelectedId(null)}
               onResultsChange={handleResultsChange}
+              hiddenParties={hiddenParties}
             />
           )}
 
@@ -2780,6 +2819,7 @@ export default function AustraliaApp() {
               running={simRunning}
               progress={simProgress}
               declared={simDeclared}
+              hiddenParties={hiddenParties}
             />
           )}
 
@@ -2810,6 +2850,9 @@ export default function AustraliaApp() {
             <AuPartyManagerPanel
               exiting={exitPanel === 'parties'}
               onClose={closePanel}
+              hiddenParties={hiddenParties}
+              onToggleParty={toggleParty}
+              activePreset={activePreset}
             />
           )}
 
