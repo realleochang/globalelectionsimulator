@@ -82,7 +82,6 @@ function UKTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: 
         <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
           <div><Tag>Breakdown</Tag> Seats by region — South East, Midlands, Scotland, etc.</div>
           <div><Tag>Parliament</Tag> Hemicycle view of all 650 seats arranged by party.</div>
-          <div><Tag>Parties</Tag> Show/hide parties or add custom ones with your own colour.</div>
           <div><Tag>Bubble Map</Tag> Replace the choropleth with circles sized by raw vote margin.</div>
         </div>
 
@@ -339,9 +338,6 @@ export default function App() {
           </button>
           <button onClick={toggleMultiSelectMode} className={multiSelectMode ? btnActive : btnInactive}>
             {multiSelectMode ? `⊕ ${selectedIds.size} sel.` : 'Multi-select'}
-          </button>
-          <button onClick={handlePartyManager} className={partyManagerOpen ? btnActive : btnInactive}>
-            Parties
           </button>
           <button onClick={handleNatSwing} className={nationalSwingOpen ? btnActive : btnInactive}>
             Swing
