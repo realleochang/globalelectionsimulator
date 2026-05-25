@@ -910,21 +910,6 @@ function ElectoratePanel({
       {showSliders ? (
         <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
 
-          {/* % Reporting slider — blank map only */}
-          {activePreset === 'blank' && (
-            <div className="pb-3 border-b border-default">
-              <div className="flex items-center justify-between mb-1.5">
-                <span className="text-[9.5px] font-mono font-bold uppercase tracking-[0.12em] text-ink-3">% Reporting</span>
-                <span className="text-[12px] font-mono font-semibold tabular-nums text-ink">{Math.round(reportingPct)}%</span>
-              </div>
-              <input type="range" min={0} max={100} step={1}
-                value={reportingPct}
-                onChange={e => { setReportingPct(+e.target.value); setProjected(false); }}
-                className="party-slider w-full"
-                style={{ '--party-color': '#c8a020', '--pct': `${reportingPct}%` } as React.CSSProperties}
-              />
-            </div>
-          )}
 
           {sliderParties.map(p => {
             const b = pct2025[p.id] ?? 0;
