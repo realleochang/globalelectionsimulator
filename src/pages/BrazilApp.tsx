@@ -517,9 +517,10 @@ function BrMapView({
           />
         )}
         {bubbleMode && (() => {
-          const maxTotal = Math.max(...Object.keys(BR_CENTROIDS).map(c => {
+          const maxMargin = Math.max(...Object.keys(BR_CENTROIDS).map(c => {
             const rv = stateResults[c] ?? {};
-            return (Object.values(rv) as number[]).reduce((s, v) => s + (v ?? 0), 0);
+            const ds = (Object.entries(rv) as [string, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+            return (ds[0]?.[1] ?? 0) - (ds[1]?.[1] ?? 0);
           }), 1);
           return Object.entries(BR_CENTROIDS).map(([code, [lat, lng]]) => {
           const r = stateResults[code] ?? {};
@@ -528,7 +529,8 @@ function BrMapView({
           const winnerId = sortedR[0]?.[0];
           const winnerColor = winnerId ? getCandInfo(winnerId).color : (dark ? '#4b5563' : '#9ca3af');
           const nom = BR_STATE_NAMES[code] ?? code;
-          const radius = stateTotal > 0 ? 6 + (stateTotal / maxTotal) * 26 : 5;
+          const rawMargin = (sortedR[0]?.[1] ?? 0) - (sortedR[1]?.[1] ?? 0);
+          const radius = stateTotal > 0 ? 6 + (rawMargin / maxMargin) * 26 : 5;
           const sel = code === selectedCode;
           return (
             <CircleMarker
