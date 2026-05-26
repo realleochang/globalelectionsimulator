@@ -9,6 +9,13 @@ import CanadaApp from './pages/CanadaApp.tsx'
 import USAApp from './pages/USAApp.tsx'
 import AustraliaApp from './pages/AustraliaApp.tsx'
 import GermanyApp from './pages/GermanyApp.tsx'
+import BrazilApp from './pages/BrazilApp.tsx'
+import NetherlandsApp from './pages/NetherlandsApp.tsx'
+import TaiwanApp from './pages/TaiwanApp.tsx'
+import ItalyApp from './pages/ItalyApp.tsx'
+import SouthAfricaApp from './pages/SouthAfricaApp.tsx'
+import RomaniaApp from './pages/RomaniaApp.tsx'
+import CountriesPage from './pages/CountriesPage.tsx'
 
 document.getElementById('splash')?.remove()
 
@@ -23,6 +30,13 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/usa" element={<USAApp />} />
         <Route path="/australia" element={<AustraliaApp />} />
         <Route path="/germany" element={<GermanyApp />} />
+        <Route path="/brazil" element={<BrazilApp />} />
+        <Route path="/netherlands" element={<NetherlandsApp />} />
+        <Route path="/taiwan" element={<TaiwanApp />} />
+        <Route path="/italy" element={<ItalyApp />} />
+        <Route path="/south-africa" element={<SouthAfricaApp />} />
+        <Route path="/romania" element={<RomaniaApp />} />
+        <Route path="/countries" element={<CountriesPage />} />
       </Routes>
     </HashRouter>
   </StrictMode>,

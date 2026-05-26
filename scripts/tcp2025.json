@@ -1,0 +1,602 @@
+{
+  "Bean": {
+    "IND": 51000,
+    "ALP": 51700
+  },
+  "Canberra": {
+    "GRN": 28469,
+    "ALP": 64936
+  },
+  "Fenner": {
+    "LIB": 26372,
+    "ALP": 68088
+  },
+  "Banks": {
+    "ALP": 51830,
+    "LIB": 47105
+  },
+  "Barton": {
+    "ALP": 65971,
+    "LIB": 33980
+  },
+  "Bennelong": {
+    "LIB": 44736,
+    "ALP": 65076
+  },
+  "Berowra": {
+    "ALP": 55895,
+    "LIB": 59673
+  },
+  "Blaxland": {
+    "LIB": 24412,
+    "ALP": 62474
+  },
+  "Bradfield": {
+    "LIB": 56088,
+    "IND": 56114
+  },
+  "Calare": {
+    "IND": 60338,
+    "NAT": 45929
+  },
+  "Chifley": {
+    "ALP": 62440,
+    "LIB": 26974
+  },
+  "Cook": {
+    "LIB": 60834,
+    "ALP": 45530
+  },
+  "Cowper": {
+    "NAT": 56609,
+    "IND": 51126
+  },
+  "Cunningham": {
+    "ALP": 77970,
+    "LIB": 37504
+  },
+  "Dobell": {
+    "LIB": 41962,
+    "ALP": 61465
+  },
+  "Eden-Monaro": {
+    "LIB": 45818,
+    "ALP": 61270
+  },
+  "Farrer": {
+    "LIB": 57916,
+    "IND": 45147
+  },
+  "Fowler": {
+    "IND": 48956,
+    "ALP": 43982
+  },
+  "Gilmore": {
+    "ALP": 61223,
+    "LIB": 49830
+  },
+  "Grayndler": {
+    "GRN": 36740,
+    "ALP": 74138
+  },
+  "Greenway": {
+    "LIB": 37237,
+    "ALP": 65518
+  },
+  "Hughes": {
+    "ALP": 52152,
+    "LIB": 46143
+  },
+  "Hume": {
+    "LIB": 57747,
+    "ALP": 41720
+  },
+  "Hunter": {
+    "ONP": 45746,
+    "ALP": 65926
+  },
+  "Kingsford Smith": {
+    "ALP": 66604,
+    "LIB": 32528
+  },
+  "Lindsay": {
+    "LIB": 51804,
+    "ALP": 46342
+  },
+  "Lyne": {
+    "ALP": 43981,
+    "NAT": 65369
+  },
+  "Macarthur": {
+    "ALP": 61365,
+    "LIB": 32171
+  },
+  "Mackellar": {
+    "LIB": 49592,
+    "IND": 62255
+  },
+  "Macquarie": {
+    "LIB": 46399,
+    "ALP": 63306
+  },
+  "McMahon": {
+    "LIB": 40093,
+    "ALP": 57742
+  },
+  "Mitchell": {
+    "LIB": 58949,
+    "ALP": 50604
+  },
+  "New England": {
+    "NAT": 76680,
+    "ALP": 37666
+  },
+  "Newcastle": {
+    "GRN": 37022,
+    "ALP": 71244
+  },
+  "Page": {
+    "ALP": 43806,
+    "NAT": 63788
+  },
+  "Parkes": {
+    "ALP": 38840,
+    "NAT": 66047
+  },
+  "Parramatta": {
+    "ALP": 60790,
+    "LIB": 36400
+  },
+  "Paterson": {
+    "ALP": 61841,
+    "LIB": 46863
+  },
+  "Reid": {
+    "LIB": 38455,
+    "ALP": 62762
+  },
+  "Richmond": {
+    "ALP": 62975,
+    "NAT": 41977
+  },
+  "Riverina": {
+    "ALP": 39561,
+    "NAT": 66276
+  },
+  "Robertson": {
+    "LIB": 41228,
+    "ALP": 60235
+  },
+  "Shortland": {
+    "ALP": 66494,
+    "LIB": 41614
+  },
+  "Sydney": {
+    "ALP": 76089,
+    "GRN": 31160
+  },
+  "Warringah": {
+    "IND": 70318,
+    "LIB": 44577
+  },
+  "Watson": {
+    "ALP": 55099,
+    "IND": 27735
+  },
+  "Wentworth": {
+    "LIB": 46002,
+    "IND": 64429
+  },
+  "Werriwa": {
+    "ALP": 49742,
+    "LIB": 37872
+  },
+  "Whitlam": {
+    "LIB": 47830,
+    "ALP": 61486
+  },
+  "Lingiari": {
+    "ALP": 26524,
+    "LIB": 19108
+  },
+  "Solomon": {
+    "LIB": 29277,
+    "ALP": 30853
+  },
+  "Blair": {
+    "LNP": 51797,
+    "ALP": 65156
+  },
+  "Bonner": {
+    "LNP": 44600,
+    "ALP": 54506
+  },
+  "Bowman": {
+    "ALP": 51372,
+    "LNP": 56615
+  },
+  "Brisbane": {
+    "ALP": 65295,
+    "LNP": 45450
+  },
+  "Capricornia": {
+    "ALP": 43573,
+    "LNP": 55085
+  },
+  "Dawson": {
+    "LNP": 60881,
+    "ALP": 37587
+  },
+  "Dickson": {
+    "ALP": 59115,
+    "LNP": 46464
+  },
+  "Fadden": {
+    "ALP": 48034,
+    "LNP": 63364
+  },
+  "Fairfax": {
+    "ALP": 51938,
+    "LNP": 59110
+  },
+  "Fisher": {
+    "LNP": 66385,
+    "ALP": 52087
+  },
+  "Flynn": {
+    "ALP": 38781,
+    "LNP": 58762
+  },
+  "Forde": {
+    "LNP": 51866,
+    "ALP": 55662
+  },
+  "Griffith": {
+    "GRN": 43058,
+    "ALP": 66154
+  },
+  "Groom": {
+    "IND": 45752,
+    "LNP": 57467
+  },
+  "Herbert": {
+    "LNP": 62374,
+    "ALP": 35988
+  },
+  "Hinkler": {
+    "LNP": 61534,
+    "ALP": 47836
+  },
+  "Kennedy": {
+    "LNP": 33274,
+    "KAP": 63888
+  },
+  "Leichhardt": {
+    "ALP": 52967,
+    "LNP": 41513
+  },
+  "Lilley": {
+    "ALP": 68030,
+    "LNP": 37410
+  },
+  "Longman": {
+    "LNP": 61099,
+    "ALP": 60830
+  },
+  "Maranoa": {
+    "LNP": 68476,
+    "ONP": 29211
+  },
+  "McPherson": {
+    "LNP": 52920,
+    "ALP": 44295
+  },
+  "Moncrieff": {
+    "LNP": 58991,
+    "ALP": 41335
+  },
+  "Moreton": {
+    "ALP": 62014,
+    "LNP": 31817
+  },
+  "Oxley": {
+    "ALP": 72003,
+    "LNP": 32059
+  },
+  "Petrie": {
+    "ALP": 59761,
+    "LNP": 57031
+  },
+  "Rankin": {
+    "LNP": 31577,
+    "ALP": 60092
+  },
+  "Ryan": {
+    "GRN": 55112,
+    "LNP": 48350
+  },
+  "Wide Bay": {
+    "ALP": 44512,
+    "LNP": 60546
+  },
+  "Wright": {
+    "LNP": 67764,
+    "ALP": 49116
+  },
+  "Adelaide": {
+    "ALP": 78796,
+    "LIB": 35293
+  },
+  "Barker": {
+    "LIB": 68465,
+    "ALP": 40249
+  },
+  "Boothby": {
+    "ALP": 71698,
+    "LIB": 45641
+  },
+  "Grey": {
+    "ALP": 48479,
+    "LIB": 58402
+  },
+  "Hindmarsh": {
+    "LIB": 37848,
+    "ALP": 74623
+  },
+  "Kingston": {
+    "ALP": 79721,
+    "LIB": 32974
+  },
+  "Makin": {
+    "LIB": 37515,
+    "ALP": 68633
+  },
+  "Mayo": {
+    "CA": 81231,
+    "ALP": 43951
+  },
+  "Spence": {
+    "LIB": 38679,
+    "ALP": 72903
+  },
+  "Sturt": {
+    "ALP": 66326,
+    "LIB": 50811
+  },
+  "Bass": {
+    "ALP": 41532,
+    "LIB": 30062
+  },
+  "Braddon": {
+    "ALP": 42809,
+    "LIB": 32031
+  },
+  "Clark": {
+    "IND": 47531,
+    "ALP": 20000
+  },
+  "Franklin": {
+    "IND": 32283,
+    "ALP": 44179
+  },
+  "Lyons": {
+    "LIB": 29516,
+    "ALP": 47316
+  },
+  "Aston": {
+    "LIB": 51159,
+    "ALP": 58690
+  },
+  "Ballarat": {
+    "LIB": 41121,
+    "ALP": 63419
+  },
+  "Bendigo": {
+    "ALP": 54800,
+    "NAT": 51817
+  },
+  "Bruce": {
+    "ALP": 70751,
+    "LIB": 38743
+  },
+  "Calwell": {
+    "IND": 40350,
+    "ALP": 49481
+  },
+  "Casey": {
+    "ALP": 52084,
+    "LIB": 58479
+  },
+  "Chisholm": {
+    "LIB": 49923,
+    "ALP": 62773
+  },
+  "Cooper": {
+    "ALP": 64246,
+    "GRN": 43340
+  },
+  "Corangamite": {
+    "ALP": 60381,
+    "LIB": 43639
+  },
+  "Corio": {
+    "LIB": 40529,
+    "ALP": 69698
+  },
+  "Deakin": {
+    "ALP": 61014,
+    "LIB": 54493
+  },
+  "Dunkley": {
+    "LIB": 46860,
+    "ALP": 62314
+  },
+  "Flinders": {
+    "IND": 54833,
+    "LIB": 60090
+  },
+  "Fraser": {
+    "GRN": 43818,
+    "ALP": 63649
+  },
+  "Gellibrand": {
+    "ALP": 68489,
+    "LIB": 36713
+  },
+  "Gippsland": {
+    "ALP": 32102,
+    "NAT": 72656
+  },
+  "Goldstein": {
+    "IND": 57749,
+    "LIB": 57924
+  },
+  "Gorton": {
+    "ALP": 68380,
+    "LIB": 45050
+  },
+  "Hawke": {
+    "ALP": 59830,
+    "LIB": 43987
+  },
+  "Holt": {
+    "ALP": 63538,
+    "LIB": 35695
+  },
+  "Hotham": {
+    "ALP": 71012,
+    "LIB": 35199
+  },
+  "Indi": {
+    "IND": 62014,
+    "LIB": 43747
+  },
+  "Isaacs": {
+    "ALP": 69604,
+    "LIB": 38577
+  },
+  "Jagajaga": {
+    "LIB": 41241,
+    "ALP": 69858
+  },
+  "Kooyong": {
+    "LIB": 56668,
+    "IND": 58200
+  },
+  "La Trobe": {
+    "ALP": 49674,
+    "LIB": 53944
+  },
+  "Lalor": {
+    "ALP": 62761,
+    "LIB": 36523
+  },
+  "Macnamara": {
+    "ALP": 62004,
+    "LIB": 38334
+  },
+  "Mallee": {
+    "NAT": 71597,
+    "ALP": 32110
+  },
+  "Maribyrnong": {
+    "ALP": 69660,
+    "LIB": 41537
+  },
+  "McEwen": {
+    "LIB": 47328,
+    "ALP": 57288
+  },
+  "Melbourne": {
+    "ALP": 51663,
+    "GRN": 45785
+  },
+  "Menzies": {
+    "LIB": 53536,
+    "ALP": 55894
+  },
+  "Monash": {
+    "ALP": 47069,
+    "LIB": 55451
+  },
+  "Nicholls": {
+    "ALP": 37563,
+    "NAT": 67887
+  },
+  "Scullin": {
+    "LIB": 34473,
+    "ALP": 62072
+  },
+  "Wannon": {
+    "IND": 50654,
+    "LIB": 57749
+  },
+  "Wills": {
+    "ALP": 56459,
+    "GRN": 53322
+  },
+  "Brand": {
+    "ALP": 62766,
+    "LIB": 31027
+  },
+  "Bullwinkel": {
+    "LIB": 51799,
+    "ALP": 52865
+  },
+  "Burt": {
+    "LIB": 33846,
+    "ALP": 64845
+  },
+  "Canning": {
+    "LIB": 56917,
+    "ALP": 43730
+  },
+  "Cowan": {
+    "LIB": 34962,
+    "ALP": 61179
+  },
+  "Curtin": {
+    "LIB": 49230,
+    "IND": 56118
+  },
+  "Durack": {
+    "LIB": 52912,
+    "ALP": 35050
+  },
+  "Forrest": {
+    "ALP": 47505,
+    "LIB": 51952
+  },
+  "Fremantle": {
+    "IND": 50365,
+    "ALP": 51765
+  },
+  "Hasluck": {
+    "ALP": 63039,
+    "LIB": 32512
+  },
+  "Moore": {
+    "ALP": 56502,
+    "LIB": 50335
+  },
+  "O'Connor": {
+    "LIB": 63356,
+    "ALP": 36759
+  },
+  "Pearce": {
+    "LIB": 42733,
+    "ALP": 55360
+  },
+  "Perth": {
+    "LIB": 33406,
+    "ALP": 66350
+  },
+  "Swan": {
+    "ALP": 62888,
+    "LIB": 35392
+  },
+  "Tangney": {
+    "LIB": 47738,
+    "ALP": 63253
+  }
+}

@@ -5,6 +5,7 @@ import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { hsl } from 'd3';
 import type { GeoJsonObject, Feature } from 'geojson';
+import { GlobeLogo } from './HomePage';
 
 // ── Parties ───────────────────────────────────────────────────────────────────
 const USA_PARTIES = [
@@ -424,60 +425,6 @@ function stateFill(results: Record<string, number>, dark: boolean): string {
   const c = hsl(baseColor);
   c.l = lightness / 100;
   return c.formatHex() as string;
-}
-
-// ── Globe logo ────────────────────────────────────────────────────────────────
-function GlobeLogo({ size = 34 }: { size?: number }) {
-  const lats: [number, number, number, string][] = [
-    [7.6,  11.2, 2.8, '#12B6CF'],
-    [13.2, 13.7, 3.4, '#02A95B'],
-    [16.0, 14.0, 3.6, '#E4003B'],
-    [18.8, 13.7, 3.4, '#FAA61A'],
-    [24.4, 11.2, 2.8, '#0087DC'],
-  ];
-  return (
-    <svg width={size} height={size} viewBox="0 0 32 32" className="shrink-0" aria-hidden="true">
-      <defs>
-        <clipPath id="usa-logo-clip"><circle cx="16" cy="16" r="14" /></clipPath>
-        <radialGradient id="usa-logo-shine" cx="32%" cy="24%" r="52%">
-          <stop offset="0%"   stopColor="white" stopOpacity="0.80" />
-          <stop offset="45%"  stopColor="white" stopOpacity="0.12" />
-          <stop offset="100%" stopColor="white" stopOpacity="0"    />
-        </radialGradient>
-        <radialGradient id="usa-logo-depth" cx="70%" cy="72%" r="55%">
-          <stop offset="0%"   stopColor="rgba(20,60,120,0.18)" />
-          <stop offset="100%" stopColor="rgba(20,60,120,0)"    />
-        </radialGradient>
-      </defs>
-      <circle cx="16" cy="16" r="14" fill="rgba(180,215,255,0.09)" clipPath="url(#usa-logo-clip)" />
-      <g clipPath="url(#usa-logo-clip)" fill="none" strokeLinecap="round">
-        {lats.map(([y, rx, ry, color]) => (
-          <path key={`bk-${y}`} d={`M${16-rx} ${y} A${rx} ${ry} 0 0 0 ${16+rx} ${y}`}
-            stroke={color} strokeWidth="1.05" strokeOpacity="0.42" strokeDasharray="2 2" />
-        ))}
-      </g>
-      <g clipPath="url(#usa-logo-clip)" fill="none" strokeLinecap="round"
-         stroke="rgba(80,140,210,0.22)" strokeWidth="0.6" strokeDasharray="2 2">
-        <ellipse cx="16" cy="16" rx="8" ry="14" />
-        <ellipse cx="16" cy="16" rx="4" ry="14" />
-      </g>
-      <g clipPath="url(#usa-logo-clip)" fill="none" strokeLinecap="round">
-        {lats.map(([y, rx, ry, color]) => (
-          <path key={`ft-${y}`} d={`M${16-rx} ${y} A${rx} ${ry} 0 0 1 ${16+rx} ${y}`}
-            stroke={color} strokeWidth="1.30" strokeOpacity="0.90" />
-        ))}
-      </g>
-      <g clipPath="url(#usa-logo-clip)" fill="none" stroke="rgba(80,140,210,0.32)" strokeLinecap="round">
-        <line x1="16" y1="2" x2="16" y2="30" strokeWidth="0.70" />
-        <ellipse cx="16" cy="16" rx="8" ry="14" strokeWidth="0.65" />
-        <ellipse cx="16" cy="16" rx="4" ry="14" strokeWidth="0.55" />
-      </g>
-      <circle cx="16" cy="16" r="14" fill="url(#usa-logo-depth)" />
-      <circle cx="16" cy="16" r="14" fill="url(#usa-logo-shine)" />
-      <circle cx="16" cy="16" r="14" fill="none" stroke="rgba(140,195,255,0.55)" strokeWidth="1.1" />
-      <circle cx="16" cy="16" r="13.4" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="0.5" />
-    </svg>
-  );
 }
 
 // ── Geometry helpers ──────────────────────────────────────────────────────────
@@ -2453,17 +2400,13 @@ export default function USAApp() {
   const selectedName = selectedFips ? STATE_NAMES[selectedFips] ?? selectedFips : null;
 
   return (
-    <div className="flex flex-col h-screen bg-canvas overflow-hidden">
+    <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="us">
 
       {/* ── Topbar ─────────────────────────────────────────────────────── */}
       <header className={`h-[52px] ${dark ? 'bg-[rgba(7,13,28,0.94)]' : 'bg-[rgba(245,244,240,0.92)]'} backdrop-blur-xl border-b border-default shadow-header shrink-0 flex items-center z-50`}>
 
         <button onClick={() => navigate('/')} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer shrink-0 pl-4" title="Home">
           <GlobeLogo />
-          <div className="hidden sm:flex flex-col justify-center mr-2 leading-none">
-            <span className="font-display font-black uppercase tracking-[0.04em] text-[14px] text-ink leading-none">Global Election Simulator</span>
-            <span className="text-[7.5px] font-mono uppercase tracking-[0.13em] text-ink-3 leading-none mt-[3px]">White House Edition</span>
-          </div>
         </button>
 
         <div ref={headerScrollRef} className="flex-1 min-w-0 header-scroll-strip flex items-center gap-2 px-2">

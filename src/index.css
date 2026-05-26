@@ -8,12 +8,101 @@
   100% { box-shadow: 0 0 0 0 rgba(239,68,68,0); }
 }
 
+/* ── Brazil R2 button gold marching border ──────────────────────────── */
+@keyframes goldMarch {
+  0%   { box-shadow: 0 0 0 2px #D4A017, 0 0 8px 2px rgba(212,160,23,0.35); }
+  50%  { box-shadow: 0 0 0 2.5px #FFD700, 0 0 14px 4px rgba(255,215,0,0.65); }
+  100% { box-shadow: 0 0 0 2px #D4A017, 0 0 8px 2px rgba(212,160,23,0.35); }
+}
+.br-r2-cta {
+  animation: goldMarch 1.4s ease-in-out infinite !important;
+  position: relative;
+}
+
+/* ── Brazil party slider (5px track, party-colored thumb) ───────────── */
+.br-party-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 5px;
+  background: transparent;
+  width: 100%;
+  cursor: pointer;
+  outline: none;
+}
+.br-party-slider::-webkit-slider-runnable-track {
+  height: 5px;
+  border-radius: 3px;
+  background: linear-gradient(
+    to right,
+    var(--party-color, #7a7870) 0%,
+    var(--party-color, #7a7870) var(--pct, 0%),
+    #e5e1d8 var(--pct, 0%),
+    #e5e1d8 100%
+  );
+}
+.br-party-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5.5px;
+  height: 16px;
+  width: 16px;
+  border-radius: 50%;
+  background: var(--party-color, #7a7870);
+  border: 2.5px solid #ffffff;
+  box-shadow: 0 1px 5px rgba(0,0,0,0.28);
+  cursor: grab;
+  transition: transform 80ms ease-out, box-shadow 80ms ease-out;
+}
+.br-party-slider:hover::-webkit-slider-thumb {
+  transform: scale(1.18);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.32);
+}
+.br-party-slider:active::-webkit-slider-thumb { cursor: grabbing; }
+.br-party-slider::-moz-range-track {
+  height: 5px;
+  border-radius: 3px;
+  background: #e5e1d8;
+}
+.br-party-slider::-moz-range-progress {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--party-color, #7a7870);
+}
+.br-party-slider::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 50%;
+  border: 2.5px solid #ffffff;
+  background: var(--party-color, #7a7870);
+  box-shadow: 0 1px 4px rgba(0,0,0,0.24);
+  cursor: grab;
+}
+.br-party-slider:disabled { opacity: 0.28; cursor: not-allowed; }
+.br-party-slider:disabled::-webkit-slider-thumb { cursor: not-allowed; }
+html.dark .br-party-slider::-webkit-slider-runnable-track {
+  background: linear-gradient(
+    to right,
+    var(--party-color, #5a7494) 0%,
+    var(--party-color, #5a7494) var(--pct, 0%),
+    rgba(90,148,220,0.14) var(--pct, 0%),
+    rgba(90,148,220,0.14) 100%
+  );
+}
+html.dark .br-party-slider::-webkit-slider-thumb { border-color: #1c2840; }
+html.dark .br-party-slider::-moz-range-track { background: rgba(90,148,220,0.14); }
+
 @layer base {
   html, body, #root {
     height: 100%;
   }
   body {
-    background: #f5f4f0;
+    background-color: #edeae4;
+    background-image:
+      radial-gradient(ellipse 72% 62% at -2% -2%,  rgba(255,252,244,0.96) 0%, transparent 65%),
+      radial-gradient(ellipse 55% 50% at 102%  4%,  rgba(218,220,230,0.70) 0%, transparent 62%),
+      radial-gradient(ellipse 55% 45% at 50%  102%, rgba(250,246,238,0.82) 0%, transparent 65%),
+      radial-gradient(ellipse 42% 36% at 98%   98%, rgba(224,220,238,0.48) 0%, transparent 60%);
+    background-attachment: fixed;
     color: #1a1a1a;
     font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
@@ -203,13 +292,135 @@ html.dark .country-card:hover {
 html.dark .ca-party-slider::-webkit-slider-runnable-track {
   background: linear-gradient(
     to right,
-    var(--party-color, #55708a) 0%,
-    var(--party-color, #55708a) var(--pct, 0%),
-    rgba(80,140,220,0.13) var(--pct, 0%),
-    rgba(80,140,220,0.13) 100%
+    var(--party-color, #5a7494) 0%,
+    var(--party-color, #5a7494) var(--pct, 0%),
+    rgba(90,148,220,0.14) var(--pct, 0%),
+    rgba(90,148,220,0.14) 100%
   );
 }
-html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13); }
+html.dark .ca-party-slider::-moz-range-track { background: rgba(90,148,220,0.14); }
+
+/* ── Dark mode body background ───────────────────────────────────────── */
+html.dark body {
+  background-color: #07101e;
+  background-image: none;
+  background-attachment: fixed;
+  color: #dde5f5;
+}
+
+/* ── Donate button gradient ───────────────────────────────────────────── */
+@keyframes donateCycle {
+  0%   { background-position: 0%   50%; }
+  100% { background-position: 200% 50%; }
+}
+
+/* ── Hero animations ─────────────────────────────────────────────────── */
+@keyframes heroFloat {
+  0%, 100% { transform: translateY(0px);  }
+  50%       { transform: translateY(-8px); }
+}
+.hero-float { animation: heroFloat 4s ease-in-out infinite; }
+
+@keyframes heroPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.85; transform: scale(0.96); }
+}
+
+@keyframes gradientShift {
+  0%   { background-position: 0%   50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0%   50%; }
+}
+.hero-gradient-text {
+  background: linear-gradient(135deg, #c8a020 0%, #f0cc60 28%, #c8a020 52%, #9a7a18 72%, #e8b840 100%);
+  background-size: 300% 300%;
+  animation: gradientShift 5s ease infinite;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── World map picker ────────────────────────────────────────────────── */
+@keyframes mapPickerIn {
+  from { opacity: 0; transform: scale(0.96) translateY(14px); }
+  to   { opacity: 1; transform: scale(1)    translateY(0); }
+}
+.map-picker-enter { animation: mapPickerIn 0.38s cubic-bezier(0.22,1,0.36,1) both; }
+
+/* Flag marker icons on world map */
+.flag-marker-icon {
+  background: none !important;
+  border:     none !important;
+  box-shadow: none !important;
+}
+.flag-marker-inner {
+  width: 42px; height: 42px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.97);
+  border: 2.5px solid rgba(0,0,0,0.09);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; line-height: 1;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.24), 0 1px 5px rgba(0,0,0,0.12);
+  transition: transform 0.18s cubic-bezier(0.34,1.56,0.64,1), box-shadow 0.18s ease, border-color 0.15s ease;
+  cursor: pointer;
+}
+.flag-marker-inner:hover {
+  transform: scale(1.22) translateY(-3px);
+  box-shadow: 0 12px 32px rgba(200,160,32,0.44), 0 4px 12px rgba(0,0,0,0.20);
+  border-color: #c8a020;
+}
+html.dark .flag-marker-inner {
+  background: rgba(15,30,65,0.97);
+  border-color: rgba(80,120,210,0.28);
+  box-shadow: 0 4px 16px rgba(0,0,0,0.55), 0 1px 5px rgba(0,0,0,0.30);
+}
+html.dark .flag-marker-inner:hover {
+  border-color: #c8a020;
+  box-shadow: 0 12px 32px rgba(200,160,32,0.38), 0 4px 12px rgba(0,0,0,0.50);
+}
+
+/* World-map Leaflet tooltip — shared */
+.leaflet-tooltip.wm-tooltip {
+  border-radius: 10px !important;
+  padding: 8px 12px !important;
+  font-family: 'Plus Jakarta Sans', ui-sans-serif, sans-serif !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  white-space: nowrap;
+}
+/* dark mode tooltip */
+.leaflet-tooltip.wm-tooltip-dark {
+  background: rgba(8,16,44,0.97) !important;
+  border: 1px solid rgba(255,255,255,0.11) !important;
+  color: #e8eef8 !important;
+  box-shadow: 0 6px 22px rgba(0,0,0,0.48) !important;
+}
+.leaflet-tooltip.wm-tooltip-dark::before { border-top-color: rgba(8,16,44,0.97) !important; }
+/* light mode tooltip */
+.leaflet-tooltip.wm-tooltip-light {
+  background: rgba(255,255,255,0.98) !important;
+  border: 1px solid rgba(0,0,0,0.10) !important;
+  color: #111111 !important;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.13) !important;
+}
+.leaflet-tooltip.wm-tooltip-light::before { border-top-color: rgba(255,255,255,0.98) !important; }
+
+/* ── Homepage card dark mode ─────────────────────────────────────────── */
+html.dark .hp-card {
+  background: rgba(14,26,54,0.96);
+  border-color: rgba(255,255,255,0.07);
+}
+html.dark .hp-card:hover {
+  border-color: rgba(100,145,230,0.28) !important;
+  box-shadow: 0 14px 50px rgba(30,70,180,0.22), 0 4px 14px rgba(0,0,0,0.45) !important;
+}
+html.dark .hp-card-body { background: rgba(14,26,54,0.96); }
+html.dark .hp-card-title { color: #dde5f8; }
+html.dark .hp-card-sub   { color: rgba(160,185,240,0.52); }
+html.dark .hp-card-divider { background: rgba(255,255,255,0.07); }
+.hp-card-title { color: #1a1a1a; }
+.hp-card-sub   { color: rgba(0,0,0,0.42); }
+.hp-card-divider { background: rgba(0,0,0,0.08); }
 
 /* ── Eyebrow / section label ─────────────────────────────────────────── */
 .eyebrow {
@@ -279,11 +490,40 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
   html.dark .header-scroll-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.22); }
 }
 
+/* ── Brand title — flowing political party color gradient ─────────────── */
+@keyframes partyFade {
+  0%   { filter: hue-rotate(0deg)   saturate(1.1) brightness(1.08); }
+  100% { filter: hue-rotate(360deg) saturate(1.1) brightness(1.08); }
+}
+
+.brand-title {
+  background: linear-gradient(100deg,
+    #E4003B 0%, #FF7900 20%, #FAA61A 38%, #02A95B 56%, #12B6CF 74%, #0087DC 88%, #5C2D91 100%
+  );
+  background-size: 100% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: partyFade 7s linear infinite;
+}
+
+html.dark .brand-title {
+  filter: hue-rotate(0deg) brightness(1.25) saturate(1.2);
+  animation: partyFadeDark 7s linear infinite;
+}
+
+@keyframes partyFadeDark {
+  0%   { filter: hue-rotate(0deg)   brightness(1.25) saturate(1.2); }
+  100% { filter: hue-rotate(360deg) brightness(1.25) saturate(1.2); }
+}
+
+
 /* ── Leaflet overrides ───────────────────────────────────────────────── */
-.leaflet-container { background: #f0eeea; font-family: inherit; }
+.leaflet-container { background: #e8e3d8; font-family: inherit; }
 .leaflet-control-attribution {
   font-size: 9px !important;
-  background: rgba(245,244,240,0.80) !important;
+  background: rgba(242,237,228,0.88) !important;
   color: #7a7870 !important;
 }
 .leaflet-control-attribution a { color: #7a7870 !important; }
@@ -808,149 +1048,329 @@ html.dark .ca-party-slider::-moz-range-track { background: rgba(80,140,220,0.13)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════
-   Dark mode — metallic midnight-blue theme
+   Dark mode — comfortable deep-slate gloss theme
    Applied when <html class="dark"> is set.
-   Non-layered rules beat @layer utilities automatically (no !important needed
-   except where Leaflet's own !important rules must be overridden).
 ═══════════════════════════════════════════════════════════════════════ */
 
 html.dark {
   color-scheme: dark;
-  /* CSS variable overrides for cand-tile internals */
-  --muted:     #55708a;
-  --vh-border: rgba(80, 140, 220, 0.15);
-  --bar-track: rgba(80, 140, 220, 0.13);
+  --muted:     #5a7494;
+  --vh-border: rgba(90, 148, 220, 0.16);
+  --bar-track: rgba(90, 148, 220, 0.14);
 }
 
 html.dark body {
-  background: #080e1c;
-  color: #d8e8f5;
+  /*
+   * GLOSSY GLASS BACKGROUND — two-layer system:
+   *   1. Specular highlights  — small, very bright, like light spots on wet glass
+   *   2. Ambient color fields — large, soft washes of colored light behind the glass
+   * Colors are deliberately mixed/scattered so no corner repeats the previous layout.
+   */
+  background-color: #0b0f19;
+  background-image:
+    /* Soft spread color hints — no concentrated spots, just wide ambient washes */
+    radial-gradient(ellipse 68% 60% at  0%   8%,  rgba(79,  70, 229, 0.28) 0%, transparent 68%),
+    radial-gradient(ellipse 58% 52% at 102%  6%,  rgba(236,  72, 153, 0.22) 0%, transparent 64%),
+    radial-gradient(ellipse 48% 58% at  -2% 68%,  rgba(59,  130, 246, 0.24) 0%, transparent 62%),
+    radial-gradient(ellipse 62% 54% at 100% 92%,  rgba(6,   182, 212, 0.26) 0%, transparent 62%),
+    radial-gradient(ellipse 50% 44% at  16% 100%, rgba(147,  51, 234, 0.20) 0%, transparent 60%),
+    radial-gradient(ellipse 38% 34% at  85%  55%,  rgba(16,  185, 129, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 45% 40% at  52%  40%,  rgba(245, 158,  11, 0.08) 0%, transparent 65%);
+  background-attachment: fixed;
+  color: #dce9f8;
 }
 
-/* ── Backgrounds ─────────────────────────────────────────────────── */
-html.dark .bg-canvas   { background-color: #080e1c; }
+/* ── Per-page flag-colour ambient tints (CSS :has — modern browsers) ────
+   Each country overrides the body gradient with soft washes drawn from
+   its flag palette. Two layers only: large ellipses, low opacity so they
+   dissolve into the #0b0f19 base without any visible "spots".
+   ──────────────────────────────────────────────────────────────────────── */
 
+/* Australia 🇦🇺 — Union Blue + Crimson */
+html.dark:has([data-country="au"]) body {
+  background-image:
+    radial-gradient(ellipse 75% 65% at -5%   5%,  rgba(0,  51, 153, 0.22) 0%, transparent 70%),
+    radial-gradient(ellipse 62% 55% at 105% 98%,  rgba(0,  51, 153, 0.18) 0%, transparent 68%),
+    radial-gradient(ellipse 58% 50% at 106%  2%,  rgba(204, 34,  34, 0.18) 0%, transparent 66%),
+    radial-gradient(ellipse 50% 44% at  -4% 100%, rgba(204, 34,  34, 0.14) 0%, transparent 65%);
+}
+
+/* Germany 🇩🇪 — Crimson + Gold */
+html.dark:has([data-country="de"]) body {
+  background-image:
+    radial-gradient(ellipse 72% 60% at -4%   8%,  rgba(221,  0,   0, 0.20) 0%, transparent 68%),
+    radial-gradient(ellipse 62% 54% at 106% 94%,  rgba(221,  0,   0, 0.16) 0%, transparent 66%),
+    radial-gradient(ellipse 58% 50% at 106%  2%,  rgba(255, 200,   0, 0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 52% 46% at  -4% 98%,  rgba(255, 200,   0, 0.15) 0%, transparent 65%);
+}
+
+/* France 🇫🇷 — Royal Blue + Crimson */
+html.dark:has([data-country="fr"]) body {
+  background-image:
+    radial-gradient(ellipse 68% 60% at -5%   5%,  rgba(0,  35, 149, 0.24) 0%, transparent 68%),
+    radial-gradient(ellipse 55% 50% at -3%  98%,  rgba(0,  35, 149, 0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 62% 54% at 107%  4%,  rgba(237, 41,  57, 0.20) 0%, transparent 66%),
+    radial-gradient(ellipse 54% 46% at 104% 100%, rgba(237, 41,  57, 0.16) 0%, transparent 65%);
+}
+
+/* Italy 🇮🇹 — Emerald + Crimson */
+html.dark:has([data-country="it"]) body {
+  background-image:
+    radial-gradient(ellipse 68% 62% at -5%   5%,  rgba(0,  146,  70, 0.24) 0%, transparent 68%),
+    radial-gradient(ellipse 54% 50% at -3%  98%,  rgba(0,  146,  70, 0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 62% 54% at 107%  4%,  rgba(206,  43,  55, 0.20) 0%, transparent 66%),
+    radial-gradient(ellipse 54% 46% at 105% 98%,  rgba(206,  43,  55, 0.16) 0%, transparent 65%);
+}
+
+/* Netherlands 🇳🇱 — Red top / Blue bottom / Dutch Orange accent */
+html.dark:has([data-country="nl"]) body {
+  background-image:
+    radial-gradient(ellipse 72% 52% at 50%  -5%,  rgba(174,  28,  40, 0.22) 0%, transparent 68%),
+    radial-gradient(ellipse 68% 52% at 50% 107%,  rgba(33,   70, 139, 0.22) 0%, transparent 68%),
+    radial-gradient(ellipse 44% 40% at 107%  50%,  rgba(255, 121,   0, 0.16) 0%, transparent 62%),
+    radial-gradient(ellipse 38% 36% at  -4%  50%,  rgba(174,  28,  40, 0.14) 0%, transparent 62%);
+}
+
+/* USA 🇺🇸 — Old Glory Blue + Old Glory Red */
+html.dark:has([data-country="us"]) body {
+  background-image:
+    radial-gradient(ellipse 70% 60% at -5%   5%,  rgba(60,  59, 110, 0.26) 0%, transparent 68%),
+    radial-gradient(ellipse 56% 50% at -3%  97%,  rgba(60,  59, 110, 0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 62% 54% at 107%  4%,  rgba(178,  34,  52, 0.20) 0%, transparent 66%),
+    radial-gradient(ellipse 54% 46% at 105% 99%,  rgba(178,  34,  52, 0.16) 0%, transparent 65%);
+}
+
+/* Romania 🇷🇴 — Blue left / Gold center / Red right */
+html.dark:has([data-country="ro"]) body {
+  background-image:
+    radial-gradient(ellipse 60% 60% at -5%  50%,  rgba(0,   43, 127, 0.24) 0%, transparent 65%),
+    radial-gradient(ellipse 52% 48% at 50%  -5%,  rgba(252, 209,  22, 0.18) 0%, transparent 65%),
+    radial-gradient(ellipse 52% 48% at 50% 107%,  rgba(252, 209,  22, 0.14) 0%, transparent 65%),
+    radial-gradient(ellipse 60% 60% at 107%  50%,  rgba(206,  17,  38, 0.22) 0%, transparent 65%);
+}
+
+/* South Africa 🇿🇦 — Green + Gold + Red + Blue */
+html.dark:has([data-country="za"]) body {
+  background-image:
+    radial-gradient(ellipse 65% 56% at -5%  50%,  rgba(0,  122,  77, 0.22) 0%, transparent 65%),
+    radial-gradient(ellipse 55% 48% at 50%  -5%,  rgba(255, 182,  18, 0.18) 0%, transparent 62%),
+    radial-gradient(ellipse 60% 54% at 107%  5%,  rgba(222,  56,  49, 0.20) 0%, transparent 65%),
+    radial-gradient(ellipse 56% 50% at 106% 97%,  rgba(0,   35, 149, 0.18) 0%, transparent 62%),
+    radial-gradient(ellipse 42% 36% at 50% 107%,  rgba(255, 182,  18, 0.12) 0%, transparent 60%);
+}
+
+/* Taiwan 🇹🇼 — Crimson field + Navy canton */
+html.dark:has([data-country="tw"]) body {
+  background-image:
+    radial-gradient(ellipse 78% 65% at 50%  50%,  rgba(254,   0,   0, 0.16) 0%, transparent 72%),
+    radial-gradient(ellipse 62% 58% at -5%  -5%,  rgba(0,    0, 149, 0.26) 0%, transparent 65%),
+    radial-gradient(ellipse 56% 50% at 107% 100%, rgba(254,   0,   0, 0.16) 0%, transparent 65%),
+    radial-gradient(ellipse 46% 40% at 50% 107%,  rgba(254,   0,   0, 0.12) 0%, transparent 62%);
+}
+
+/* Brazil 🇧🇷 — Emerald + Gold + Blue circle */
+html.dark:has([data-country="br"]) body {
+  background-image:
+    radial-gradient(ellipse 72% 62% at -4%   4%,  rgba(0,  156,  59, 0.24) 0%, transparent 68%),
+    radial-gradient(ellipse 62% 54% at 106% 98%,  rgba(0,  156,  59, 0.18) 0%, transparent 66%),
+    radial-gradient(ellipse 50% 45% at 50%  50%,  rgba(255, 223,   0, 0.14) 0%, transparent 65%),
+    radial-gradient(ellipse 38% 34% at 50%  50%,  rgba(0,   39, 118, 0.20) 0%, transparent 58%),
+    radial-gradient(ellipse 52% 46% at 106%  4%,  rgba(0,  156,  59, 0.16) 0%, transparent 65%);
+}
+
+/* Canada 🇨🇦 — Maple Red flanking white centre */
+html.dark:has([data-country="ca"]) body {
+  background-image:
+    radial-gradient(ellipse 68% 60% at -5%   5%,  rgba(255,   0,   0, 0.20) 0%, transparent 68%),
+    radial-gradient(ellipse 62% 54% at 107%  4%,  rgba(255,   0,   0, 0.18) 0%, transparent 66%),
+    radial-gradient(ellipse 52% 46% at -4%  98%,  rgba(200,   0,   0, 0.14) 0%, transparent 65%),
+    radial-gradient(ellipse 50% 44% at 106% 98%,  rgba(200,   0,   0, 0.14) 0%, transparent 65%);
+}
+
+/* Home 🌍 — all flag colours blended, very soft */
+html.dark:has([data-country="home"]) body {
+  background-image:
+    radial-gradient(ellipse 68% 60% at  0%   8%,  rgba(79,  70, 229, 0.20) 0%, transparent 68%),
+    radial-gradient(ellipse 58% 52% at 102%  6%,  rgba(236,  72, 153, 0.16) 0%, transparent 64%),
+    radial-gradient(ellipse 48% 58% at -2%  68%,  rgba(59,  130, 246, 0.18) 0%, transparent 62%),
+    radial-gradient(ellipse 62% 54% at 100% 92%,  rgba(6,   182, 212, 0.18) 0%, transparent 62%),
+    radial-gradient(ellipse 50% 44% at 16%  100%, rgba(147,  51, 234, 0.16) 0%, transparent 60%),
+    radial-gradient(ellipse 38% 34% at 85%   55%, rgba(16,  185, 129, 0.14) 0%, transparent 60%),
+    radial-gradient(ellipse 42% 38% at 50%  102%, rgba(255, 200,   0, 0.12) 0%, transparent 60%),
+    radial-gradient(ellipse 44% 40% at 50%   40%, rgba(245, 158,  11, 0.08) 0%, transparent 65%);
+}
+
+/* ── Canvas — transparent so the body gradient shows everywhere ──── */
+html.dark .bg-canvas { background-color: transparent; }
+
+/* ── Panel / surface backgrounds — TRUE glassmorphism ───────────── */
+/*
+ * Semi-transparent so the colored body orbs bleed through.
+ * Backdrop blur smears those colors into a frosted-glass haze.
+ * Inset top highlight = the "lit rim" of the glass bubble.
+ */
 html.dark .bg-white,
 html.dark .bg-card,
-html.dark .bg-surface  { background-color: #0f1a2e; }
+html.dark .bg-surface {
+  background-color: rgba(18, 24, 48, 0.60);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  border-color: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
 
-html.dark .bg-surface2 { background-color: #0b1422; }
+html.dark .bg-surface2,
+html.dark .bg-muted-bg {
+  background-color: rgba(12, 17, 38, 0.70);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
 
-html.dark .bg-muted-bg { background-color: #0b1422; }
+/* Inline TSX dark panel colours — same glass treatment */
+html.dark .bg-\[\#0d1b2e\],
+html.dark .bg-\[\#0f1b2e\],
+html.dark .bg-\[\#0f1a2e\] {
+  background-color: rgba(18, 24, 48, 0.62);
+  backdrop-filter: blur(24px) saturate(160%);
+  -webkit-backdrop-filter: blur(24px) saturate(160%);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
 
-html.dark .bg-hover    { background-color: rgba(80,140,220,0.08); }
-html.dark .bg-active   { background-color: rgba(80,140,220,0.15); }
+html.dark .bg-hover  { background-color: rgba(90,148,220,0.09); }
+html.dark .bg-active { background-color: rgba(90,148,220,0.16); }
 
-/* Active button (bg-ink/8 in light) */
-html.dark .bg-ink\/8   { background-color: rgba(216,232,245,0.09); }
+html.dark .bg-ink\/8  { background-color: rgba(220,233,248,0.09); }
+html.dark .bg-ink\/60 { background-color: rgba(0,0,0,0.68); }
 
-/* Branding stamp — stays dark in dark mode */
-html.dark .bg-ink\/60  { background-color: rgba(0,0,0,0.68); }
+html.dark .bg-\[\#f8f7f4\] {
+  background-color: rgba(12, 17, 38, 0.70);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+}
 
-/* Arbitrary muted-bg used inside panels */
-html.dark .bg-\[\#f8f7f4\] { background-color: #0b1422; }
+/* ── Dark panel glass sheen ──────────────────────────────────────── */
+/* Top-lit frosted-glass highlight — bright edge fading to clear */
+html.dark .panel-slide,
+html.dark .panel-slide-left {
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.10) 0%,
+    rgba(255, 255, 255, 0.04) 8%,
+    rgba(255, 255, 255, 0.01) 22%,
+    transparent 45%
+  );
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.09);
+}
 
 /* ── Text ────────────────────────────────────────────────────────── */
-html.dark .text-ink   { color: #d8e8f5; }
-html.dark .text-ink-2 { color: #8aa2c0; }
-html.dark .text-ink-3 { color: #55708a; }
+html.dark .text-ink   { color: #dce9f8; }
+html.dark .text-ink-2 { color: #8daac6; }
+html.dark .text-ink-3 { color: #5a7494; }
 
 /* ── Borders ─────────────────────────────────────────────────────── */
-html.dark .border-default { border-color: rgba(80,140,220,0.15); }
-html.dark .border-subtle  { border-color: rgba(80,140,220,0.08); }
-html.dark .border-strong  { border-color: rgba(80,140,220,0.26); }
+html.dark .border-default { border-color: rgba(90,148,220,0.16); }
+html.dark .border-subtle  { border-color: rgba(90,148,220,0.09); }
+html.dark .border-strong  { border-color: rgba(90,148,220,0.28); }
 
 /* ── Hover utilities ─────────────────────────────────────────────── */
-html.dark .hover\:bg-hover:hover  { background-color: rgba(80,140,220,0.08); }
-html.dark .hover\:text-ink:hover  { color: #d8e8f5; }
+html.dark .hover\:bg-hover:hover { background-color: rgba(90,148,220,0.09); }
+html.dark .hover\:text-ink:hover { color: #dce9f8; }
 
 /* ── Tutorial note boxes ─────────────────────────────────────────── */
 html.dark .tutorial-note,
 html.dark .bg-amber-50  { background-color: rgba(255,190,50,0.07); }
+html.dark .tutorial-note { color: rgba(255, 215, 100, 0.90); border-color: rgba(255,190,50,0.25); }
 html.dark .border-amber-200 { border-color: rgba(255,190,50,0.20); }
 html.dark .text-amber-800   { color: #f5c842; }
 
 /* ── Candidate tiles ─────────────────────────────────────────────── */
 html.dark .cand-col,
 html.dark .cand-col-landscape {
-  background: #0f1a2e;
+  background: rgb(18, 24, 48);
+  border-color: rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 4px 16px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.09);
 }
 html.dark .cand-party-name,
-html.dark .ls-party-name,
-html.dark .ls-party-name { color: #8aa2c0; }
+html.dark .ls-party-name { color: #8daac6; }
 html.dark .cand-leader-select,
 html.dark .cand-leader-select:hover,
 html.dark .ls-leader,
-html.dark .ls-leader:hover { color: #55708a; }
+html.dark .ls-leader:hover { color: #5a7494; }
 html.dark .cand-leader-wrap:hover .cand-leader-select,
 html.dark .cand-leader-wrap:hover .leader-chevron,
 html.dark .ls-leader-wrap:hover .ls-leader,
-html.dark .ls-leader-wrap:hover .leader-chevron { color: #d8e8f5; }
+html.dark .ls-leader-wrap:hover .leader-chevron { color: #dce9f8; }
 
 /* ── NI group box ────────────────────────────────────────────────── */
 html.dark .ni-group {
-  border-color: rgba(80,140,220,0.20);
-  background: rgba(80,140,220,0.04);
+  border-color: rgba(255, 255, 255, 0.07);
+  background: rgba(18, 24, 48, 0.55);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
-html.dark .ni-group-label { color: #55708a; }
+html.dark .ni-group-label { color: #5a7494; }
 
-/* ── Party slider ────────────────────────────────────────────────── */
+/* ── Party sliders ───────────────────────────────────────────────── */
 html.dark .party-slider::-webkit-slider-runnable-track {
   background: linear-gradient(
     to right,
-    var(--party-color, #55708a) 0%,
-    var(--party-color, #55708a) var(--pct, 0%),
-    rgba(80,140,220,0.13) var(--pct, 0%),
-    rgba(80,140,220,0.13) 100%
+    var(--party-color, #5a7494) 0%,
+    var(--party-color, #5a7494) var(--pct, 0%),
+    rgba(90,148,220,0.14) var(--pct, 0%),
+    rgba(90,148,220,0.14) 100%
   );
 }
-html.dark .party-slider::-webkit-slider-thumb {
-  border-color: #0f1a2e;
-}
-html.dark .party-slider::-moz-range-track { background: rgba(80,140,220,0.13); }
+html.dark .party-slider::-webkit-slider-thumb { border-color: #1c2840; }
+html.dark .party-slider::-moz-range-track { background: rgba(90,148,220,0.14); }
 
 /* ── Thin scrollbar ──────────────────────────────────────────────── */
-html.dark .thin-scroll::-webkit-scrollbar-thumb { background: rgba(80,140,220,0.16); }
+html.dark .thin-scroll::-webkit-scrollbar-thumb { background: rgba(90,148,220,0.18); }
 
 /* ── Leaflet map ─────────────────────────────────────────────────── */
-html.dark .leaflet-container { background: #0b1422; }
+html.dark .leaflet-container { background: #0a0f1e; }
 html.dark .leaflet-control-attribution {
-  background: rgba(8,14,28,0.85) !important;
-  color: #55708a !important;
+  background: rgba(6,9,18,0.90) !important;
+  color: #5a7494 !important;
 }
-html.dark .leaflet-control-attribution a { color: #55708a !important; }
+html.dark .leaflet-control-attribution a { color: #5a7494 !important; }
 html.dark .leaflet-control-zoom {
-  border-color: rgba(80,140,220,0.18) !important;
+  border-color: rgba(90,148,220,0.20) !important;
 }
 html.dark .leaflet-control-zoom a {
-  background: #0f1a2e !important;
-  color: #8aa2c0 !important;
+  background: rgba(18, 24, 48, 0.75) !important;
+  color: #8daac6 !important;
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
 }
 html.dark .leaflet-control-zoom a:hover {
-  background: rgba(80,140,220,0.15) !important;
-  color: #d8e8f5 !important;
+  background: rgba(90,148,220,0.16) !important;
+  color: #dce9f8 !important;
 }
 
-/* ── Black-opacity utilities inverted for dark mode ─────────────────── */
+/* ── Black-opacity utilities inverted for dark mode ─────────────── */
 html.dark .bg-black\/8  { background-color: rgba(255,255,255,0.07); }
 html.dark .bg-black\/5  { background-color: rgba(255,255,255,0.05); }
 html.dark .bg-black\/30 { background-color: rgba(0,0,0,0.55); }
 
-/* ── Forum panel dark mode ───────────────────────────────────────────── */
+/* ── Forum panel dark mode ───────────────────────────────────────── */
 html.dark .forum-input {
-  background: rgba(80,140,220,0.07);
-  color: #d8e8f5;
+  background: rgba(90,148,220,0.08);
+  color: #dce9f8;
 }
-html.dark .forum-input::placeholder { color: rgba(85,112,138,0.6); }
+html.dark .forum-input::placeholder { color: rgba(90,116,148,0.6); }
 
-/* ── Map tooltip (dark-glass style, no overrides needed) ────────────── */
-
-/* Winner shimmer in dark mode uses a blue-tinted sheen */
+/* Winner shimmer — warm blue sheen in dark mode */
 html.dark .cand-col.is-winner::after {
   background: linear-gradient(
     105deg,
     transparent 30%,
-    rgba(120, 180, 255, 0.18) 50%,
+    rgba(120, 180, 255, 0.16) 50%,
     transparent 70%
   );
 }
