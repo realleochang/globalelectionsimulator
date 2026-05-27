@@ -12,24 +12,29 @@ type SaParty = { id: SaPartyId; name: string; fullName: string; color: string; s
 const SA_PARTIES: SaParty[] = [
   // Leaders current as of May 2026
   { id: 'ANC',  name: 'ANC',       fullName: 'African National Congress',          color: '#007A4D', seats2024: 159, leader: 'Cyril Ramaphosa',     wikiTitle: 'Cyril_Ramaphosa' },
-  { id: 'DA',   name: 'DA',        fullName: 'Democratic Alliance',                color: '#1565C0', seats2024:  87, leader: 'John Steenhuisen',    wikiTitle: 'John_Steenhuisen' },
+  // DA: Steenhuisen stepped down Feb 2026 → Geordin Hill-Lewis elected leader Apr 12 2026
+  { id: 'DA',   name: 'DA',        fullName: 'Democratic Alliance',                color: '#1565C0', seats2024:  87, leader: 'Geordin Hill-Lewis',  wikiTitle: 'Geordin_Hill-Lewis' },
   { id: 'MK',   name: 'MK',        fullName: 'uMkhonto we Sizwe Party',            color: '#B71C1C', seats2024:  58, leader: 'Jacob Zuma',          wikiTitle: 'Jacob_Zuma' },
   { id: 'EFF',  name: 'EFF',       fullName: 'Economic Freedom Fighters',          color: '#E53935', seats2024:  39, leader: 'Julius Malema',       wikiTitle: 'Julius_Malema' },
   { id: 'IFP',  name: 'IFP',       fullName: 'Inkatha Freedom Party',              color: '#6A1B9A', seats2024:  17, leader: 'Velenkosini Hlabisa', wikiTitle: 'Velenkosini_Hlabisa' },
   { id: 'PA',   name: 'PA',        fullName: 'Patriotic Alliance',                 color: '#E65100', seats2024:   9, leader: 'Gayton McKenzie',     wikiTitle: 'Gayton_McKenzie' },
-  // FF+: Pieter Groenewald became NA Speaker (Jun 2024) → Willy Lubbe is now federal chair
-  { id: 'FFP',  name: 'FF+',       fullName: 'Freedom Front Plus',                 color: '#FF8F00', seats2024:   6, leader: 'Willy Lubbe',         wikiTitle: undefined },
+  // FF+: Groenewald became NA Speaker (Jun 2024) → Corné Mulder elected leader Feb 22 2025
+  { id: 'FFP',  name: 'FF+',       fullName: 'Freedom Front Plus',                 color: '#FF8F00', seats2024:   6, leader: 'Corné Mulder',        wikiTitle: 'Corné_Mulder' },
   { id: 'ASA',  name: 'ActionSA',  fullName: 'ActionSA',                           color: '#00ACC1', seats2024:   6, leader: 'Herman Mashaba',      wikiTitle: 'Herman_Mashaba' },
   { id: 'UDM',  name: 'UDM',       fullName: 'United Democratic Movement',         color: '#558B2F', seats2024:   3, leader: 'Bantu Holomisa',      wikiTitle: 'Bantu_Holomisa' },
   { id: 'ACDP', name: 'ACDP',      fullName: 'African Christian Democratic Party', color: '#1A237E', seats2024:   3, leader: 'Kenneth Meshoe',      wikiTitle: 'Kenneth_Meshoe' },
   { id: 'RISE', name: 'Rise',      fullName: 'Rise Mzansi',                        color: '#00838F', seats2024:   2, leader: 'Songezo Zibi',        wikiTitle: 'Songezo_Zibi' },
-  { id: 'ATM',  name: 'ATM',       fullName: 'African Transformation Movement',    color: '#880E4F', seats2024:   2, leader: 'Vuyo Zungula',        wikiTitle: 'Vuyo_Zungula' },
-  { id: 'NCC',  name: 'NCC',       fullName: 'National Coloured Congress',         color: '#78909C', seats2024:   2, leader: 'Nic Koornhof',        wikiTitle: undefined },
+  // ATM: Zungula removed as party president Jun 2025 → Caesar Nongqunga (party founder) installed
+  { id: 'ATM',  name: 'ATM',       fullName: 'African Transformation Movement',    color: '#880E4F', seats2024:   2, leader: 'Caesar Nongqunga',    wikiTitle: undefined },
+  // NCC: Fadiel Adams is and has been the leader (Nic Koornhof had no NCC connection)
+  { id: 'NCC',  name: 'NCC',       fullName: 'National Coloured Congress',         color: '#78909C', seats2024:   2, leader: 'Fadiel Adams',        wikiTitle: 'Fadiel_Adams' },
   { id: 'AJ',   name: 'Al Jama-ah',fullName: 'Al Jama-ah',                         color: '#2E7D32', seats2024:   2, leader: 'Ganief Hendricks',    wikiTitle: 'Ganief_Hendricks' },
   { id: 'BOSA', name: 'BOSA',      fullName: 'Build One South Africa',             color: '#0288D1', seats2024:   2, leader: 'Mmusi Maimane',       wikiTitle: 'Mmusi_Maimane' },
   { id: 'GOOD', name: 'GOOD',      fullName: 'Good Party',                         color: '#43A047', seats2024:   1, leader: 'Patricia de Lille',   wikiTitle: 'Patricia_de_Lille' },
-  { id: 'PAC',  name: 'PAC',       fullName: 'Pan Africanist Congress',            color: '#9C27B0', seats2024:   1, leader: 'Narius Moloto',       wikiTitle: undefined },
-  { id: 'UAT',  name: 'UAT',       fullName: 'United Africans Transformation',     color: '#795548', seats2024:   1, leader: 'Mzwandile Maphanga',  wikiTitle: undefined },
+  // PAC: Narius Moloto's presidency declared invalid; Mzwanele Nyhontso confirmed & re-elected Dec 2025
+  { id: 'PAC',  name: 'PAC',       fullName: 'Pan Africanist Congress',            color: '#9C27B0', seats2024:   1, leader: 'Mzwanele Nyhontso',  wikiTitle: 'Mzwanele_Nyhontso' },
+  // UAT: Wonder Mahlatsi is the president and sole MP (Mzwandile Maphanga was incorrect)
+  { id: 'UAT',  name: 'UAT',       fullName: 'United Africans Transformation',     color: '#795548', seats2024:   1, leader: 'Wonder Mahlatsi',     wikiTitle: 'Wonder_Mahlatsi' },
 ];
 
 const SA_PARTY_MAP = Object.fromEntries(SA_PARTIES.map(p => [p.id, p])) as Record<SaPartyId, SaParty>;
