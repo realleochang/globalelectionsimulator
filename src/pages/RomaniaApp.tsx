@@ -1974,7 +1974,12 @@ export default function RomaniaApp() {
   const [refOpen,     setRefOpen]     = useState(false);
 
   // Draft inputs for sim panel — ISOLATED from natPcts so typing doesn't update the map
-  const [simDraftPcts, setSimDraftPcts] = useState<Record<RoPartyId, number>>(() => ({ ...natPcts }));
+  const [simDraftPcts,   setSimDraftPcts]   = useState<Record<RoPartyId, number>>(() => ({ ...natPcts }));
+  // Others is also a free-typed independent value — not auto-computed
+  const [simDraftOthers, setSimDraftOthers] = useState<number>(() => {
+    const s = RO_PARTIES.reduce((acc, p) => acc + (natPcts[p.id] ?? 0), 0);
+    return Math.max(0, parseFloat((100 - s).toFixed(1)));
+  });
 
   // Stable sort order: captured when sim panel opens, not reshuffled on every keystroke
   const [simSortOrder, setSimSortOrder] = useState<RoPartyId[]>(() =>
@@ -1985,6 +1990,8 @@ export default function RomaniaApp() {
     setSimSortOrder([...RO_PARTIES].sort((a, b) => (natPcts[b.id] ?? 0) - (natPcts[a.id] ?? 0)).map(p => p.id));
     // Re-seed draft from current map state each time the panel opens
     setSimDraftPcts({ ...natPcts });
+    const s = RO_PARTIES.reduce((acc, p) => acc + (natPcts[p.id] ?? 0), 0);
+    setSimDraftOthers(Math.max(0, parseFloat((100 - s).toFixed(1))));
     // Capture the reference snapshot
     setSimRefPcts({ ...natPcts });
     setSimRefLabel(
@@ -2216,8 +2223,10 @@ export default function RomaniaApp() {
               {/* ── Party input rows — each value is INDEPENDENT, no auto-redistribution ── */}
               {(() => {
                 const draftTrackedSum = RO_PARTIES.reduce((s, p) => s + (simDraftPcts[p.id] ?? 0), 0);
-                const draftOthers     = Math.max(0, 100 - draftTrackedSum);
-                const overflow        = draftTrackedSum > 100.05;
+                const grandTotal      = draftTrackedSum + simDraftOthers;
+                const overflow        = grandTotal > 100.05;
+                const underflow       = grandTotal < 99.95;
+                const totalInvalid    = overflow || underflow;
                 return (
                   <>
                     <div className="flex-1 overflow-y-auto px-3 py-3 thin-scroll space-y-2">
@@ -2281,8 +2290,8 @@ export default function RomaniaApp() {
                         );
                       })}
 
-                      {/* ── Others (read-only residual: 100 − tracked sum) ─── */}
-                      <div className={`rounded-lg px-2.5 py-2 ${dark ? 'bg-white/[0.02]' : 'bg-black/[0.015]'}`}>
+                      {/* ── Others — fully editable, independent of party inputs ─── */}
+                      <div className={`rounded-lg px-2.5 py-2 transition-colors ${dark ? 'bg-white/[0.04] hover:bg-white/[0.07]' : 'bg-black/[0.025] hover:bg-black/[0.05]'}`}>
                         <div className="flex items-center gap-1.5 mb-1.5">
                           <span className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
                           <span className="text-[10px] font-semibold text-ink-3 flex-1 leading-none">Others</span>
@@ -2291,13 +2300,24 @@ export default function RomaniaApp() {
                         <div className="flex items-center gap-2">
                           <span className="text-[8px] font-mono font-bold w-7 shrink-0 text-gray-400">OTH</span>
                           <div className="flex-1 h-2 rounded-full overflow-hidden bg-ink/8">
-                            <div style={{ width: `${Math.min(draftOthers / 55 * 100, 100)}%`, background: overflow ? '#ef4444' : '#9CA3AF', height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
+                            <div style={{ width: `${Math.min(simDraftOthers / 55 * 100, 100)}%`, background: '#9CA3AF', height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
                           </div>
-                          {/* Read-only display */}
-                          <div className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md"
-                            style={{ color: overflow ? '#ef4444' : '#9CA3AF', background: overflow ? 'rgba(239,68,68,0.08)' : 'rgba(156,163,175,0.08)', border: `1.5px solid ${overflow ? 'rgba(239,68,68,0.30)' : 'rgba(156,163,175,0.22)'}`, padding: '3px 4px' }}>
-                            {overflow ? '—' : draftOthers.toFixed(1)}
-                          </div>
+                          <input
+                            type="number" min={0} max={100} step={0.1}
+                            value={simDraftOthers.toFixed(1)}
+                            onChange={e => {
+                              const v = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                              setSimDraftOthers(v);
+                            }}
+                            onFocus={e => e.target.select()}
+                            className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none transition-colors"
+                            style={{
+                              color: '#9CA3AF',
+                              background: 'rgba(156,163,175,0.10)',
+                              border: '1.5px solid rgba(156,163,175,0.35)',
+                              padding: '3px 4px',
+                            }}
+                          />
                         </div>
                       </div>
                     </div>
@@ -2306,25 +2326,25 @@ export default function RomaniaApp() {
                     <div className={`mx-3 mb-2 px-3 py-2 rounded-lg border text-[9px] font-mono flex items-center justify-between gap-2 ${
                       overflow
                         ? 'border-red-500/30 bg-red-500/8 text-red-400'
-                        : draftTrackedSum < 99.9
+                        : underflow
                           ? 'border-amber-500/30 bg-amber-500/6 text-amber-500'
                           : 'border-emerald-500/30 bg-emerald-500/8 text-emerald-500'
                     }`}>
                       <span className="leading-tight">
                         {overflow
-                          ? `⚠ Exceeds 100% — reduce by ${(draftTrackedSum - 100).toFixed(1)}pp`
-                          : draftTrackedSum < 99.9
-                            ? `ℹ ${draftOthers.toFixed(1)}% goes to Others — total OK`
-                            : `✓ Fully allocated — ready to run`}
+                          ? `⚠ Over 100% — reduce by ${(grandTotal - 100).toFixed(1)}pp`
+                          : underflow
+                            ? `⚠ ${(100 - grandTotal).toFixed(1)}pp unaccounted — adjust values`
+                            : `✓ Adds up to 100% — ready to run`}
                       </span>
                       <span className="font-bold tabular-nums shrink-0">
-                        {draftTrackedSum.toFixed(1)}%
+                        {grandTotal.toFixed(1)}%
                       </span>
                     </div>
 
                     <div className="px-3.5 pb-3.5 pt-0 border-t border-default shrink-0 space-y-2 pt-2">
                       <button
-                        disabled={simRunning || overflow}
+                        disabled={simRunning || totalInvalid}
                         onClick={() => {
                           stopSim();
                           // Commit draft → natPcts so map updates when sim starts
