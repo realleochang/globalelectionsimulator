@@ -1617,11 +1617,11 @@ export default function SouthAfricaApp() {
   }, [dark]);
 
   // ── Election state ───────────────────────────────────────────────────────────
-  const [preset, setPreset]           = useState<'baseline' | 'polling2026' | 'blank' | 'custom'>('baseline');
+  const [preset, setPreset]           = useState<'baseline' | 'polling2026' | 'blank' | 'custom'>('polling2026');
   // natRegPcts  = Regional ballot (9 provinces, drives map colouring + 200 regional seats)
-  const [natPcts, setNatPcts]         = useState<Record<SaPartyId, number>>(() => ({ ...SA_VOTE_PCT_2024 }));
+  const [natPcts, setNatPcts]         = useState<Record<SaPartyId, number>>(() => ({ ...POLL_2026_PCTS }));
   // natListPcts = National Compensatory Ballot (200 list seats, edited via List Seats panel)
-  const [natListPcts, setNatListPcts] = useState<Record<SaPartyId, number>>(() => ({ ...SA_VOTE_PCT_2024 }));
+  const [natListPcts, setNatListPcts] = useState<Record<SaPartyId, number>>(() => ({ ...POLL_2026_PCTS }));
   // activeParties = which parties participate; inactive ones are forced to 0% and their votes redistribute
   const [activeParties, setActiveParties] = useState<Set<SaPartyId>>(() => new Set(SA_PARTIES.map(p => p.id)));
 
