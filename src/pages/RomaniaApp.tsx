@@ -62,7 +62,15 @@ const RO_PARTIES: RoParty[] = [
 ];
 
 const RO_PARTY_MAP = Object.fromEntries(RO_PARTIES.map(p => [p.id, p])) as Record<RoPartyId, RoParty>;
-const RO_CAMERA_SEATS    = 331;
+
+// ── Seat-count constants ───────────────────────────────────────────────────────
+// Romania's Camera Deputaților 2024: 331 total seats
+//   • 312 contested proportionally (308 county Hare-quota seats + 4 diaspora seats, all via two-stage PR)
+//   • 19 reserved for national minority organisations (1 seat each, bypasses the vote threshold)
+// Majority = floor(331/2)+1 = 166 (always calculated from the full 331-seat chamber)
+const RO_PROP_SEATS     = 312;   // proportional seats — parties compete for these (308 county + 4 diaspora)
+const RO_MINORITY_SEATS = 19;    // fixed minority seats — always present, not proportional
+const RO_CAMERA_SEATS   = RO_PROP_SEATS + RO_MINORITY_SEATS;  // 331 total
 const RO_CAMERA_MAJORITY = 166;
 const RO_THRESHOLD       = 5.0;
 
@@ -174,15 +182,55 @@ const RO_COUNTY_VALID_VOTES_2024: Record<RoCountyId, number> = {
 const RO_TOTAL_MAINLAND_VOTES = Object.values(RO_COUNTY_VALID_VOTES_2024).reduce((s, v) => s + v, 0);
 
 // ── Official Camera Deputaților seats per county (2024) ───────────────────────
-// Allocated by Hamilton/largest-remainder method from valid votes.
-// 42 counties sum to 327 mainland seats; 4 diaspora seats → 331 total.
+// Source: Romanian Electoral Authority (AEP) — constituency mandates, 2024 election.
+// 42 counties sum to 308 mainland seats; + 4 diaspora (Constituency 43) = 312 proportional.
+// Plus 19 minority reserved seats → 331 total Camera seats.
 // Diaspora seats fall into Stage 2 redistribution (not modelled county-by-county).
 const RO_COUNTY_CAMERA_SEATS: Partial<Record<RoCountyId, number>> = {
-  AB:  6, AR:  7, AG: 10, BC:  9, BH: 11, BN:  5, BT:  6, BR:  5, BV: 10,
-  B:  33, BZ:  7, CL:  4, CS:  4, CJ: 13, CT: 11, CV:  4, DB:  8, DJ: 11,
-  GL:  8, GR:  4, GJ:  6, HR:  6, HD:  7, IL:  3, IS: 12, IF:  9, MM:  7,
-  MH:  4, MS:  9, NT:  7, OT:  7, PH: 12, SJ:  4, SM:  5, SB:  7, SV: 10,
-  TR:  5, TM: 12, TL:  3, VL:  6, VS:  5, VN:  5,
+  //           Seats
+  AB:  5,  // Alba
+  AR:  7,  // Arad
+  AG:  9,  // Argeș
+  BC: 10,  // Bacău
+  BH:  9,  // Bihor
+  BN:  5,  // Bistrița-Năsăud
+  BT:  6,  // Botoșani
+  BR:  5,  // Brăila
+  BV:  9,  // Brașov
+  B:  29,  // Bucharest (Constituency 42)
+  BZ:  7,  // Buzău
+  CL:  4,  // Călărași
+  CS:  5,  // Caraș-Severin
+  CJ: 10,  // Cluj
+  CT: 11,  // Constanța
+  CV:  4,  // Covasna
+  DB:  7,  // Dâmbovița
+  DJ: 10,  // Dolj
+  GL:  9,  // Galați
+  GJ:  5,  // Gorj
+  GR:  4,  // Giurgiu
+  HD:  6,  // Hunedoara
+  HR:  5,  // Harghita
+  IF:  5,  // Ilfov
+  IL:  4,  // Ialomița
+  IS: 12,  // Iași
+  MH:  4,  // Mehedinți
+  MM:  7,  // Maramureș
+  MS:  8,  // Mureș
+  NT:  8,  // Neamț
+  OT:  6,  // Olt
+  PH: 11,  // Prahova
+  SB:  6,  // Sibiu
+  SJ:  4,  // Sălaj
+  SM:  5,  // Satu Mare
+  SV: 10,  // Suceava
+  TL:  4,  // Tulcea
+  TM: 10,  // Timiș
+  TR:  5,  // Teleorman
+  VL:  6,  // Vâlcea
+  VN:  5,  // Vrancea
+  VS:  7,  // Vaslui
+  // Total: 308 mainland seats
 };
 
 // ── 2024 county results — official percentages of all valid votes cast ────────
@@ -277,6 +325,36 @@ function calcCountyVotes(natPcts: Record<RoPartyId, number>, countyId: RoCountyI
   return raw;
 }
 
+// ── County Stage-1 seats (Hare quota floor, single county) ────────────────────
+// Used by the county breakdown panel to show per-party seat estimates per county.
+// Returns { partyId → Stage-1 seats } for all qualifying parties in that county.
+function calcCountySeatStage1(
+  countyId: RoCountyId,
+  countyVotes: Partial<Record<RoPartyId, number>>,
+  qualifying: Set<RoPartyId>,
+): Partial<Record<RoPartyId, number>> {
+  const countySeats = RO_COUNTY_CAMERA_SEATS[countyId] ?? 0;
+  const countyValidVotes = RO_COUNTY_VALID_VOTES_2024[countyId] ?? 0;
+  if (countySeats === 0 || countyValidVotes === 0) return {};
+
+  let qualSum = 0;
+  const partyVotes: Partial<Record<RoPartyId, number>> = {};
+  for (const id of qualifying) {
+    const v = Math.round((countyVotes[id] ?? 0) / 100 * countyValidVotes);
+    partyVotes[id] = v;
+    qualSum += v;
+  }
+  if (qualSum === 0) return {};
+
+  const quota = qualSum / countySeats;
+  const result: Partial<Record<RoPartyId, number>> = {};
+  for (const id of qualifying) {
+    const s = Math.floor((partyVotes[id] ?? 0) / quota);
+    if (s > 0) result[id] = s;
+  }
+  return result;
+}
+
 // ── Two-stage proportional seat allocation (Romania's real system) ────────────
 // Stage 0 – threshold: ≥5% nationally, OR ≥20% in ≥4 counties (alternative threshold for UDMR etc.)
 // Stage 1 – county Hare quota: floor(partyVotes / quota) seats per county; remainder votes accumulate nationally
@@ -284,7 +362,7 @@ function calcCountyVotes(natPcts: Record<RoPartyId, number>, countyId: RoCountyI
 function calcSeatsTwoStage(
   natPcts: Record<RoPartyId, number>,
   overrides?: Record<string, Record<RoPartyId, number>>,
-  totalSeats = RO_CAMERA_SEATS,
+  totalSeats = RO_PROP_SEATS,
   threshold = RO_THRESHOLD,
 ): Partial<Record<RoPartyId, number>> {
   // ── Stage 0: qualifying parties ────────────────────────────────────────────
@@ -1050,6 +1128,7 @@ function RoParliamentPanel({ cameraSeats, onClose, exiting, dark }: {
   onClose: () => void; exiting?: boolean; dark?: boolean;
 }) {
   const seatsMap = cameraSeats;
+  const MINORITY_COLOR = '#8B93A5';
 
   const seatColors: string[] = [];
   const legend: { id: RoPartyId; count: number; color: string }[] = [];
@@ -1059,7 +1138,9 @@ function RoParliamentPanel({ cameraSeats, onClose, exiting, dark }: {
     legend.push({ id, count: n, color });
     for (let i = 0; i < n; i++) seatColors.push(color);
   }
-  const totalSeats = seatColors.length;
+  // 18 minority seats are always present (reserved for national minority organisations)
+  for (let i = 0; i < RO_MINORITY_SEATS; i++) seatColors.push(MINORITY_COLOR);
+  const partySeatsTotal = seatColors.length - RO_MINORITY_SEATS;
 
   // ── Semicircle geometry ─────────────────────────────────────────────────────
   // Wide SVG for a proper congress-arch look
@@ -1095,14 +1176,15 @@ function RoParliamentPanel({ cameraSeats, onClose, exiting, dark }: {
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Chamber of Deputies</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{RO_CAMERA_SEATS} seats · majority {RO_CAMERA_MAJORITY} · 5% or alt threshold</div>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{RO_CAMERA_SEATS} seats · majority {RO_CAMERA_MAJORITY} · {RO_MINORITY_SEATS} minority reserved</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
       <div className="flex-1 overflow-y-auto thin-scroll">
-        {totalSeats === 0
-          ? <div className="flex items-center justify-center h-40 text-ink-3 text-[11px] font-mono px-4 text-center">Adjust sliders to allocate seats</div>
-          : <>
+        {partySeatsTotal === 0 && (
+          <div className="flex items-center justify-center h-10 text-ink-3 text-[10px] font-mono px-4 text-center">Adjust sliders to allocate party seats</div>
+        )}
+        <>
             {/* Hemicycle */}
             <div className="px-1 pt-3 pb-0">
               <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display:'block' }}>
@@ -1127,6 +1209,8 @@ function RoParliamentPanel({ cameraSeats, onClose, exiting, dark }: {
                   {RO_LR_ORDER.filter(id => (seatsMap[id] ?? 0) > 0).map(id => (
                     <div key={id} style={{ width:`${((seatsMap[id]??0)/RO_CAMERA_SEATS)*100}%`, background:partyColor(id), transition:'width 0.3s' }} />
                   ))}
+                  {/* 18 minority seats always occupy a fixed slice */}
+                  <div style={{ width:`${(RO_MINORITY_SEATS/RO_CAMERA_SEATS)*100}%`, background:MINORITY_COLOR, flexShrink:0 }} />
                 </div>
               </div>
               <div className="flex justify-between text-[7.5px] font-mono text-ink-3">
@@ -1145,10 +1229,15 @@ function RoParliamentPanel({ cameraSeats, onClose, exiting, dark }: {
                     <span className="text-[9.5px] font-mono font-bold text-ink">{count}</span>
                   </div>
                 ))}
+                {/* Minority orgs — always 18, reserved seats */}
+                <div className="flex items-center gap-1.5">
+                  <div style={{ width:9, height:9, borderRadius:2, background:MINORITY_COLOR, flexShrink:0 }} />
+                  <span className="text-[9.5px] font-mono text-ink-3 flex-1 truncate">Nat. Minorities</span>
+                  <span className="text-[9.5px] font-mono font-bold text-ink">{RO_MINORITY_SEATS}</span>
+                </div>
               </div>
             </div>
           </>
-        }
       </div>
     </aside>
   );
@@ -1176,7 +1265,7 @@ function RoCoalitionPanel({ cameraSeats, onClose, exiting, dark }: {
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Coalition Builder</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Chamber majority: {RO_CAMERA_MAJORITY} · {RO_CAMERA_SEATS} total</div>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Majority: {RO_CAMERA_MAJORITY} · {RO_PROP_SEATS} party + {RO_MINORITY_SEATS} minority</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
@@ -1569,6 +1658,16 @@ function RoCountyBreakdownPanel({ natPcts, countyOverrides, onClose, exiting, da
   const [sortBy, setSortBy] = useState<SortKey>('name');
   const [query, setQuery]   = useState('');
 
+  // Determine qualifying parties (threshold check) — same as calcSeatsTwoStage Stage 0
+  const qualifying = useMemo(() => {
+    const altQ = getAltThresholdQualifiers(natPcts, countyOverrides);
+    const q = new Set<RoPartyId>();
+    for (const p of RO_PARTIES) {
+      if ((natPcts[p.id] ?? 0) >= RO_THRESHOLD || altQ.has(p.id)) q.add(p.id);
+    }
+    return q;
+  }, [natPcts, countyOverrides]);
+
   const rows = useMemo(() => RO_COUNTIES.map(county => {
     const cv = countyOverrides?.[county.id] ?? calcCountyVotes(natPcts, county.id);
     const sorted = (Object.entries(cv) as [RoPartyId, number][])
@@ -1576,8 +1675,9 @@ function RoCountyBreakdownPanel({ natPcts, countyOverrides, onClose, exiting, da
     const winner    = sorted[0]?.[0] as RoPartyId | undefined;
     const winnerPct = sorted[0]?.[1] ?? 0;
     const seats     = RO_COUNTY_CAMERA_SEATS[county.id] ?? 0;
-    return { county, sorted, winner, winnerPct, seats };
-  }), [natPcts, countyOverrides]);
+    const stage1Seats = calcCountySeatStage1(county.id, cv, qualifying);
+    return { county, sorted, winner, winnerPct, seats, stage1Seats };
+  }), [natPcts, countyOverrides, qualifying]);
 
   const displayRows = useMemo(() => {
     const q = query.toLowerCase();
@@ -1644,36 +1744,62 @@ function RoCountyBreakdownPanel({ natPcts, countyOverrides, onClose, exiting, da
 
       {/* County rows */}
       <div className="flex-1 overflow-y-auto thin-scroll">
-        {displayRows.map(({ county, sorted, winner, seats }) => {
+        {displayRows.map(({ county, sorted, winner, seats, stage1Seats }) => {
           const wColor = winner ? partyColor(winner) : '#888';
           const top4 = sorted.slice(0, 4);
-          const top4Sum = top4.reduce((s, [, v]) => s + v, 0);
+          // Seat allocation bar: show stage-1 seats as blocks (each block = 1 seat)
+          const seatEntries = (Object.entries(stage1Seats) as [RoPartyId, number][])
+            .filter(([, n]) => n > 0)
+            .sort(([, a], [, b]) => b - a);
+          const stage1Total = seatEntries.reduce((s, [, n]) => s + n, 0);
+          const unallocated = seats - stage1Total; // seats not yet claimed in Stage 1
           return (
             <div key={county.id}
-              className={`px-3.5 py-2 border-b border-default hover:bg-hover transition-colors cursor-default`}
+              className={`px-3.5 py-2.5 border-b border-default hover:bg-hover transition-colors cursor-default`}
               style={{ borderLeftWidth: 3, borderLeftColor: wColor }}>
               {/* Row 1: code · name · seats badge */}
               <div className="flex items-center gap-1.5 mb-1">
                 <span className="text-[9px] font-mono font-bold w-6 shrink-0 tabular-nums" style={{ color: wColor }}>{county.id}</span>
                 <span className="text-[10px] font-semibold text-ink flex-1 truncate">{county.name}</span>
-                <span className="text-[8px] font-mono text-ink-3 shrink-0">{seats}✦</span>
+                <span className="text-[8px] font-mono text-ink-3 shrink-0">{seats} seats</span>
               </div>
-              {/* Row 2: stacked bar */}
-              <div className="h-2 rounded-full overflow-hidden flex mb-1" style={{ background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
-                {top4.map(([id, pct]) => (
-                  <div key={id} style={{ width: `${(pct / (top4Sum || 1)) * 100}%`, background: partyColor(id as RoPartyId), flexShrink: 0 }} />
-                ))}
+              {/* Row 2: vote-share bar (proportional to vote, NOT seats) */}
+              <div className="flex items-center gap-1 mb-1">
+                <span className="text-[7px] font-mono text-ink-3 w-7 shrink-0">votes</span>
+                <div className="flex-1 h-1.5 rounded-full overflow-hidden flex" style={{ background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                  {top4.map(([id, pct]) => {
+                    const total = top4.reduce((s, [, v]) => s + v, 0);
+                    return <div key={id} style={{ width: `${(pct / (total || 1)) * 100}%`, background: partyColor(id as RoPartyId), flexShrink: 0 }} />;
+                  })}
+                </div>
               </div>
-              {/* Row 3: top party labels */}
-              <div className="flex gap-2">
-                {top4.slice(0, 3).map(([id, pct]) => (
-                  <div key={id} className="flex items-center gap-0.5">
-                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: partyColor(id as RoPartyId) }} />
-                    <span className="text-[8px] font-mono" style={{ color: partyColor(id as RoPartyId) }}>
-                      {RO_PARTY_MAP[id as RoPartyId]?.name ?? id} {pct.toFixed(1)}%
-                    </span>
-                  </div>
-                ))}
+              {/* Row 3: seat-allocation bar (each pip = 1 Stage-1 seat) */}
+              <div className="flex items-center gap-1 mb-1">
+                <span className="text-[7px] font-mono text-ink-3 w-7 shrink-0">seats</span>
+                <div className="flex-1 flex gap-px">
+                  {seatEntries.map(([id, n]) =>
+                    Array.from({ length: n }, (_, i) => (
+                      <div key={`${id}-${i}`} style={{ flex: 1, height: 6, background: partyColor(id as RoPartyId), borderRadius: 1, maxWidth: 16 }} />
+                    ))
+                  )}
+                  {Array.from({ length: unallocated }, (_, i) => (
+                    <div key={`u-${i}`} style={{ flex: 1, height: 6, background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.10)', borderRadius: 1, maxWidth: 16 }} />
+                  ))}
+                </div>
+              </div>
+              {/* Row 4: top parties with vote % and seat count */}
+              <div className="flex flex-wrap gap-x-2.5 gap-y-0.5">
+                {top4.slice(0, 3).map(([id, pct]) => {
+                  const n = stage1Seats[id as RoPartyId] ?? 0;
+                  return (
+                    <div key={id} className="flex items-center gap-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: partyColor(id as RoPartyId) }} />
+                      <span className="text-[8px] font-mono" style={{ color: partyColor(id as RoPartyId) }}>
+                        {RO_PARTY_MAP[id as RoPartyId]?.name ?? id} {pct.toFixed(1)}%{n > 0 ? ` ·${n}✦` : ''}
+                      </span>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );

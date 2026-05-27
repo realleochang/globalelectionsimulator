@@ -111,8 +111,8 @@ export const COUNTRIES = [
     lat: 45, lng: 25,
     accent: 'linear-gradient(90deg,#002B7F,#FCD116,#CE1126)',
     parties: [
-      { color: '#CC0000', abbr: 'PSD'  }, { color: '#C8960C', abbr: 'AUR'  },
-      { color: '#F9A800', abbr: 'PNL'  }, { color: '#003DA5', abbr: 'USR'  },
+      { color: '#CC0000', abbr: 'PSD'  }, { color: '#003DA5', abbr: 'USR'  },
+      { color: '#F9A800', abbr: 'PNL'  }, { color: '#C8960C', abbr: 'AUR'  },
     ],
   },
   {
@@ -133,10 +133,10 @@ export const COUNTRIES = [
     electionType: 'General Election', subtitle: 'National Assembly',
     lat: -29, lng: 25,
     accent: 'linear-gradient(90deg,#007A4D,#FFB612,#003DA5)',
-    locked: true as const,
     parties: [
       { color: '#007A4D', abbr: 'ANC' }, { color: '#1565C0', abbr: 'DA'  },
       { color: '#B71C1C', abbr: 'MK'  }, { color: '#E53935', abbr: 'EFF' },
+      { color: '#6A1B9A', abbr: 'IFP' }, { color: '#1E88E5', abbr: 'PA'  },
     ],
   },
 ];
