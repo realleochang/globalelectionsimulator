@@ -139,6 +139,18 @@ const RO_COUNTY_VALID_VOTES_2024: Record<RoCountyId, number> = {
   VS: 135_275, VN: 133_444,
 };
 
+// ── Official Camera Deputaților seats per county (2024) ───────────────────────
+// Allocated by Hamilton/largest-remainder method from valid votes.
+// 42 counties sum to 327 mainland seats; 4 diaspora seats → 331 total.
+// Diaspora seats fall into Stage 2 redistribution (not modelled county-by-county).
+const RO_COUNTY_CAMERA_SEATS: Partial<Record<RoCountyId, number>> = {
+  AB:  6, AR:  7, AG: 10, BC:  9, BH: 11, BN:  5, BT:  6, BR:  5, BV: 10,
+  B:  33, BZ:  7, CL:  4, CS:  4, CJ: 13, CT: 11, CV:  4, DB:  8, DJ: 11,
+  GL:  8, GR:  4, GJ:  6, HR:  6, HD:  7, IL:  3, IS: 12, IF:  9, MM:  7,
+  MH:  4, MS:  9, NT:  7, OT:  7, PH: 12, SJ:  4, SM:  5, SB:  7, SV: 10,
+  TR:  5, TM: 12, TL:  3, VL:  6, VS:  5, VN:  5,
+};
+
 // ── 2024 county results — official percentages of all valid votes cast ────────
 // Source: rezultatevot.ro API, election ID 93, fetched May 2026
 // POT absent from GL/IL/MS — party did not field candidates in those counties
@@ -253,6 +265,86 @@ function calcCountyVotes(natPcts: Record<RoPartyId, number>, countyId: RoCountyI
   }
 
   return raw;
+}
+
+// ── Two-stage proportional seat allocation (Romania's real system) ────────────
+// Stage 0 – threshold: ≥5% nationally, OR ≥20% in ≥4 counties (alternative threshold for UDMR etc.)
+// Stage 1 – county Hare quota: floor(partyVotes / quota) seats per county; remainder votes accumulate nationally
+// Stage 2 – national D'Hondt: unallocated seats (= totalSeats − stage1Total) distributed by remainder votes
+function calcSeatsTwoStage(
+  natPcts: Record<RoPartyId, number>,
+  overrides?: Record<string, Record<RoPartyId, number>>,
+  totalSeats = RO_CAMERA_SEATS,
+  threshold = RO_THRESHOLD,
+): Partial<Record<RoPartyId, number>> {
+  // ── Stage 0: qualifying parties ────────────────────────────────────────────
+  const qualifying = new Set<RoPartyId>();
+  for (const [id, v] of Object.entries(natPcts) as [RoPartyId, number][]) {
+    if ((v ?? 0) >= threshold) qualifying.add(id);
+  }
+  // Alternative threshold: ≥20% in ≥4 counties (protects ethnic-minority parties like UDMR)
+  const countyOver20: Partial<Record<RoPartyId, number>> = {};
+  for (const countyId of Object.keys(RO_COUNTY_CAMERA_SEATS) as RoCountyId[]) {
+    const cv = overrides?.[countyId] ?? calcCountyVotes(natPcts, countyId);
+    for (const p of RO_PARTIES) {
+      if ((cv[p.id] ?? 0) >= 20) countyOver20[p.id] = (countyOver20[p.id] ?? 0) + 1;
+    }
+  }
+  for (const [id, cnt] of Object.entries(countyOver20) as [RoPartyId, number][]) {
+    if (cnt >= 4) qualifying.add(id);
+  }
+  if (qualifying.size === 0) return {};
+
+  // ── Stage 1: Hare quota per county (floor only — no largest-remainder here) ─
+  const seats: Partial<Record<RoPartyId, number>> = {};
+  const natRemVotes: Partial<Record<RoPartyId, number>> = {};
+  let stage1Total = 0;
+
+  for (const countyId of Object.keys(RO_COUNTY_CAMERA_SEATS) as RoCountyId[]) {
+    const countySeats = RO_COUNTY_CAMERA_SEATS[countyId] ?? 0;
+    const countyValidVotes = RO_COUNTY_VALID_VOTES_2024[countyId] ?? 0;
+    if (countySeats === 0 || countyValidVotes === 0) continue;
+
+    const cv = overrides?.[countyId] ?? calcCountyVotes(natPcts, countyId);
+
+    // Estimate qualifying-party raw votes in this county
+    const partyVotes: Partial<Record<RoPartyId, number>> = {};
+    let qualSum = 0;
+    for (const id of qualifying) {
+      const v = Math.round((cv[id] ?? 0) / 100 * countyValidVotes);
+      partyVotes[id] = v;
+      qualSum += v;
+    }
+    if (qualSum === 0) continue;
+
+    // Hare quota = total qualifying votes / county seats
+    const quota = qualSum / countySeats;
+
+    for (const id of qualifying) {
+      const v = partyVotes[id] ?? 0;
+      const floorSeats = Math.floor(v / quota);
+      seats[id] = (seats[id] ?? 0) + floorSeats;
+      stage1Total += floorSeats;
+      // Remainder votes bubble up to Stage 2
+      natRemVotes[id] = (natRemVotes[id] ?? 0) + (v - floorSeats * quota);
+    }
+  }
+
+  // ── Stage 2: D'Hondt on aggregated remainder votes (fills remaining seats) ──
+  // Remaining seats = total − stage1 allocated (includes the 4 diaspora seats + any county gaps)
+  const stage2Seats = totalSeats - stage1Total;
+  if (stage2Seats > 0) {
+    const quotients: { id: RoPartyId; q: number }[] = [];
+    for (const [id, v] of Object.entries(natRemVotes) as [RoPartyId, number][]) {
+      for (let d = 1; d <= stage2Seats; d++) quotients.push({ id, q: v / d });
+    }
+    quotients.sort((a, b) => b.q - a.q);
+    for (let i = 0; i < Math.min(stage2Seats, quotients.length); i++) {
+      seats[quotients[i].id] = (seats[quotients[i].id] ?? 0) + 1;
+    }
+  }
+
+  return seats;
 }
 
 type PartialSeatsResult = { camera: Partial<Record<RoPartyId, number>>; senate: Partial<Record<RoPartyId, number>> };
@@ -431,7 +523,7 @@ function RoScoreboard({ natPcts, simCameraSeats, isBaseline, totalVotesBase, dar
     return () => el.removeEventListener('wheel', handler);
   }, []);
 
-  const seats = useMemo(() => simCameraSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simCameraSeats, natPcts]);
+  const seats = useMemo(() => simCameraSeats ?? calcSeatsTwoStage(natPcts), [simCameraSeats, natPcts]);
 
   const sorted = useMemo(
     () => RO_PARTIES
@@ -1545,7 +1637,7 @@ export default function RomaniaApp() {
 
   const displayPcts = preset === 'blank' ? blankDisplayPcts : natPcts;
 
-  const cameraSeats = useMemo(() => simCameraSeats ?? calcSeats(displayPcts, RO_CAMERA_SEATS), [simCameraSeats, displayPcts]);
+  const cameraSeats = useMemo(() => simCameraSeats ?? calcSeatsTwoStage(displayPcts, countyOverrides), [simCameraSeats, displayPcts, countyOverrides]);
 
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
