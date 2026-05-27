@@ -1999,6 +1999,64 @@ export default function SouthAfricaApp() {
               declaredProvs={declaredProvs}
               overrides={provOverrides}
             />
+
+            {/* ── % Reporting widget — blank map + simulation modes only ── */}
+            {declaredProvs !== undefined && (() => {
+              const declared  = declaredProvs.size;
+              const total     = SA_PROVINCES.length;
+              const votePct   = SA_PROVINCES.reduce(
+                (s, p) => s + (declaredProvs.has(p.id) ? p.votes2024 : 0), 0
+              ) / SA_GRAND_TOTAL_VOTES * 100;
+              const barPct    = (declared / total) * 100;
+              const isDone    = declared === total;
+              const accentClr = isDone ? '#16a34a' : simRunning ? '#f59e0b' : '#3b82f6';
+              const bg        = dark ? 'rgba(13,27,46,0.93)' : 'rgba(255,255,255,0.95)';
+              const border    = dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.09)';
+              const titleClr  = dark ? 'rgba(255,255,255,0.42)' : 'rgba(0,0,0,0.38)';
+              const bigClr    = dark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.84)';
+              const subClr    = dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.46)';
+              const trackClr  = dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)';
+
+              return (
+                <div className="absolute bottom-8 left-3 z-[1000] pointer-events-none select-none"
+                  style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10,
+                    boxShadow: dark ? '0 4px 22px rgba(0,0,0,0.45)' : '0 4px 22px rgba(0,0,0,0.11)',
+                    backdropFilter: 'blur(10px)', padding: '10px 14px', minWidth: 172 }}>
+
+                  {/* Header label */}
+                  <div style={{ fontSize: 8, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700,
+                    letterSpacing: '0.12em', textTransform: 'uppercase', color: titleClr, marginBottom: 6,
+                    display: 'flex', alignItems: 'center', gap: 5 }}>
+                    {simRunning && (
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: accentClr,
+                        display: 'inline-block', animation: 'pulse 1.4s ease-in-out infinite' }} />
+                    )}
+                    {isDone ? 'Final Result' : simRunning ? 'Live Count' : 'Reporting'}
+                  </div>
+
+                  {/* X / 9 provinces */}
+                  <div style={{ display: 'flex', alignItems: 'baseline', gap: 5, marginBottom: 6 }}>
+                    <span style={{ fontSize: 26, fontFamily: '"JetBrains Mono",monospace', fontWeight: 900,
+                      color: bigClr, lineHeight: 1 }}>{declared}</span>
+                    <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', color: subClr }}>
+                      / {total} provinces
+                    </span>
+                  </div>
+
+                  {/* Progress bar */}
+                  <div style={{ width: '100%', height: 5, borderRadius: 3, background: trackClr,
+                    overflow: 'hidden', marginBottom: 5 }}>
+                    <div style={{ height: '100%', width: `${barPct}%`, background: accentClr,
+                      borderRadius: 3, transition: 'width 0.5s ease' }} />
+                  </div>
+
+                  {/* Vote % sub-label */}
+                  <div style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: subClr }}>
+                    {votePct.toFixed(1)}% of national vote
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* ── RIGHT PANELS (only one visible at a time, left-to-right priority) ── */}
