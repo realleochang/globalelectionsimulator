@@ -649,12 +649,15 @@ function RoScoreboard({ natPcts, simCameraSeats, isBaseline, totalVotesBase, dar
   const leader = sorted[0]?.id ?? null;
   const winner = leader && (seats[leader] ?? 0) >= RO_CAMERA_MAJORITY ? leader : null;
 
-  const votesBase     = totalVotesBase ?? RO_GRAND_TOTAL_VOTES;
-  const trackedPctSum = useMemo(() => RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0), [natPcts]);
-  const otherPct      = Math.max(0, 100 - trackedPctSum);
-  const otherRawVotes = isBaseline
+  const votesBase       = totalVotesBase ?? RO_GRAND_TOTAL_VOTES;
+  const trackedPctSum   = useMemo(() => RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0), [natPcts]);
+  const otherPct        = Math.max(0, 100 - trackedPctSum);
+  const otherRawVotes   = isBaseline
     ? RO_GRAND_TOTAL_VOTES - RO_PARTIES.reduce((s, p) => s + (RO_VOTE_RAW_2024[p.id] ?? 0), 0)
     : Math.round(otherPct / 100 * votesBase);
+  // Seats not allocated to tracked parties = minority reserved seats + any unallocated remainder
+  const trackedSeatSum  = useMemo(() => RO_PARTIES.reduce((s, p) => s + (seats[p.id] ?? 0), 0), [seats]);
+  const othersSeats     = RO_CAMERA_SEATS - trackedSeatSum;
 
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
@@ -674,34 +677,34 @@ function RoScoreboard({ natPcts, simCameraSeats, isBaseline, totalVotesBase, dar
                 isBaseline={isBaseline} />
             );
           })}
-          {/* Others tile — all non-tracked parties combined */}
-          {otherPct >= 0.05 && (
-            <div className="cand-col" style={{
-              '--cand-color': '#888888', '--cand-color-alpha': 'rgba(136,136,136,0.13)',
-              borderColor: 'rgba(136,136,136,0.22)', opacity: 0.65,
-            } as React.CSSProperties}>
-              <div style={{ position:'relative' }}>
-                <div className="cand-circle-frame" style={{ background:'rgba(136,136,136,0.12)', border:'1.5px solid rgba(136,136,136,0.25)' }}>
-                  <span className="cand-initials" style={{ color:'#888', fontSize:13 }}>···</span>
-                </div>
-              </div>
-              <span className="cand-leader-name" style={{ color:'#999' }}>Minor</span>
-              <span className="cand-party-abbrev" style={{ color:'#888' }}>Others</span>
-              <span className="cand-seats" style={{ color:'#999' }}>—</span>
-              <span className="cand-party-name" style={{ color:'#888' }}>All other parties (sub-threshold + untracked)</span>
-              <div style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:1 }}>
-                <span style={{ fontSize:6.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:600, color:'rgba(136,136,136,0.48)', letterSpacing:'0.10em', textTransform:'uppercase' }}>VOTES</span>
-                <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:'#888' }}>{otherPct.toFixed(1)}%</span>
-              </div>
-              <div style={{ width:'100%', textAlign:'right', marginBottom:3 }}>
-                <span className="cand-votes-full" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:'rgba(136,136,136,0.65)' }}>{otherRawVotes.toLocaleString()}</span>
-                <span className="cand-votes-compact" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:'rgba(136,136,136,0.65)' }}>{fmtN(otherRawVotes)}</span>
-              </div>
-              <div className="cand-bar-track" style={{ width:'100%', height:3, borderRadius:2, background:'var(--bar-track)' }}>
-                <div style={{ height:'100%', borderRadius:2, background:'#888', width:`${Math.min(otherPct/30*100,100)}%` }} />
+          {/* Others tile — minority reserved seats + untracked minor parties */}
+          <div className="cand-col" style={{
+            '--cand-color': '#8B93A5', '--cand-color-alpha': 'rgba(139,147,165,0.13)',
+            borderColor: 'rgba(139,147,165,0.28)', opacity: 0.75,
+          } as React.CSSProperties}>
+            <div style={{ position:'relative' }}>
+              <div className="cand-circle-frame" style={{ background:'rgba(139,147,165,0.12)', border:'1.5px solid rgba(139,147,165,0.28)' }}>
+                <span className="cand-initials" style={{ color:'#8B93A5', fontSize:11 }}>MN</span>
               </div>
             </div>
-          )}
+            <span className="cand-leader-name" style={{ color:'#8B93A5' }}>Reserved</span>
+            <span className="cand-party-abbrev" style={{ color:'#8B93A5' }}>Min+Oth</span>
+            <span className="cand-seats" style={{ color:'#8B93A5' }}>{othersSeats}</span>
+            <span className="cand-party-name" style={{ color:'#8B93A5' }}>
+              {RO_MINORITY_SEATS} minority reserved · minor parties
+            </span>
+            <div style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:1 }}>
+              <span style={{ fontSize:6.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:600, color:'rgba(139,147,165,0.48)', letterSpacing:'0.10em', textTransform:'uppercase' }}>VOTES</span>
+              <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:'#8B93A5' }}>{otherPct.toFixed(1)}%</span>
+            </div>
+            <div style={{ width:'100%', textAlign:'right', marginBottom:3 }}>
+              <span className="cand-votes-full" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:'rgba(139,147,165,0.60)' }}>{otherRawVotes.toLocaleString()}</span>
+              <span className="cand-votes-compact" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:'rgba(139,147,165,0.60)' }}>{fmtN(otherRawVotes)}</span>
+            </div>
+            <div className="cand-bar-track" style={{ width:'100%', height:3, borderRadius:2, background:'var(--bar-track)' }}>
+              <div style={{ height:'100%', borderRadius:2, background:'#8B93A5', width:`${Math.min(otherPct/30*100,100)}%` }} />
+            </div>
+          </div>
         </div>
       </div>
     </div>
