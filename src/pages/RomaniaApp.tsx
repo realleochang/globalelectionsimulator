@@ -16,18 +16,49 @@ type RoParty = {
   fullName: string;
   color: string;
   seats2024: number;
+  // Current (2026) leader + photo
   leader: string;
   wikiTitle?: string;
+  // Dec-2024 baseline leader + photo
+  leader2024: string;
+  wikiTitle2024?: string;
+  // Threshold category:
+  //   'standard'  → must clear 5% national hurdle
+  //   'regional'  → may also qualify via ≥20% in ≥4 counties (alt. threshold)
+  //   'minority'  → constitutionally reserved seat (bypasses threshold entirely)
+  thresholdType?: 'standard' | 'regional' | 'minority';
 };
 
 const RO_PARTIES: RoParty[] = [
-  { id: 'PSD',  name: 'PSD',  fullName: 'Social Democratic Party',                color: '#CC0000', seats2024: 86, leader: 'Marcel Ciolacu',  wikiTitle: 'Marcel_Ciolacu' },
-  { id: 'AUR',  name: 'AUR',  fullName: 'Alliance for the Union of Romanians',   color: '#C8960C', seats2024: 63, leader: 'George Simion',   wikiTitle: 'George_Simion' },
-  { id: 'PNL',  name: 'PNL',  fullName: 'National Liberal Party',                color: '#F9A800', seats2024: 49, leader: 'Nicolae Ciucă',   wikiTitle: 'Nicolae_Ciucă' },
-  { id: 'USR',  name: 'USR',  fullName: 'Save Romania Union',                    color: '#003DA5', seats2024: 40, leader: 'Cătălin Drulă',   wikiTitle: 'Cătălin_Drulă' },
-  { id: 'SOS',  name: 'SOS',  fullName: 'SOS Romania',                           color: '#B71C1C', seats2024: 28, leader: 'Diana Șoșoacă',   wikiTitle: 'Diana_Șoșoacă' },
-  { id: 'POT',  name: 'POT',  fullName: 'Party of Young People',                 color: '#E65100', seats2024: 24, leader: 'Călin Georgescu' },
-  { id: 'UDMR', name: 'UDMR', fullName: 'Dem. Union of Hungarians in Romania',   color: '#2E7D32', seats2024: 22, leader: 'Kelemen Hunor',   wikiTitle: 'Kelemen_Hunor' },
+  { id: 'PSD',  name: 'PSD',  fullName: 'Social Democratic Party',
+    color: '#CC0000', seats2024: 86,
+    leader: 'Sorin Grindeanu',      wikiTitle: 'Sorin_Grindeanu',
+    leader2024: 'Marcel Ciolacu',   wikiTitle2024: 'Marcel_Ciolacu' },
+  { id: 'AUR',  name: 'AUR',  fullName: 'Alliance for the Union of Romanians',
+    color: '#C8960C', seats2024: 63,
+    leader: 'George Simion',        wikiTitle: 'George_Simion',
+    leader2024: 'George Simion',    wikiTitle2024: 'George_Simion' },
+  { id: 'PNL',  name: 'PNL',  fullName: 'National Liberal Party',
+    color: '#F9A800', seats2024: 49,
+    leader: 'Ilie Bolojan',         wikiTitle: 'Ilie_Bolojan',
+    leader2024: 'Nicolae Ciucă',    wikiTitle2024: 'Nicolae_Ciucă' },
+  { id: 'USR',  name: 'USR',  fullName: 'Save Romania Union',
+    color: '#003DA5', seats2024: 40,
+    leader: 'Dominic Fritz',        wikiTitle: 'Dominic_Fritz',
+    leader2024: 'Elena Lasconi',    wikiTitle2024: 'Elena_Lasconi' },
+  { id: 'SOS',  name: 'SOS',  fullName: 'SOS Romania',
+    color: '#B71C1C', seats2024: 28,
+    leader: 'Diana Șoșoacă',        wikiTitle: 'Diana_Șoșoacă',
+    leader2024: 'Diana Șoșoacă',    wikiTitle2024: 'Diana_Șoșoacă' },
+  { id: 'POT',  name: 'POT',  fullName: 'Party of Young People',
+    color: '#E65100', seats2024: 24,
+    leader: 'Anamaria Gavrilă',     wikiTitle: 'Anamaria_Gavrilă',
+    leader2024: 'Anamaria Gavrilă', wikiTitle2024: 'Anamaria_Gavrilă' },
+  { id: 'UDMR', name: 'UDMR', fullName: 'Dem. Union of Hungarians in Romania',
+    color: '#2E7D32', seats2024: 22,
+    thresholdType: 'regional',
+    leader: 'Kelemen Hunor',        wikiTitle: 'Kelemen_Hunor',
+    leader2024: 'Kelemen Hunor',    wikiTitle2024: 'Kelemen_Hunor' },
 ];
 
 const RO_PARTY_MAP = Object.fromEntries(RO_PARTIES.map(p => [p.id, p])) as Record<RoPartyId, RoParty>;
@@ -437,20 +468,24 @@ type CountyTooltipState = {
 const RO_LR_ORDER: RoPartyId[] = ['PSD', 'UDMR', 'PNL', 'USR', 'POT', 'AUR', 'SOS'];
 
 // ── Scoreboard tile ────────────────────────────────────────────────────────────
-function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLeader, isWinner }: {
+function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLeader, isWinner, isBaseline }: {
   partyId: RoPartyId; seats: number; pct: number; rawVotes: number;
-  belowThreshold: boolean; isLeader: boolean; isWinner: boolean;
+  belowThreshold: boolean; isLeader: boolean; isWinner: boolean; isBaseline?: boolean;
 }) {
   const party = RO_PARTY_MAP[partyId];
+  // Swap between 2024 and current leaders depending on mode
+  const leaderName  = isBaseline ? party.leader2024 : party.leader;
+  const wikiKey     = isBaseline ? party.wikiTitle2024 : party.wikiTitle;
+
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (!party.wikiTitle) { setPhotoUrl(null); return; }
+    if (!wikiKey) { setPhotoUrl(null); return; }
     let cancelled = false;
-    fetchWikiPhoto(party.wikiTitle).then(url => { if (!cancelled) setPhotoUrl(url); });
+    fetchWikiPhoto(wikiKey).then(url => { if (!cancelled) setPhotoUrl(url); });
     return () => { cancelled = true; };
-  }, [party.wikiTitle]);
+  }, [wikiKey]);
 
-  const initials = party.leader.split(' ').map((w: string) => w[0]).join('').slice(0, 2);
+  const initials = leaderName.split(' ').map((w: string) => w[0]).join('').slice(0, 2);
   const color = partyColor(partyId);
   const colorAlpha = hexToRgba(color, 0.13);
 
@@ -466,7 +501,7 @@ function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLea
       <div style={{ position: 'relative' }}>
         <div className="cand-circle-frame">
           {photoUrl
-            ? <img src={photoUrl} alt={party.leader} onError={() => setPhotoUrl(null)} />
+            ? <img src={photoUrl} alt={leaderName} onError={() => setPhotoUrl(null)} />
             : <span className="cand-initials">{initials}</span>
           }
         </div>
@@ -484,7 +519,7 @@ function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLea
           </span>
         )}
       </div>
-      <span className="cand-leader-name" title={party.leader}>{party.leader.split(' ').pop()}</span>
+      <span className="cand-leader-name" title={leaderName}>{leaderName.split(' ').pop()}</span>
       <span className="cand-party-abbrev">{party.name}</span>
       <span className="cand-seats">{seats}</span>
       <span className="cand-party-name" title={party.fullName}>{party.fullName}</span>
@@ -556,7 +591,8 @@ function RoScoreboard({ natPcts, simCameraSeats, isBaseline, totalVotesBase, dar
             return (
               <RoScoreboardTile key={party.id} partyId={party.id} seats={s} pct={pct}
                 rawVotes={rawVotes} belowThreshold={belowThreshold}
-                isLeader={party.id === leader && !winner} isWinner={party.id === winner} />
+                isLeader={party.id === leader && !winner} isWinner={party.id === winner}
+                isBaseline={isBaseline} />
             );
           })}
           {/* Others tile — all non-tracked parties combined */}
@@ -1601,9 +1637,21 @@ export default function RomaniaApp() {
   const [simCameraSeats, setSimCameraSeats]   = useState<Partial<Record<RoPartyId, number>> | undefined>();
   const [simProgress, setSimProgress]         = useState(0);
   const [simRunning, setSimRunning]           = useState(false);
+  const [simTouched, setSimTouched]           = useState(false);
   const [declaredCounties, setDeclaredCounties] = useState<Set<RoCountyId> | undefined>();
   const simTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
   const natPctsAtSimStart = useRef<Record<RoPartyId, number>>(natPcts);
+
+  // Stable sort order: captured when sim panel opens, not reshuffled on every keystroke
+  const [simSortOrder, setSimSortOrder] = useState<RoPartyId[]>(() =>
+    [...RO_PARTIES].sort((a, b) => (RO_VOTE_PCT_2026_POLLING[b.id] ?? 0) - (RO_VOTE_PCT_2026_POLLING[a.id] ?? 0)).map(p => p.id)
+  );
+  useEffect(() => {
+    if (!simOpen) return;
+    setSimSortOrder([...RO_PARTIES].sort((a, b) => (natPcts[b.id] ?? 0) - (natPcts[a.id] ?? 0)).map(p => p.id));
+    setSimTouched(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [simOpen]); // natPcts intentionally omitted — captures order at panel-open only
 
   function stopSim() { simTimersRef.current.forEach(clearTimeout); simTimersRef.current = []; setSimRunning(false); }
   function resetSim() { stopSim(); setSimCameraSeats(undefined); setDeclaredCounties(undefined); setSimProgress(0); }
@@ -1729,53 +1777,131 @@ export default function RomaniaApp() {
             <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0 flex items-center justify-between">
               <div>
                 <h2 className="text-[14px] font-bold text-ink leading-none">Simulation</h2>
-                <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Vote shares · D'Hondt · 5% threshold</p>
+                <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Vote shares · Two-stage PR · 5%/Alt threshold</p>
               </div>
               <button onClick={() => setSimOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
             </div>
-            <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
-              {([...RO_PARTIES] as RoParty[])
-                .sort((a, b) => (natPcts[b.id]??0) - (natPcts[a.id]??0))
-                .map((party: RoParty) => {
-                  const pct = natPcts[party.id] ?? 0;
-                  const isLocked = locks.has(party.id);
-                  const color = partyColor(party.id);
-                  return (
-                    <div key={party.id}>
-                      <div className="flex items-center gap-1 mb-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background:color }} />
-                        <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{party.fullName}</span>
-                        {pct < RO_THRESHOLD && pct > 0 && <span className="text-[7px] font-mono text-red-400">&lt;5%</span>}
-                        <button
-                          onClick={() => setLocks(prev => { const n = new Set(prev); n.has(party.id) ? n.delete(party.id) : n.add(party.id); return n; })}
-                          className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked?'text-gold':'text-ink-3 hover:text-ink'}`}
-                          title={isLocked?'Unlock':'Lock'}>
-                          {isLocked
-                            ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                            : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                          }
-                        </button>
-                      </div>
-                      <input type="range" min={0} max={50} step={0.1} value={pct} disabled={isLocked}
+            <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-2.5">
+              {simSortOrder.map(partyId => {
+                const party = RO_PARTY_MAP[partyId];
+                if (!party) return null;
+                const pct = natPcts[party.id] ?? 0;
+                const isLocked = locks.has(party.id);
+                const color = partyColor(party.id);
+                const isRegional = party.thresholdType === 'regional';
+                // Threshold badge logic
+                const belowStd = pct < RO_THRESHOLD;
+                // For regional parties, check if they'd qualify via alt threshold
+                // (≥20% in ≥4 counties) — approximate from current swing model
+                const altQualifies = isRegional && (() => {
+                  let cnt = 0;
+                  for (const cId of Object.keys(RO_COUNTY_CAMERA_SEATS) as RoCountyId[]) {
+                    if ((calcCountyVotes(natPcts, cId)[partyId] ?? 0) >= 20) cnt++;
+                  }
+                  return cnt >= 4;
+                })();
+                return (
+                  <div key={party.id}>
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                      <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{party.fullName}</span>
+                      {/* Threshold badge */}
+                      {isRegional ? (
+                        belowStd && !altQualifies
+                          ? <span title="Below 5% national AND cannot reach ≥20% in 4 counties" className="text-[7px] font-mono text-red-400 shrink-0">elim</span>
+                          : belowStd && altQualifies
+                            ? <span title="Qualifies via ≥20% in 4 counties (alternative threshold)" className="text-[7px] font-mono text-amber-500 shrink-0">alt</span>
+                            : null
+                      ) : (
+                        belowStd && pct > 0 && <span title="Below 5% national threshold — eliminated" className="text-[7px] font-mono text-red-400 shrink-0">&lt;5%</span>
+                      )}
+                      <button
+                        onClick={() => setLocks(prev => { const n = new Set(prev); n.has(party.id) ? n.delete(party.id) : n.add(party.id); return n; })}
+                        className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked ? 'text-gold' : 'text-ink-3 hover:text-ink'}`}
+                        title={isLocked ? 'Unlock' : 'Lock'}>
+                        {isLocked
+                          ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
+                          : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
+                        }
+                      </button>
+                      <input
+                        type="number" min={0} max={60} step={0.1}
+                        value={pct.toFixed(1)}
+                        disabled={isLocked}
                         onChange={e => {
-                          setNatPcts(redistributePcts(natPcts, party.id, parseFloat(e.target.value), locks));
+                          const v = Math.max(0, Math.min(60, parseFloat(e.target.value) || 0));
+                          setNatPcts(redistributePcts(natPcts, party.id, v, locks));
                           setPreset('custom');
+                          setSimTouched(true);
                         }}
-                        className="br-party-slider w-full"
-                        style={{ '--party-color': color, '--pct': `${(pct/50)*100}%` } as React.CSSProperties} />
-                      <div className="flex justify-between mt-0.5">
-                        <span className="text-[8px] font-mono text-ink-3">{party.name}</span>
-                        <span className="text-[8.5px] font-mono tabular-nums text-ink-3">{pct.toFixed(1)}%</span>
+                        onFocus={e => e.target.select()}
+                        className="text-[10px] font-mono font-semibold tabular-nums w-10 text-right bg-transparent border-b border-transparent focus:border-ink-3 outline-none disabled:opacity-40"
+                        style={{ color }}
+                      />
+                    </div>
+                    {/* Mini progress bar */}
+                    <div className="flex items-center gap-1">
+                      <span className="text-[8px] font-mono text-ink-3 w-8 shrink-0">{party.name}</span>
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: hexToRgba(color, 0.12) }}>
+                        <div style={{ width: `${Math.min(pct / 50 * 100, 100)}%`, background: color, height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
                       </div>
                     </div>
-                  );
-                })}
+                  </div>
+                );
+              })}
+
+              {/* ── Others row (residual = 100 − tracked sum) ──────────────── */}
+              {(() => {
+                const trackedSum = RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
+                const otherPct = Math.max(0, 100 - trackedSum);
+                return (
+                  <div className="pt-1 border-t border-default mt-1">
+                    <div className="flex items-center gap-1 mb-0.5">
+                      <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-gray-400" />
+                      <span className="text-[10px] font-medium text-ink-3 flex-1 truncate leading-none">Others (minor / sub-threshold)</span>
+                      <input
+                        type="number" min={0} max={100} step={0.1}
+                        value={otherPct.toFixed(1)}
+                        onChange={e => {
+                          const newOthers = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                          const targetTracked = 100 - newOthers;
+                          const lockedSum = RO_PARTIES.filter(p => locks.has(p.id)).reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
+                          const unlocked = RO_PARTIES.filter(p => !locks.has(p.id));
+                          const unlockedSum = unlocked.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
+                          const available = Math.max(0, targetTracked - lockedSum);
+                          const next = { ...natPcts };
+                          if (unlockedSum > 0) {
+                            for (const p of unlocked) next[p.id] = (natPcts[p.id] ?? 0) / unlockedSum * available;
+                          } else if (unlocked.length > 0) {
+                            for (const p of unlocked) next[p.id] = available / unlocked.length;
+                          }
+                          setNatPcts(next);
+                          setPreset('custom');
+                          setSimTouched(true);
+                        }}
+                        onFocus={e => e.target.select()}
+                        className="text-[10px] font-mono font-semibold tabular-nums w-10 text-right bg-transparent border-b border-transparent focus:border-ink-3 outline-none text-ink-3"
+                      />
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-[8px] font-mono text-ink-3 w-8 shrink-0">OTH</span>
+                      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-ink/8">
+                        <div style={{ width: `${Math.min(otherPct / 50 * 100, 100)}%`, background: '#9CA3AF', height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
+                      </div>
+                    </div>
+                    <p className="text-[7.5px] font-mono text-ink-3 mt-1 leading-tight opacity-70">
+                      Total: {(RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0) + otherPct).toFixed(1)}%
+                    </p>
+                  </div>
+                );
+              })()}
             </div>
             <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
               <button
-                disabled={simRunning}
+                disabled={simRunning || !simTouched}
                 onClick={() => {
                   stopSim();
+                  setSimTouched(false);
                   natPctsAtSimStart.current = { ...natPcts };
                   const allCounties = [...RO_COUNTIES].sort(() => Math.random() - 0.5);
                   const NCHUNKS = 12;
@@ -1795,7 +1921,7 @@ export default function RomaniaApp() {
                       const partial = calcPartialSeats(natPctsAtSimStart.current, snap);
                       setSimCameraSeats(partial.camera);
                       if (snap.size >= RO_COUNTIES.length) {
-                        setSimCameraSeats(calcSeats(natPctsAtSimStart.current, RO_CAMERA_SEATS));
+                        setSimCameraSeats(calcSeatsTwoStage(natPctsAtSimStart.current));
                         setSimRunning(false);
                       }
                     }, t));
@@ -1808,7 +1934,7 @@ export default function RomaniaApp() {
                   : '▶ Run Simulation'}
               </button>
               {(simCameraSeats || declaredCounties) && (
-                <button onClick={resetSim} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
+                <button onClick={() => { resetSim(); setSimTouched(false); }} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
                   Reset
                 </button>
               )}
