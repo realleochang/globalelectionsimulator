@@ -1667,7 +1667,6 @@ export default function RomaniaApp() {
   const [countyOverrides, setCountyOverrides]     = useState<Record<string, Record<RoPartyId, number>>>({});
   const [bubbleMap, setBubbleMap]                 = useState(false);
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
-  const [locks, setLocks]                         = useState<Set<RoPartyId>>(new Set());
   const [simOpen, setSimOpen]                     = useState(false);
   const [parliOpen, setParliOpen]                 = useState(false);
   const [coalitionOpen, setCoalitionOpen]         = useState(false);
@@ -1696,6 +1695,9 @@ export default function RomaniaApp() {
   const [simRefLabel, setSimRefLabel] = useState<string>('');
   const [refOpen,     setRefOpen]     = useState(false);
 
+  // Draft inputs for sim panel — ISOLATED from natPcts so typing doesn't update the map
+  const [simDraftPcts, setSimDraftPcts] = useState<Record<RoPartyId, number>>(() => ({ ...natPcts }));
+
   // Stable sort order: captured when sim panel opens, not reshuffled on every keystroke
   const [simSortOrder, setSimSortOrder] = useState<RoPartyId[]>(() =>
     [...RO_PARTIES].sort((a, b) => (RO_VOTE_PCT_2026_POLLING[b.id] ?? 0) - (RO_VOTE_PCT_2026_POLLING[a.id] ?? 0)).map(p => p.id)
@@ -1704,6 +1706,8 @@ export default function RomaniaApp() {
     if (!simOpen) { setRefOpen(false); return; }
     setSimSortOrder([...RO_PARTIES].sort((a, b) => (natPcts[b.id] ?? 0) - (natPcts[a.id] ?? 0)).map(p => p.id));
     setSimTouched(false);
+    // Re-seed draft from current map state each time the panel opens
+    setSimDraftPcts({ ...natPcts });
     // Capture the reference snapshot
     setSimRefPcts({ ...natPcts });
     setSimRefLabel(
@@ -1927,137 +1931,118 @@ export default function RomaniaApp() {
                 <button onClick={() => setSimOpen(false)} className="w-6 h-6 shrink-0 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-3 py-3 thin-scroll space-y-2">
-                {simSortOrder.map(partyId => {
-                  const party = RO_PARTY_MAP[partyId];
-                  if (!party) return null;
-                  const pct = natPcts[party.id] ?? 0;
-                  const isLocked = locks.has(party.id);
-                  const color = partyColor(party.id);
-                  const isRegional = party.thresholdType === 'regional';
-                  const belowStd = pct < RO_THRESHOLD;
-                  const altQualifies = isRegional && (() => {
-                    let cnt = 0;
-                    for (const cId of Object.keys(RO_COUNTY_CAMERA_SEATS) as RoCountyId[]) {
-                      if ((calcCountyVotes(natPcts, cId)[partyId] ?? 0) >= 20) cnt++;
-                    }
-                    return cnt >= 4;
-                  })();
-                  return (
-                    <div key={party.id} className={`rounded-lg px-2.5 py-2 transition-colors ${dark ? 'bg-white/[0.04] hover:bg-white/[0.07]' : 'bg-black/[0.025] hover:bg-black/[0.05]'}`}>
-                      {/* Row 1: dot · name · threshold badge · lock */}
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                        <span className="text-[10px] font-semibold text-ink flex-1 truncate leading-none">{party.fullName}</span>
-                        {isRegional ? (
-                          belowStd && !altQualifies
-                            ? <span title="Below 5% AND alt-threshold unreachable" className="text-[7px] font-mono text-red-400 shrink-0 px-1 py-px rounded border border-red-400/30">elim</span>
-                            : belowStd && altQualifies
-                              ? <span title="Qualifies via ≥20% in 4+ counties" className="text-[7px] font-mono text-amber-500 shrink-0 px-1 py-px rounded border border-amber-500/30">alt</span>
-                              : null
-                        ) : (
-                          belowStd && pct > 0 && (
-                            <span title="Below 5% threshold" className="text-[7px] font-mono text-red-400 shrink-0 px-1 py-px rounded border border-red-400/30">&lt;5%</span>
-                          )
-                        )}
-                        <button
-                          onClick={() => setLocks(prev => { const n = new Set(prev); n.has(party.id) ? n.delete(party.id) : n.add(party.id); return n; })}
-                          className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked ? 'text-gold' : 'text-ink-3 hover:text-ink'}`}
-                          title={isLocked ? 'Unlock' : 'Lock'}>
-                          {isLocked
-                            ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                            : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
+              {/* ── Party input rows — each value is INDEPENDENT, no auto-redistribution ── */}
+              {(() => {
+                const draftTrackedSum = RO_PARTIES.reduce((s, p) => s + (simDraftPcts[p.id] ?? 0), 0);
+                const draftOthers     = Math.max(0, 100 - draftTrackedSum);
+                const draftTotal      = draftTrackedSum + draftOthers; // = 100 when tracked ≤ 100
+                const overflow        = draftTrackedSum > 100.05;
+                return (
+                  <>
+                    <div className="flex-1 overflow-y-auto px-3 py-3 thin-scroll space-y-2">
+                      {simSortOrder.map(partyId => {
+                        const party = RO_PARTY_MAP[partyId];
+                        if (!party) return null;
+                        const pct      = simDraftPcts[party.id] ?? 0;
+                        const color    = partyColor(party.id);
+                        const isRegional = party.thresholdType === 'regional';
+                        const belowStd   = pct < RO_THRESHOLD;
+                        const altQualifies = isRegional && (() => {
+                          let cnt = 0;
+                          for (const cId of Object.keys(RO_COUNTY_CAMERA_SEATS) as RoCountyId[]) {
+                            if ((calcCountyVotes(simDraftPcts as Record<RoPartyId,number>, cId)[partyId] ?? 0) >= 20) cnt++;
                           }
-                        </button>
-                      </div>
-                      {/* Row 2: abbrev · bar · input box */}
-                      <div className="flex items-center gap-2">
-                        <span className="text-[8px] font-mono font-bold w-7 shrink-0" style={{ color: hexToRgba(color, 0.7) }}>{party.name}</span>
-                        <div className="flex-1 h-2 rounded-full overflow-hidden cursor-pointer" style={{ background: hexToRgba(color, 0.12) }}
-                          onClick={() => { if (!isLocked) { /* click bar = nudge focus */ } }}>
-                          <div style={{ width: `${Math.min(pct / 55 * 100, 100)}%`, background: color, height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
+                          return cnt >= 4;
+                        })();
+                        return (
+                          <div key={party.id} className={`rounded-lg px-2.5 py-2 transition-colors ${dark ? 'bg-white/[0.04] hover:bg-white/[0.07]' : 'bg-black/[0.025] hover:bg-black/[0.05]'}`}>
+                            {/* Row 1: dot · name · threshold badge */}
+                            <div className="flex items-center gap-1.5 mb-1.5">
+                              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                              <span className="text-[10px] font-semibold text-ink flex-1 truncate leading-none">{party.fullName}</span>
+                              {isRegional ? (
+                                belowStd && !altQualifies
+                                  ? <span title="Below 5% AND alt-threshold unreachable" className="text-[7px] font-mono text-red-400 shrink-0 px-1 py-px rounded border border-red-400/30">elim</span>
+                                  : belowStd && altQualifies
+                                    ? <span title="Qualifies via ≥20% in 4+ counties" className="text-[7px] font-mono text-amber-500 shrink-0 px-1 py-px rounded border border-amber-500/30">alt</span>
+                                    : null
+                              ) : (
+                                belowStd && pct > 0 && (
+                                  <span title="Below 5% threshold" className="text-[7px] font-mono text-red-400 shrink-0 px-1 py-px rounded border border-red-400/30">&lt;5%</span>
+                                )
+                              )}
+                            </div>
+                            {/* Row 2: abbrev · bar · input */}
+                            <div className="flex items-center gap-2">
+                              <span className="text-[8px] font-mono font-bold w-7 shrink-0" style={{ color: hexToRgba(color, 0.7) }}>{party.name}</span>
+                              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: hexToRgba(color, 0.12) }}>
+                                <div style={{ width: `${Math.min(pct / 55 * 100, 100)}%`, background: color, height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
+                              </div>
+                              <input
+                                type="number" min={0} max={100} step={0.1}
+                                value={pct.toFixed(1)}
+                                onChange={e => {
+                                  const v = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                                  // ← writes ONLY to draft; map (natPcts) is untouched
+                                  setSimDraftPcts(prev => ({ ...prev, [party.id]: v }));
+                                  setSimTouched(true);
+                                }}
+                                onFocus={e => e.target.select()}
+                                className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none transition-colors"
+                                style={{
+                                  color,
+                                  background: hexToRgba(color, 0.10),
+                                  border: `1.5px solid ${hexToRgba(color, 0.35)}`,
+                                  padding: '3px 4px',
+                                }}
+                              />
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* ── Others (read-only residual: 100 − tracked sum) ─── */}
+                      <div className={`rounded-lg px-2.5 py-2 ${dark ? 'bg-white/[0.02]' : 'bg-black/[0.015]'}`}>
+                        <div className="flex items-center gap-1.5 mb-1.5">
+                          <span className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
+                          <span className="text-[10px] font-semibold text-ink-3 flex-1 leading-none">Others</span>
+                          <span className="text-[7.5px] font-mono text-ink-3 opacity-60">sub-threshold + minor</span>
                         </div>
-                        {/* Prominent styled input */}
-                        <input
-                          type="number" min={0} max={60} step={0.1}
-                          value={pct.toFixed(1)}
-                          disabled={isLocked}
-                          onChange={e => {
-                            const v = Math.max(0, Math.min(60, parseFloat(e.target.value) || 0));
-                            setNatPcts(redistributePcts(natPcts, party.id, v, locks));
-                            setPreset('custom');
-                            setSimTouched(true);
-                          }}
-                          onFocus={e => e.target.select()}
-                          className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none disabled:opacity-35 transition-colors"
-                          style={{
-                            color,
-                            background: hexToRgba(color, isLocked ? 0.04 : 0.10),
-                            border: `1.5px solid ${hexToRgba(color, isLocked ? 0.12 : 0.35)}`,
-                            padding: '3px 4px',
-                          }}
-                        />
+                        <div className="flex items-center gap-2">
+                          <span className="text-[8px] font-mono font-bold w-7 shrink-0 text-gray-400">OTH</span>
+                          <div className="flex-1 h-2 rounded-full overflow-hidden bg-ink/8">
+                            <div style={{ width: `${Math.min(draftOthers / 55 * 100, 100)}%`, background: overflow ? '#ef4444' : '#9CA3AF', height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
+                          </div>
+                          {/* Read-only display */}
+                          <div className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md"
+                            style={{ color: overflow ? '#ef4444' : '#9CA3AF', background: overflow ? 'rgba(239,68,68,0.08)' : 'rgba(156,163,175,0.08)', border: `1.5px solid ${overflow ? 'rgba(239,68,68,0.30)' : 'rgba(156,163,175,0.22)'}`, padding: '3px 4px' }}>
+                            {overflow ? `−${(draftTrackedSum - 100).toFixed(1)}` : draftOthers.toFixed(1)}
+                          </div>
+                        </div>
+                        {/* Total indicator */}
+                        <div className={`flex items-center justify-between mt-1.5 text-[8px] font-mono ${overflow ? 'text-red-400' : 'text-emerald-500'}`}>
+                          <span>{overflow ? '⚠ parties exceed 100%' : draftTotal.toFixed(1) === '100.0' ? '✓ total = 100%' : `total = ${draftTotal.toFixed(1)}%`}</span>
+                          <span className="tabular-nums font-bold">{draftTotal.toFixed(1)}%</span>
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
 
-                {/* ── Others row ─────────────────────────────────────────── */}
-                {(() => {
-                  const trackedSum = RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
-                  const otherPct = Math.max(0, 100 - trackedSum);
-                  return (
-                    <div className={`rounded-lg px-2.5 py-2 border-t border-default mt-0.5 pt-2 ${dark ? 'bg-white/[0.02]' : 'bg-black/[0.015]'}`}>
-                      <div className="flex items-center gap-1.5 mb-1.5">
-                        <span className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
-                        <span className="text-[10px] font-semibold text-ink-3 flex-1 truncate leading-none">Others</span>
-                        <span className="text-[7.5px] font-mono text-ink-3 opacity-60">sub-threshold + minor</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[8px] font-mono font-bold w-7 shrink-0 text-gray-400">OTH</span>
-                        <div className="flex-1 h-2 rounded-full overflow-hidden bg-ink/8">
-                          <div style={{ width: `${Math.min(otherPct / 55 * 100, 100)}%`, background: '#9CA3AF', height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
-                        </div>
-                        <input
-                          type="number" min={0} max={100} step={0.1}
-                          value={otherPct.toFixed(1)}
-                          onChange={e => {
-                            const newOthers = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
-                            const targetTracked = 100 - newOthers;
-                            const lockedSum = RO_PARTIES.filter(p => locks.has(p.id)).reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
-                            const unlocked = RO_PARTIES.filter(p => !locks.has(p.id));
-                            const unlockedSum = unlocked.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
-                            const available = Math.max(0, targetTracked - lockedSum);
-                            const next = { ...natPcts };
-                            if (unlockedSum > 0) for (const p of unlocked) next[p.id] = (natPcts[p.id] ?? 0) / unlockedSum * available;
-                            else if (unlocked.length > 0) for (const p of unlocked) next[p.id] = available / unlocked.length;
-                            setNatPcts(next); setPreset('custom'); setSimTouched(true);
-                          }}
-                          onFocus={e => e.target.select()}
-                          className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none transition-colors"
-                          style={{
-                            color: '#9CA3AF',
-                            background: 'rgba(156,163,175,0.10)',
-                            border: '1.5px solid rgba(156,163,175,0.30)',
-                            padding: '3px 4px',
-                          }}
-                        />
-                      </div>
-                      <p className="text-[7.5px] font-mono text-ink-3 mt-1.5 text-right opacity-60">
-                        Total: {(trackedSum + otherPct).toFixed(1)}%
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
-                <button
-                  disabled={simRunning || !simTouched}
-                  onClick={() => {
-                    stopSim();
-                    setSimTouched(false);
-                    natPctsAtSimStart.current = { ...natPcts };
+                    <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
+                      {overflow && (
+                        <p className="text-[9px] font-mono text-red-400 text-center leading-tight">
+                          Parties sum to {draftTrackedSum.toFixed(1)}% — reduce values to ≤ 100%
+                        </p>
+                      )}
+                      <button
+                        disabled={simRunning || !simTouched || overflow}
+                        onClick={() => {
+                          stopSim();
+                          setSimTouched(false);
+                          // Commit draft → natPcts so map updates when sim starts
+                          const pcts = { ...simDraftPcts } as Record<RoPartyId, number>;
+                          natPctsAtSimStart.current = pcts;
+                          setNatPcts(pcts);
+                          setPreset('custom');
 
                     // 5 random batches — first fires immediately, rest on bell-curve schedule
                     const shuffled = [...RO_COUNTIES].sort(() => Math.random() - 0.5);
@@ -2101,6 +2086,9 @@ export default function RomaniaApp() {
                   </button>
                 )}
               </div>
+                  </>
+                );
+              })()}
             </aside>
           </div>
         )}
