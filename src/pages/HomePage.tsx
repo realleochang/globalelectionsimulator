@@ -138,7 +138,6 @@ export const COUNTRIES = [
     electionType: 'Legislative Election', subtitle: 'Camera Deputaților',
     lat: 45, lng: 25,
     accent: 'linear-gradient(90deg,#002B7F,#FCD116,#CE1126)',
-    locked: true as const,
     parties: [
       { color: '#CC0000', abbr: 'PSD'  }, { color: '#C8960C', abbr: 'AUR'  },
       { color: '#F9A800', abbr: 'PNL'  }, { color: '#003DA5', abbr: 'USR'  },
