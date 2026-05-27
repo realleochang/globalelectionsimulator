@@ -1283,8 +1283,8 @@ export default function NetherlandsApp() {
   }, [dark]);
 
   // ── Election state ──────────────────────────────────────────────────────────
-  const [preset, setPreset] = useState<'baseline' | 'blank' | 'polling2026' | 'custom'>('baseline');
-  const [natPcts, setNatPcts] = useState<Record<NlPartyId, number>>(() => ({ ...NL_VOTE_PCT_2025 }));
+  const [preset, setPreset] = useState<'baseline' | 'blank' | 'polling2026' | 'custom'>('polling2026');
+  const [natPcts, setNatPcts] = useState<Record<NlPartyId, number>>(() => ({ ...NL_VOTE_PCT_2026 }));
 
   function loadBaseline() {
     setNatPcts({ ...NL_VOTE_PCT_2025 });
@@ -1451,7 +1451,7 @@ export default function NetherlandsApp() {
 
         <div ref={headerScrollRef} className="flex-1 min-w-0 flex items-center gap-2 px-2 overflow-x-auto scroll-none">
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={loadBaseline}    className={preset === 'baseline'    ? btnGold : btnMuted}>2025 Results</button>
+          <button onClick={loadBaseline}    className={preset === 'baseline'    ? btnGold : btnMuted}>2025 Baseline</button>
           <button onClick={loadPolling2026} className={preset === 'polling2026' ? btnGold : btnMuted}>2026 Polling</button>
           <button onClick={loadBlank}       className={preset === 'blank'       ? btnGold : btnMuted}>Blank Map</button>
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />

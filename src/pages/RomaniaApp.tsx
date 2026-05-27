@@ -31,11 +31,9 @@ const RO_PARTIES: RoParty[] = [
 ];
 
 const RO_PARTY_MAP = Object.fromEntries(RO_PARTIES.map(p => [p.id, p])) as Record<RoPartyId, RoParty>;
-const RO_CAMERA_SEATS   = 331;
+const RO_CAMERA_SEATS    = 331;
 const RO_CAMERA_MAJORITY = 166;
-const RO_SENATE_SEATS   = 137;
-const RO_SENATE_MAJORITY = 69;
-const RO_THRESHOLD = 5.0;
+const RO_THRESHOLD       = 5.0;
 
 // ── Real 2024 national results (Camera Deputaților) ───────────────────────────
 // Source: Permanent Electoral Authority / Wikipedia official count
@@ -275,7 +273,7 @@ function calcPartialSeats(
   if (totalPop === 0) return { camera: {}, senate: {} };
   const norm: Partial<Record<RoPartyId, number>> = {};
   for (const p of RO_PARTIES) norm[p.id] = (weighted[p.id] ?? 0) / totalPop;
-  return { camera: calcSeats(norm, RO_CAMERA_SEATS), senate: calcSeats(norm, RO_SENATE_SEATS) };
+  return { camera: calcSeats(norm, RO_CAMERA_SEATS), senate: {} };
 }
 
 function redistributePcts(
@@ -444,13 +442,18 @@ function RoScoreboard({ natPcts, simCameraSeats, isBaseline, dark: _dark }: {
   const leader = sorted[0]?.id ?? null;
   const winner = leader && (seats[leader] ?? 0) >= RO_CAMERA_MAJORITY ? leader : null;
 
+  const trackedPctSum = useMemo(() => RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0), [natPcts]);
+  const otherPct      = Math.max(0, 100 - trackedPctSum);
+  const otherRawVotes = isBaseline
+    ? RO_GRAND_TOTAL_VOTES - RO_PARTIES.reduce((s, p) => s + (RO_VOTE_RAW_2024[p.id] ?? 0), 0)
+    : Math.round(otherPct / 100 * RO_GRAND_TOTAL_VOTES);
+
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
           {sorted.map(party => {
             const s = seats[party.id] ?? 0;
-            // Use the actual slider value directly — natPcts stores % of all valid votes
             const pct = natPcts[party.id] ?? 0;
             const rawVotes = isBaseline
               ? RO_VOTE_RAW_2024[party.id]
@@ -462,6 +465,34 @@ function RoScoreboard({ natPcts, simCameraSeats, isBaseline, dark: _dark }: {
                 isLeader={party.id === leader && !winner} isWinner={party.id === winner} />
             );
           })}
+          {/* Others tile — all non-tracked parties combined */}
+          {otherPct >= 0.05 && (
+            <div className="cand-col" style={{
+              '--cand-color': '#888888', '--cand-color-alpha': 'rgba(136,136,136,0.13)',
+              borderColor: 'rgba(136,136,136,0.22)', opacity: 0.65,
+            } as React.CSSProperties}>
+              <div style={{ position:'relative' }}>
+                <div className="cand-circle-frame" style={{ background:'rgba(136,136,136,0.12)', border:'1.5px solid rgba(136,136,136,0.25)' }}>
+                  <span className="cand-initials" style={{ color:'#888', fontSize:13 }}>···</span>
+                </div>
+              </div>
+              <span className="cand-leader-name" style={{ color:'#999' }}>Minor</span>
+              <span className="cand-party-abbrev" style={{ color:'#888' }}>Others</span>
+              <span className="cand-seats" style={{ color:'#999' }}>—</span>
+              <span className="cand-party-name" style={{ color:'#888' }}>All other parties (sub-threshold + untracked)</span>
+              <div style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:1 }}>
+                <span style={{ fontSize:6.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:600, color:'rgba(136,136,136,0.48)', letterSpacing:'0.10em', textTransform:'uppercase' }}>VOTES</span>
+                <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:'#888' }}>{otherPct.toFixed(1)}%</span>
+              </div>
+              <div style={{ width:'100%', textAlign:'right', marginBottom:3 }}>
+                <span className="cand-votes-full" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:'rgba(136,136,136,0.65)' }}>{otherRawVotes.toLocaleString()}</span>
+                <span className="cand-votes-compact" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:'rgba(136,136,136,0.65)' }}>{fmtN(otherRawVotes)}</span>
+              </div>
+              <div className="cand-bar-track" style={{ width:'100%', height:3, borderRadius:2, background:'var(--bar-track)' }}>
+                <div style={{ height:'100%', borderRadius:2, background:'#888', width:`${Math.min(otherPct/30*100,100)}%` }} />
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -680,16 +711,24 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
               </div>
               {/* Party rows */}
               <div style={{ padding:'2px 14px 12px' }}>
-                {tooltip.parties.map(({ id, pct, rawVotes }, i) => {
-                  const pColor = partyColor(id);
+                {(() => {
+                  const shownSum = tooltip.parties.reduce((s, x) => s + x.pct, 0);
+                  const otherPct = Math.max(0, 100 - shownSum);
+                  const otherRaw = tooltip.totalVotes > 0 ? Math.round(otherPct / 100 * tooltip.totalVotes) : 0;
+                  const allRows = [
+                    ...tooltip.parties.map(p => ({ ...p, isOther: false })),
+                    ...(otherPct >= 0.05 ? [{ id: null as any, pct: otherPct, rawVotes: otherRaw, isOther: true }] : []),
+                  ];
+                  return allRows.map(({ id, pct, rawVotes, isOther }, i) => {
+                  const pColor = isOther ? '#888888' : partyColor(id);
                   const barW = maxPct > 0 ? Math.round((pct / maxPct) * 100) : 0;
                   return (
-                    <div key={id} style={{ marginBottom: i < tooltip.parties.length - 1 ? 9 : 0 }}>
+                    <div key={isOther ? '__other' : id} style={{ marginBottom: i < allRows.length - 1 ? 9 : 0 }}>
                       {/* Name + votes + % */}
                       <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
-                        <span style={{ width:8, height:8, borderRadius:2, flexShrink:0, background:pColor }} />
-                        <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
-                          {RO_PARTY_MAP[id]?.name ?? id}
+                        <span style={{ width:8, height:8, borderRadius:2, flexShrink:0, background:pColor, opacity: isOther ? 0.5 : 1 }} />
+                        <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap', opacity: isOther ? 0.7 : 1 }}>
+                          {isOther ? 'Others' : (id ? (RO_PARTY_MAP[id as RoPartyId]?.name ?? id) : id)}
                         </span>
                         {rawVotes > 0 && (
                           <span style={{ fontSize:9.5, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(pColor, 0.72), whiteSpace:'nowrap' }}>
@@ -706,7 +745,8 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
                       </div>
                     </div>
                   );
-                })}
+                  });
+                })()}
               </div>
               {/* Footer divider */}
               <div style={{ borderTop:`1px solid ${tt.divider}`, padding:'6px 14px', display:'flex', justifyContent:'flex-end' }}>
@@ -827,6 +867,23 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override, i
             </div>
           );
         })}
+        {/* Others row */}
+        {(() => {
+          const otherPct = Math.max(0, 100 - Object.values(pcts).reduce((s, v) => s + (v ?? 0), 0));
+          if (otherPct < 0.05) return null;
+          return (
+            <div style={{ opacity: 0.55 }}>
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background:'#888' }} />
+                <span className="text-[10px] font-medium text-ink-3 flex-1 truncate leading-none">Others (minor parties)</span>
+                <span className="text-[10px] font-mono font-semibold text-ink-3">{otherPct.toFixed(1)}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-black/10 overflow-hidden">
+                <div className="h-full rounded-full bg-gray-400" style={{ width:`${Math.min(otherPct,100)}%` }} />
+              </div>
+            </div>
+          );
+        })()}
         <div className="pt-2 border-t border-default space-y-2">
           <div>
             <div className="text-[8.5px] font-mono text-ink-3 uppercase tracking-wide mb-1">Population (approx.)</div>
@@ -857,15 +914,11 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override, i
 }
 
 // ── Parliament panel ───────────────────────────────────────────────────────────
-function RoParliamentPanel({ cameraSeats, senateSeats, onClose, exiting, dark }: {
+function RoParliamentPanel({ cameraSeats, onClose, exiting, dark }: {
   cameraSeats: Partial<Record<RoPartyId, number>>;
-  senateSeats: Partial<Record<RoPartyId, number>>;
   onClose: () => void; exiting?: boolean; dark?: boolean;
 }) {
-  const [chamber, setChamber] = useState<'camera' | 'senate'>('camera');
-  const seatsMap        = chamber === 'camera' ? cameraSeats : senateSeats;
-  const totalSeatsConst = chamber === 'camera' ? RO_CAMERA_SEATS   : RO_SENATE_SEATS;
-  const majorityConst   = chamber === 'camera' ? RO_CAMERA_MAJORITY : RO_SENATE_MAJORITY;
+  const seatsMap = cameraSeats;
 
   const seatColors: string[] = [];
   const legend: { id: RoPartyId; count: number; color: string }[] = [];
@@ -876,74 +929,82 @@ function RoParliamentPanel({ cameraSeats, senateSeats, onClose, exiting, dark }:
     for (let i = 0; i < n; i++) seatColors.push(color);
   }
   const totalSeats = seatColors.length;
-  const W = 310, H = 180, cx = W/2, cy = H - 4, innerR = 52, rowSpacing = 9;
-  const rows = chamber === 'camera' ? 6 : 5;
+
+  // ── Semicircle geometry ─────────────────────────────────────────────────────
+  // Wide SVG for a proper congress-arch look
+  const W = 420, H = 230;
+  const cx = W / 2, cy = H - 8;
+  const innerR = 58, rowSpacing = 14, rows = 8;
+  const dotR = 3.2;
+
   const arcLengths = Array.from({ length: rows }, (_, i) => Math.PI * (innerR + i * rowSpacing));
-  const totalArc = arcLengths.reduce((s, v) => s + v, 0);
-  const floors = arcLengths.map(a => Math.floor((a / totalArc) * totalSeatsConst));
-  const remainder = totalSeatsConst - floors.reduce((s, v) => s + v, 0);
+  const totalArc   = arcLengths.reduce((s, v) => s + v, 0);
+  const floors     = arcLengths.map(a => Math.floor((a / totalArc) * RO_CAMERA_SEATS));
+  const remainder  = RO_CAMERA_SEATS - floors.reduce((s, v) => s + v, 0);
   arcLengths
-    .map((a, i) => ({ i, frac: (a / totalArc) * totalSeatsConst - floors[i] }))
+    .map((a, i) => ({ i, frac: (a / totalArc) * RO_CAMERA_SEATS - floors[i] }))
     .sort((a, b) => b.frac - a.frac)
     .slice(0, remainder)
-    .forEach(({ i }) => floors[i]++);
+    .forEach(({ i }) => { floors[i]++; });
+
   const rawPos: { x: number; y: number; θ: number; r: number }[] = [];
   for (let row = 0; row < rows; row++) {
-    const r = innerR + row * rowSpacing; const n = floors[row];
+    const r = innerR + row * rowSpacing;
+    const n = floors[row];
     for (let j = 0; j < n; j++) {
       const θ = Math.PI * (n - j - 0.5) / n;
       rawPos.push({ x: cx + r * Math.cos(θ), y: cy - r * Math.sin(θ), θ, r });
     }
   }
+  // Sort left-to-right (by θ desc) then inner-to-outer: determines colour assignment
   rawPos.sort((a, b) => b.θ - a.θ || a.r - b.r);
 
   return (
     <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting?'panel-exit-left':'panel-slide-left'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">Parliament of Romania</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeatsConst} seats · majority {majorityConst} · 5% threshold</div>
+          <h2 className="text-[13px] font-bold text-ink leading-none">Chamber of Deputies</h2>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{RO_CAMERA_SEATS} seats · majority {RO_CAMERA_MAJORITY} · 5% threshold</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
-      {/* Chamber toggle */}
-      <div className="flex px-3.5 pt-3 pb-2 gap-2 shrink-0">
-        {(['camera','senate'] as const).map(ch => (
-          <button key={ch} onClick={() => setChamber(ch)}
-            className={`flex-1 h-7 rounded-[4px] text-[10px] font-mono font-semibold uppercase tracking-wide transition-colors ${chamber===ch ? 'bg-gold text-white' : 'border border-default text-ink-3 hover:bg-hover'}`}>
-            {ch === 'camera' ? `Chamber (${RO_CAMERA_SEATS})` : `Senate (${RO_SENATE_SEATS})`}
-          </button>
-        ))}
-      </div>
       <div className="flex-1 overflow-y-auto thin-scroll">
         {totalSeats === 0
-          ? <div className="flex items-center justify-center h-40 text-ink-3 text-[11px] font-mono px-4 text-center">Load results or run simulation first</div>
+          ? <div className="flex items-center justify-center h-40 text-ink-3 text-[11px] font-mono px-4 text-center">Adjust sliders to allocate seats</div>
           : <>
-            <div className="px-2.5 pt-3 pb-1">
+            {/* Hemicycle */}
+            <div className="px-1 pt-3 pb-0">
               <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display:'block' }}>
-                <line x1={cx} y1={cy-innerR+4} x2={cx} y2={cy-(innerR+(rows-1)*rowSpacing)-8}
-                  stroke="rgba(0,0,0,0.10)" strokeWidth="1" strokeDasharray="3,3" />
+                {/* Centre line */}
+                <line
+                  x1={cx} y1={cy - innerR + 4}
+                  x2={cx} y2={cy - (innerR + (rows - 1) * rowSpacing) - 10}
+                  stroke={dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)'}
+                  strokeWidth="1" strokeDasharray="3,3"
+                />
                 {rawPos.map(({ x, y }, i) => (
-                  <circle key={i} cx={x} cy={y} r={2.8}
-                    fill={i < seatColors.length ? seatColors[i] : (dark?'#374151':'#e5e7eb')} />
+                  <circle key={i} cx={x} cy={y} r={dotR}
+                    fill={i < seatColors.length ? seatColors[i] : (dark ? '#374151' : '#e5e7eb')}
+                  />
                 ))}
               </svg>
             </div>
-            {/* Majority progress bar */}
-            <div className="px-3.5 pb-2">
+            {/* Majority bar */}
+            <div className="px-3.5 pb-2 pt-1">
               <div className="h-2 rounded-full bg-black/8 overflow-hidden mb-1">
                 <div className="flex h-full">
                   {RO_LR_ORDER.filter(id => (seatsMap[id] ?? 0) > 0).map(id => (
-                    <div key={id} style={{ width:`${((seatsMap[id]??0)/totalSeatsConst)*100}%`, background:partyColor(id), transition:'width 0.3s' }} />
+                    <div key={id} style={{ width:`${((seatsMap[id]??0)/RO_CAMERA_SEATS)*100}%`, background:partyColor(id), transition:'width 0.3s' }} />
                   ))}
                 </div>
               </div>
               <div className="flex justify-between text-[7.5px] font-mono text-ink-3">
                 <span>0</span>
-                <span className="font-bold text-ink">{majorityConst} needed</span>
-                <span>{totalSeatsConst}</span>
+                <span className="font-bold text-ink">{RO_CAMERA_MAJORITY} majority</span>
+                <span>{RO_CAMERA_SEATS}</span>
               </div>
             </div>
+            {/* Legend */}
             <div className="px-3.5 pb-4">
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                 {legend.map(({ id, count, color }) => (
@@ -1410,8 +1471,8 @@ export default function RomaniaApp() {
     localStorage.setItem('darkMode', String(dark));
   }, [dark]);
 
-  const [preset, setPreset]   = useState<'2024'|'polling2026'|'blank'|'custom'>('2024');
-  const [natPcts, setNatPcts] = useState<Record<RoPartyId, number>>(() => ({ ...RO_VOTE_PCT_2024 }));
+  const [preset, setPreset]   = useState<'2024'|'polling2026'|'blank'|'custom'>('polling2026');
+  const [natPcts, setNatPcts] = useState<Record<RoPartyId, number>>(() => ({ ...RO_VOTE_PCT_2026_POLLING }));
   const [projectedCounties, setProjectedCounties] = useState<Set<RoCountyId>>(new Set());
 
   function load2024()        { setNatPcts({ ...RO_VOTE_PCT_2024 }); setPreset('2024'); setProjectedCounties(new Set()); resetSim(); }
@@ -1460,7 +1521,6 @@ export default function RomaniaApp() {
   }, []);
 
   const cameraSeats = useMemo(() => simCameraSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simCameraSeats, natPcts]);
-  const senateSeats = useMemo(() => calcSeats(natPcts, RO_SENATE_SEATS), [natPcts]);
 
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
@@ -1484,7 +1544,7 @@ export default function RomaniaApp() {
 
         <div ref={headerScrollRef} className="flex-1 min-w-0 flex items-center gap-2 px-2 overflow-x-auto scroll-none">
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={load2024}        className={preset==='2024'        ? btnGold : btnMuted}>2024 Results</button>
+          <button onClick={load2024}        className={preset==='2024'        ? btnGold : btnMuted}>2024 Baseline</button>
           <button onClick={loadPolling2026} className={preset==='polling2026' ? btnGold : btnMuted}>2026 Polling</button>
           <button onClick={loadBlank}       className={preset==='blank'       ? btnGold : btnMuted}>Blank Map</button>
           {preset === 'blank' && (
@@ -1505,10 +1565,6 @@ export default function RomaniaApp() {
           )}
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
           <button onClick={() => setSimOpen(v => !v)} className={simOpen ? btnActive : btnMuted}>▶ Simulation</button>
-          <button onClick={() => setBubbleMap(v => !v)}
-            className={bubbleMap ? `${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700` : btnMuted}>
-            Bubble Map
-          </button>
           <button onClick={() => setScoreboardVisible(v => !v)} className={scoreboardVisible ? btnActive : btnMuted}>Scoreboard</button>
           <button onClick={() => {
             if (parliOpen) { setParliOpen(false); triggerExit('parli'); }
@@ -1522,6 +1578,10 @@ export default function RomaniaApp() {
             if (analysisOpen) { setAnalysisOpen(false); triggerExit('analysis'); }
             else { setAnalysisOpen(true); setTutorialOpen(false); }
           }} className={analysisOpen ? btnActive : btnMuted}>📊 Analysis</button>
+          <button onClick={() => setBubbleMap(v => !v)}
+            className={bubbleMap ? `${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700` : btnMuted}>
+            Bubble Map
+          </button>
           <button onClick={() => {
             if (tutorialOpen) { setTutorialOpen(false); triggerExit('tutorial'); }
             else { setTutorialOpen(true); setAnalysisOpen(false); }
@@ -1546,7 +1606,7 @@ export default function RomaniaApp() {
         {/* Parliament — LEFT */}
         {showParli && (
           <RoParliamentPanel
-            cameraSeats={cameraSeats} senateSeats={senateSeats}
+            cameraSeats={cameraSeats}
             onClose={() => { setParliOpen(false); triggerExit('parli'); }}
             exiting={exitPanel==='parli'} dark={dark}
           />
