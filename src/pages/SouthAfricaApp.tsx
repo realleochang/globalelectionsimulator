@@ -7,25 +7,25 @@ import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import { GlobeLogo } from './HomePage';
 
 type SaPartyId = 'ANC' | 'DA' | 'MK' | 'EFF' | 'IFP' | 'PA' | 'FFP' | 'ASA' | 'UDM' | 'ACDP' | 'RISE' | 'ATM' | 'NCC' | 'AJ' | 'BOSA' | 'GOOD' | 'PAC' | 'UAT';
-type SaParty = { id: SaPartyId; name: string; fullName: string; color: string; seats2024: number; leader: string; wikiTitle?: string };
+type SaParty = { id: SaPartyId; name: string; fullName: string; color: string; seats2024: number; leader: string; wikiTitle?: string; leader2024?: string; wikiTitle2024?: string };
 
 const SA_PARTIES: SaParty[] = [
   // Leaders current as of May 2026
   { id: 'ANC',  name: 'ANC',       fullName: 'African National Congress',          color: '#007A4D', seats2024: 159, leader: 'Cyril Ramaphosa',     wikiTitle: 'Cyril_Ramaphosa' },
   // DA: Steenhuisen stepped down Feb 2026 → Geordin Hill-Lewis elected leader Apr 12 2026
-  { id: 'DA',   name: 'DA',        fullName: 'Democratic Alliance',                color: '#1565C0', seats2024:  87, leader: 'Geordin Hill-Lewis',  wikiTitle: 'Geordin_Hill-Lewis' },
+  { id: 'DA',   name: 'DA',        fullName: 'Democratic Alliance',                color: '#1565C0', seats2024:  87, leader: 'Geordin Hill-Lewis',  wikiTitle: 'Geordin_Hill-Lewis',  leader2024: 'John Steenhuisen', wikiTitle2024: 'John_Steenhuisen' },
   { id: 'MK',   name: 'MK',        fullName: 'uMkhonto we Sizwe Party',            color: '#B71C1C', seats2024:  58, leader: 'Jacob Zuma',          wikiTitle: 'Jacob_Zuma' },
   { id: 'EFF',  name: 'EFF',       fullName: 'Economic Freedom Fighters',          color: '#E53935', seats2024:  39, leader: 'Julius Malema',       wikiTitle: 'Julius_Malema' },
   { id: 'IFP',  name: 'IFP',       fullName: 'Inkatha Freedom Party',              color: '#6A1B9A', seats2024:  17, leader: 'Velenkosini Hlabisa', wikiTitle: 'Velenkosini_Hlabisa' },
   { id: 'PA',   name: 'PA',        fullName: 'Patriotic Alliance',                 color: '#E65100', seats2024:   9, leader: 'Gayton McKenzie',     wikiTitle: 'Gayton_McKenzie' },
   // FF+: Groenewald became NA Speaker (Jun 2024) → Corné Mulder elected leader Feb 22 2025
-  { id: 'FFP',  name: 'FF+',       fullName: 'Freedom Front Plus',                 color: '#FF8F00', seats2024:   6, leader: 'Corné Mulder',        wikiTitle: 'Corné_Mulder' },
+  { id: 'FFP',  name: 'FF+',       fullName: 'Freedom Front Plus',                 color: '#FF8F00', seats2024:   6, leader: 'Corné Mulder',        wikiTitle: 'Corné_Mulder',        leader2024: 'Pieter Groenewald', wikiTitle2024: 'Pieter_Groenewald' },
   { id: 'ASA',  name: 'ActionSA',  fullName: 'ActionSA',                           color: '#00ACC1', seats2024:   6, leader: 'Herman Mashaba',      wikiTitle: 'Herman_Mashaba' },
   { id: 'UDM',  name: 'UDM',       fullName: 'United Democratic Movement',         color: '#558B2F', seats2024:   3, leader: 'Bantu Holomisa',      wikiTitle: 'Bantu_Holomisa' },
   { id: 'ACDP', name: 'ACDP',      fullName: 'African Christian Democratic Party', color: '#1A237E', seats2024:   3, leader: 'Kenneth Meshoe',      wikiTitle: 'Kenneth_Meshoe' },
   { id: 'RISE', name: 'Rise',      fullName: 'Rise Mzansi',                        color: '#00838F', seats2024:   2, leader: 'Songezo Zibi',        wikiTitle: 'Songezo_Zibi' },
   // ATM: Zungula removed as party president Jun 2025 → Caesar Nongqunga (party founder) installed
-  { id: 'ATM',  name: 'ATM',       fullName: 'African Transformation Movement',    color: '#880E4F', seats2024:   2, leader: 'Caesar Nongqunga',    wikiTitle: undefined },
+  { id: 'ATM',  name: 'ATM',       fullName: 'African Transformation Movement',    color: '#880E4F', seats2024:   2, leader: 'Caesar Nongqunga',    wikiTitle: undefined,             leader2024: 'Vuyo Zungula',     wikiTitle2024: 'Vuyo_Zungula' },
   // NCC: Fadiel Adams is and has been the leader (Nic Koornhof had no NCC connection)
   { id: 'NCC',  name: 'NCC',       fullName: 'National Coloured Congress',         color: '#78909C', seats2024:   2, leader: 'Fadiel Adams',        wikiTitle: 'Fadiel_Adams' },
   { id: 'AJ',   name: 'Al Jama-ah',fullName: 'Al Jama-ah',                         color: '#2E7D32', seats2024:   2, leader: 'Ganief Hendricks',    wikiTitle: 'Ganief_Hendricks' },
@@ -399,7 +399,7 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      <MapContainer center={[-29, 25]} zoom={5} minZoom={4} maxZoom={13}
+      <MapContainer center={[-29, 25]} zoom={5} minZoom={2} maxZoom={13}
         style={{ width:'100%', height:'100%' }} zoomControl worldCopyJump={false}>
         <TileLayer key={dark ? 'dark' : 'light'}
           url={dark
@@ -454,23 +454,28 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
 }
 
 // ── Scoreboard tile — Germany dual-row style (NAT LIST + REGIONAL) ────────────
-const SaScoreboardTile = React.memo(function SaScoreboardTile({ partyId, listSeats, regSeats, listPct, regPct, listRaw, regRaw, isLeader, isWinner }: {
+const SaScoreboardTile = React.memo(function SaScoreboardTile({ partyId, listSeats, regSeats, listPct, regPct, listRaw, regRaw, isLeader, isWinner, isBaseline }: {
   partyId: SaPartyId;
   listSeats: number; regSeats: number;
   listPct: number;   regPct: number;
   listRaw: number;   regRaw: number;
   isLeader: boolean; isWinner: boolean;
+  isBaseline?: boolean;
 }) {
   const party = SA_PARTY_MAP[partyId];
+  // Show 2024-era leader on the baseline results dashboard; current leader everywhere else
+  const leaderName  = (isBaseline && party.leader2024)   ? party.leader2024   : party.leader;
+  const wikiTitle   = (isBaseline && party.wikiTitle2024 !== undefined) ? party.wikiTitle2024 : party.wikiTitle;
+
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   useEffect(() => {
-    if (!party.wikiTitle) { setPhotoUrl(null); return; }
+    if (!wikiTitle) { setPhotoUrl(null); return; }
     let cancelled = false;
-    fetchWikiPhoto(party.wikiTitle).then(url => { if (!cancelled) setPhotoUrl(url); });
+    fetchWikiPhoto(wikiTitle).then(url => { if (!cancelled) setPhotoUrl(url); });
     return () => { cancelled = true; };
-  }, [party.wikiTitle]);
+  }, [wikiTitle]);
 
-  const initials = party.leader.split(' ').map((w: string) => w[0]).join('').slice(0, 2);
+  const initials = leaderName.split(' ').map((w: string) => w[0]).join('').slice(0, 2);
   const color = partyColor(partyId);
   const colorAlpha = hexToRgba(color, 0.13);
 
@@ -482,7 +487,7 @@ const SaScoreboardTile = React.memo(function SaScoreboardTile({ partyId, listSea
       <div style={{ position: 'relative' }}>
         <div className="cand-circle-frame">
           {photoUrl
-            ? <img src={photoUrl} alt={party.leader} onError={() => setPhotoUrl(null)} />
+            ? <img src={photoUrl} alt={leaderName} onError={() => setPhotoUrl(null)} />
             : <span className="cand-initials">{initials}</span>
           }
         </div>
@@ -495,7 +500,7 @@ const SaScoreboardTile = React.memo(function SaScoreboardTile({ partyId, listSea
           </span>
         )}
       </div>
-      <span className="cand-leader-name" title={party.leader}>{party.leader.split(' ').pop()}</span>
+      <span className="cand-leader-name" title={leaderName}>{leaderName.split(' ').pop()}</span>
       <span className="cand-party-abbrev">{party.name}</span>
       {/* Total seats — large number */}
       <span className="cand-seats">{listSeats + regSeats}</span>
@@ -609,7 +614,8 @@ const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts,
                 listPct={listPct} regPct={regPct}
                 listRaw={listRaw} regRaw={regRaw}
                 isLeader={party.id === leader && !winner}
-                isWinner={party.id === winner} />
+                isWinner={party.id === winner}
+                isBaseline={isBaseline} />
             );
           })}
         </div>
