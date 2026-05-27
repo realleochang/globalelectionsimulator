@@ -34,20 +34,20 @@ const SA_PARTY_MAP = Object.fromEntries(SA_PARTIES.map(p => [p.id, p])) as Recor
 const SA_TOTAL_SEATS = 400;
 const SA_MAJORITY = 201;
 
-// Official 2024 IEC national results
+// Official 2024 IEC national results (national ballot)
 const SA_VOTE_PCT_2024: Record<SaPartyId, number> = {
-  ANC: 40.18, DA: 21.81, MK: 14.58, EFF: 9.52, IFP: 3.83, PA: 1.95,
-  FFP: 1.34, ASA: 1.43, UDM: 0.91, ACDP: 0.65, RISE: 0.77, ATM: 0.59,
-  NCC: 0.30, AJ: 0.28, BOSA: 0.38, GOOD: 0.23, PAC: 0.24, UAT: 0.24,
+  ANC: 40.18, DA: 21.81, MK: 14.58, EFF: 9.52, IFP: 3.85, PA: 2.06,
+  FFP: 1.36, ASA: 1.20, UDM: 0.49, ACDP: 0.60, RISE: 0.42, ATM: 0.40,
+  BOSA: 0.41, AJ: 0.24, NCC: 0.23, PAC: 0.23, UAT: 0.22, GOOD: 0.18,
 };
 const SA_VOTE_RAW_2024: Record<SaPartyId, number> = {
-  ANC: 6_487_000, DA: 3_522_000, MK: 2_354_000, EFF: 1_537_000,
-  IFP: 618_000,   PA: 315_000,   FFP: 216_000,   ASA: 231_000,
-  UDM: 147_000,   ACDP: 105_000, RISE: 124_000,  ATM:  95_000,
-  NCC:  48_000,   AJ:   45_000,  BOSA:  61_000,  GOOD:  37_000,
-  PAC:  39_000,   UAT:  39_000,
+  ANC: 6_459_683, DA: 3_505_735, MK: 2_344_309, EFF: 1_529_961,
+  IFP:   618_207, PA:   330_425, FFP:   218_850, ASA:   192_373,
+  UDM:    78_448, ACDP:  96_575, RISE:   67_975, ATM:    63_554,
+  BOSA:   65_912, AJ:    39_067, NCC:    37_422, PAC:    36_716,
+  UAT:    35_679, GOOD:  29_501,
 };
-const SA_GRAND_TOTAL_VOTES = 16_143_000;
+const SA_GRAND_TOTAL_VOTES = 16_076_719;
 
 // Official 2024 seat allocation (used for baseline display)
 const SA_SEATS_2024: Record<SaPartyId, number> = {
@@ -83,6 +83,39 @@ const SA_PROV_RESULTS_2024: Record<SaProvId, Record<SaPartyId, number>> = {
   NC:  { ANC:47.0, DA:26.0, MK:8.0,  EFF:9.0,  IFP:0.3,  PA:5.0, FFP:2.0, ASA:1.0, UDM:0.2, ACDP:0.5, RISE:0.3, ATM:0.2, NCC:1.0, AJ:0.3, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
   NW:  { ANC:50.0, DA:13.0, MK:16.0, EFF:11.0, IFP:1.5,  PA:3.0, FFP:1.0, ASA:1.0, UDM:0.3, ACDP:0.3, RISE:0.3, ATM:0.5, NCC:0.1, AJ:0.1, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
   FS:  { ANC:55.0, DA:15.0, MK:11.0, EFF:13.0, IFP:0.5,  PA:2.0, FFP:1.0, ASA:0.8, UDM:0.3, ACDP:0.3, RISE:0.3, ATM:0.4, NCC:0.1, AJ:0.1, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
+};
+
+// Maps each of the 52 districts in south-africa-provinces.geojson → its province
+const SA_DISTRICT_TO_PROV: Record<string, SaProvId> = {
+  // Gauteng
+  'City of Johannesburg Metropolitan': 'GP', 'City of Tshwane Metropolitan': 'GP',
+  'Ekurhuleni Metropolitan': 'GP', 'West Rand District': 'GP', 'Sedibeng District': 'GP',
+  // KwaZulu-Natal
+  'eThekwini Metropolitan': 'KZN', 'iLembe District': 'KZN', 'uMgungundlovu District': 'KZN',
+  'uThungulu District': 'KZN', 'Zululand District': 'KZN', 'Umkhanyakude District': 'KZN',
+  'Uthukela District': 'KZN', 'Umzinyathi District': 'KZN', 'Amajuba District': 'KZN',
+  'Sisonke District': 'KZN', 'Ugu District': 'KZN',
+  // Western Cape
+  'City of Cape Town': 'WC', 'West Coast District': 'WC', 'Cape Winelands District': 'WC',
+  'Eden District': 'WC', 'Central Karoo District': 'WC', 'Overberg District': 'WC',
+  // Eastern Cape
+  'Buffalo City Metropolitan': 'EC', 'Nelson Mandela Bay Metropolitan': 'EC',
+  'Amathole District': 'EC', 'Chris Hani District': 'EC', 'Joe Gqabi District': 'EC',
+  'O.R. Tambo District': 'EC', 'Alfred Nzo District': 'EC', 'Sarah Baartman District': 'EC',
+  // Limpopo
+  'Capricorn District': 'LP', 'Vhembe District': 'LP', 'Mopani District': 'LP',
+  'Waterberg District': 'LP', 'Sekhukhune District': 'LP',
+  // Mpumalanga
+  'Ehlanzeni District': 'MP', 'Nkangala District': 'MP', 'Gert Sibande District': 'MP',
+  // Northern Cape
+  'Frances Baard District': 'NC', 'Namakwa District': 'NC', 'Pixley ka Seme District': 'NC',
+  'ZF Mgcawu District': 'NC', 'John Taolo Gaetsewe District': 'NC',
+  // North West
+  'Bojanala Platinum District': 'NW', 'Dr Kenneth Kaunda District': 'NW',
+  'Ngaka Modiri Molema District': 'NW', 'Dr Ruth Segomotsi Mompati District': 'NW',
+  // Free State
+  'Mangaung Metropolitan': 'FS', 'Lejweleputswa District': 'FS',
+  'Thabo Mofutsanyana District': 'FS', 'Fezile Dabi District': 'FS', 'Xhariep District': 'FS',
 };
 
 function calcSeats(votePcts: Partial<Record<SaPartyId, number>>, totalSeats = SA_TOTAL_SEATS): Partial<Record<SaPartyId, number>> {
@@ -293,11 +326,8 @@ function MapController() {
   return null;
 }
 
-// ── Province bubble layer (hardcoded coords — no GeoJSON) ──────────────────────
-type BubbleEntry = { marker: L.CircleMarker; baseRadius: number };
-function zoomScale(zoom: number): number { return Math.max(0.40, Math.min(1.0, (zoom - 4) / (9 - 4))); }
-
-function SaBubbleLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides }: {
+// ── Province choropleth layer (fills 52 districts coloured by province winner) ──
+function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides, dark }: {
   natPcts: Record<SaPartyId, number>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   setTooltip: (t: ProvTooltipState) => void;
@@ -305,50 +335,74 @@ function SaBubbleLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef
   natPctsRef: React.MutableRefObject<Record<SaPartyId, number>>;
   overrides?: Record<string, Record<SaPartyId, number>>;
   declaredProvs?: Set<SaProvId>;
+  dark?: boolean;
 }) {
   const map = useMap();
-  const bubblesRef = useRef<BubbleEntry[]>([]);
+  const layerRef = useRef<L.GeoJSON | null>(null);
   const onSelectRef = useRef(onSelect);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
+  // Fetch GeoJSON once and cache it
+  const [geoData, setGeoData] = useState<GeoJSON.FeatureCollection | null>(null);
   useEffect(() => {
-    const onZoom = () => {
-      const scale = zoomScale(map.getZoom());
-      for (const { marker, baseRadius } of bubblesRef.current) marker.setRadius(baseRadius * scale);
-    };
-    map.on('zoomend', onZoom); return () => { map.off('zoomend', onZoom); };
-  }, [map]);
+    fetch('/south-africa-provinces.geojson').then(r => r.json()).then(setGeoData).catch(() => {});
+  }, []);
 
   useEffect(() => {
-    for (const { marker } of bubblesRef.current) marker.remove();
-    bubblesRef.current = [];
-    const scale = zoomScale(map.getZoom());
+    if (!geoData) return;
+    if (layerRef.current) { layerRef.current.remove(); layerRef.current = null; }
 
-    for (const prov of SA_PROVINCES) {
-      if (declaredProvs && !declaredProvs.has(prov.id)) continue;
-      const rv = overrides?.[prov.id] ?? calcProvVotes(natPcts, prov.id);
-      const sorted = (Object.entries(rv) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
-      if (!sorted.length) continue;
-      const [winId, winPct] = sorted[0];
-      const margin = winPct - (sorted[1]?.[1] ?? 0);
-      const baseRadius = 7 + Math.min(margin / 20, 1) * 17;
-      const color = partyColor(winId);
-      const marker = L.circleMarker([prov.lat, prov.lng] as L.LatLngExpression, {
-        radius: baseRadius * scale, color, fillColor: color, fillOpacity: 0.72, weight: 1.5, opacity: 0.9,
-      }).addTo(map);
+    const borderColor = dark ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.60)';
+    const undeclaredFill = dark ? '#1e2a3a' : '#d1d5db';
 
-      marker.on('click', () => { setTooltip(null); onSelectRef.current(prov.id); });
-      marker.on('mousemove', (e: L.LeafletMouseEvent) => {
-        const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
-        const cur = overrides?.[prov.id] ?? calcProvVotes(natPctsRef.current, prov.id);
-        const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 5).map(([id, pct]) => ({ id, pct }));
-        setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: prov.name, parties, leader: parties[0]?.id ?? null });
-      });
-      marker.on('mouseout', () => setTooltip(null));
-      bubblesRef.current.push({ marker, baseRadius });
-    }
-    return () => { for (const { marker } of bubblesRef.current) marker.remove(); bubblesRef.current = []; };
-  }, [map, natPcts, declaredProvs, overrides]);
+    const layer = L.geoJSON(geoData as GeoJSON.GeoJsonObject, {
+      style: (feature) => {
+        const distName: string = (feature as GeoJSON.Feature)?.properties?.name ?? '';
+        const provId = SA_DISTRICT_TO_PROV[distName];
+        if (!provId) return { fillColor: undeclaredFill, fillOpacity: 0.5, weight: 0.8, color: borderColor, opacity: 1 };
+        if (declaredProvs && !declaredProvs.has(provId)) {
+          return { fillColor: undeclaredFill, fillOpacity: 0.5, weight: 0.8, color: borderColor, opacity: 1 };
+        }
+        const rv = overrides?.[provId] ?? calcProvVotes(natPcts, provId);
+        const sorted = (Object.entries(rv) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+        const winnerId = sorted[0]?.[0] as SaPartyId | undefined;
+        const color = winnerId ? partyColor(winnerId) : '#888';
+        const margin = (sorted[0]?.[1] ?? 0) - (sorted[1]?.[1] ?? 0);
+        const opacity = 0.45 + Math.min(margin / 40, 1) * 0.30; // stronger colour = bigger margin
+        return { fillColor: color, fillOpacity: opacity, weight: 0.8, color: borderColor, opacity: 1 };
+      },
+      onEachFeature: (feature, lyr) => {
+        const distName: string = (feature as GeoJSON.Feature)?.properties?.name ?? '';
+        const provId = SA_DISTRICT_TO_PROV[distName];
+
+        lyr.on('click', () => {
+          if (provId) { setTooltip(null); onSelectRef.current(provId); }
+        });
+        lyr.on('mouseover', (e: L.LeafletMouseEvent) => {
+          if (lyr instanceof L.Path) lyr.setStyle({ fillOpacity: Math.min(((lyr.options.fillOpacity ?? 0.55) as number) + 0.18, 0.92), weight: 1.5 });
+          if (!provId) return;
+          const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+          const cur = overrides?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
+          const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6).map(([id, pct]) => ({ id, pct }));
+          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: SA_PROV_MAP[provId]?.name ?? distName, parties, leader: parties[0]?.id ?? null });
+        });
+        lyr.on('mousemove', (e: L.LeafletMouseEvent) => {
+          if (!provId) return;
+          const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+          const cur = overrides?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
+          const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6).map(([id, pct]) => ({ id, pct }));
+          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: SA_PROV_MAP[provId]?.name ?? distName, parties, leader: parties[0]?.id ?? null });
+        });
+        lyr.on('mouseout', () => {
+          if (lyr instanceof L.Path) layer.resetStyle(lyr);
+          setTooltip(null);
+        });
+      },
+    }).addTo(map);
+
+    layerRef.current = layer;
+    return () => { layer.remove(); layerRef.current = null; };
+  }, [map, geoData, natPcts, declaredProvs, overrides, dark]);
 
   return null;
 }
@@ -375,8 +429,9 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
           attribution='&copy; OpenStreetMap &copy; CARTO'
           subdomains="abcd" updateWhenZooming={false} updateWhenIdle maxZoom={20} />
         <MapController />
-        <SaBubbleLayer natPcts={natPcts} containerRef={containerRef}
-          setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef} declaredProvs={declaredProvs} overrides={overrides} />
+        <SaChoroplethLayer natPcts={natPcts} containerRef={containerRef}
+          setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
+          declaredProvs={declaredProvs} overrides={overrides} dark={dark} />
       </MapContainer>
       {tooltip && (() => {
         const cw = containerRef.current?.clientWidth ?? 9999;
@@ -392,7 +447,7 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
           <div className="absolute pointer-events-none z-[1000]" style={{ left, top: Math.max(6, tooltip.y - 20), width: TW }}>
             <div style={{ background:tt.bg, borderRadius:10, border:`1px solid ${tt.border}`, boxShadow:tt.shadow, backdropFilter:'blur(10px)', padding:'12px 14px' }}>
               <div style={{ fontSize:13, fontWeight:700, color:tt.title }}>{tooltip.name}</div>
-              <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:dark?'rgba(255,255,255,0.40)':'rgba(0,0,0,0.42)', marginTop:2 }}>Est. provincial result</div>
+              <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:dark?'rgba(255,255,255,0.40)':'rgba(0,0,0,0.42)', marginTop:2 }}>Provincial result · click to expand</div>
               <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:6 }}>
                 {tooltip.parties.map(({ id, pct }, i) => {
                   const c = partyColor(id);
@@ -409,7 +464,7 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
           </div>
         );
       })()}
-      <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono">Scroll to zoom · Click bubble to open</div>
+      <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono">Scroll to zoom · Click province to open</div>
     </div>
   );
 }
