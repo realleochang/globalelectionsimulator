@@ -1605,7 +1605,7 @@ export default function RomaniaApp() {
       </header>
 
       {/* ── Scoreboard ───────────────────────────────────────────────────── */}
-      {scoreboardVisible && (
+      {scoreboardVisible && !(preset === 'blank' && projectedCounties.size === 0) && (
         <RoScoreboard natPcts={displayPcts} simCameraSeats={simCameraSeats} isBaseline={preset==='2024'}
           totalVotesBase={preset==='blank' ? blankTotalVotes : undefined} dark={dark} />
       )}
