@@ -412,10 +412,11 @@ function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLea
 }
 
 // ── Scoreboard ─────────────────────────────────────────────────────────────────
-function RoScoreboard({ natPcts, simCameraSeats, isBaseline, dark: _dark }: {
+function RoScoreboard({ natPcts, simCameraSeats, isBaseline, totalVotesBase, dark: _dark }: {
   natPcts: Record<RoPartyId, number>;
   simCameraSeats?: Partial<Record<RoPartyId, number>>;
   isBaseline?: boolean;
+  totalVotesBase?: number;
   dark?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -442,11 +443,12 @@ function RoScoreboard({ natPcts, simCameraSeats, isBaseline, dark: _dark }: {
   const leader = sorted[0]?.id ?? null;
   const winner = leader && (seats[leader] ?? 0) >= RO_CAMERA_MAJORITY ? leader : null;
 
+  const votesBase     = totalVotesBase ?? RO_GRAND_TOTAL_VOTES;
   const trackedPctSum = useMemo(() => RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0), [natPcts]);
   const otherPct      = Math.max(0, 100 - trackedPctSum);
   const otherRawVotes = isBaseline
     ? RO_GRAND_TOTAL_VOTES - RO_PARTIES.reduce((s, p) => s + (RO_VOTE_RAW_2024[p.id] ?? 0), 0)
-    : Math.round(otherPct / 100 * RO_GRAND_TOTAL_VOTES);
+    : Math.round(otherPct / 100 * votesBase);
 
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
@@ -457,7 +459,7 @@ function RoScoreboard({ natPcts, simCameraSeats, isBaseline, dark: _dark }: {
             const pct = natPcts[party.id] ?? 0;
             const rawVotes = isBaseline
               ? RO_VOTE_RAW_2024[party.id]
-              : Math.round(pct / 100 * RO_GRAND_TOTAL_VOTES);
+              : Math.round(pct / 100 * votesBase);
             const belowThreshold = pct < RO_THRESHOLD;
             return (
               <RoScoreboardTile key={party.id} partyId={party.id} seats={s} pct={pct}
@@ -1233,7 +1235,7 @@ function RoAnalysisPanel({ natPcts, cameraSeats, onClose, exiting, dark }: {
     <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">📊 Election Analysis</h2>
+          <h2 className="text-[13px] font-bold text-ink leading-none">Election Analysis</h2>
           <div className="text-[9px] font-mono text-ink-3 mt-0.5">Nerdy stats · Romania 2024 base</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -1520,7 +1522,30 @@ export default function RomaniaApp() {
     el.addEventListener('wheel', h, { passive: false }); return () => el.removeEventListener('wheel', h);
   }, []);
 
-  const cameraSeats = useMemo(() => simCameraSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simCameraSeats, natPcts]);
+  // In blank mode: weighted-average pcts of projected counties (zeros when none projected)
+  const blankDisplayPcts = useMemo<Record<RoPartyId, number>>(() => {
+    const zero = Object.fromEntries(RO_PARTIES.map(p => [p.id, 0])) as Record<RoPartyId, number>;
+    if (preset !== 'blank' || projectedCounties.size === 0) return zero;
+    const weighted: Partial<Record<RoPartyId, number>> = {};
+    let totalV = 0;
+    for (const id of projectedCounties) {
+      const cv = (countyOverrides[id] as Record<RoPartyId, number> | undefined) ?? calcCountyVotes(natPcts, id);
+      const votes = RO_COUNTY_VALID_VOTES_2024[id as RoCountyId] ?? 0;
+      for (const p of RO_PARTIES) weighted[p.id] = (weighted[p.id] ?? 0) + (cv[p.id] ?? 0) * votes;
+      totalV += votes;
+    }
+    if (totalV === 0) return zero;
+    return Object.fromEntries(RO_PARTIES.map(p => [p.id, (weighted[p.id] ?? 0) / totalV])) as Record<RoPartyId, number>;
+  }, [preset, projectedCounties, natPcts, countyOverrides]);
+
+  const blankTotalVotes = useMemo(
+    () => preset === 'blank' ? [...projectedCounties].reduce((s, id) => s + (RO_COUNTY_VALID_VOTES_2024[id as RoCountyId] ?? 0), 0) : RO_GRAND_TOTAL_VOTES,
+    [preset, projectedCounties],
+  );
+
+  const displayPcts = preset === 'blank' ? blankDisplayPcts : natPcts;
+
+  const cameraSeats = useMemo(() => simCameraSeats ?? calcSeats(displayPcts, RO_CAMERA_SEATS), [simCameraSeats, displayPcts]);
 
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
@@ -1547,22 +1572,6 @@ export default function RomaniaApp() {
           <button onClick={load2024}        className={preset==='2024'        ? btnGold : btnMuted}>2024 Baseline</button>
           <button onClick={loadPolling2026} className={preset==='polling2026' ? btnGold : btnMuted}>2026 Polling</button>
           <button onClick={loadBlank}       className={preset==='blank'       ? btnGold : btnMuted}>Blank Map</button>
-          {preset === 'blank' && (
-            <>
-              <button
-                onClick={() => setProjectedCounties(new Set(RO_COUNTIES.map(c => c.id)))}
-                className={`${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700`}>
-                Project All
-              </button>
-              {projectedCounties.size > 0 && (
-                <button
-                  onClick={() => setProjectedCounties(new Set())}
-                  className={btnMuted}>
-                  Clear ({projectedCounties.size})
-                </button>
-              )}
-            </>
-          )}
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
           <button onClick={() => setSimOpen(v => !v)} className={simOpen ? btnActive : btnMuted}>▶ Simulation</button>
           <button onClick={() => setScoreboardVisible(v => !v)} className={scoreboardVisible ? btnActive : btnMuted}>Scoreboard</button>
@@ -1577,7 +1586,7 @@ export default function RomaniaApp() {
           <button onClick={() => {
             if (analysisOpen) { setAnalysisOpen(false); triggerExit('analysis'); }
             else { setAnalysisOpen(true); setTutorialOpen(false); }
-          }} className={analysisOpen ? btnActive : btnMuted}>📊 Analysis</button>
+          }} className={analysisOpen ? btnActive : btnMuted}>Analysis</button>
           <button onClick={() => setBubbleMap(v => !v)}
             className={bubbleMap ? `${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700` : btnMuted}>
             Bubble Map
@@ -1597,7 +1606,8 @@ export default function RomaniaApp() {
 
       {/* ── Scoreboard ───────────────────────────────────────────────────── */}
       {scoreboardVisible && (
-        <RoScoreboard natPcts={natPcts} simCameraSeats={simCameraSeats} isBaseline={preset==='2024'} dark={dark} />
+        <RoScoreboard natPcts={displayPcts} simCameraSeats={simCameraSeats} isBaseline={preset==='2024'}
+          totalVotesBase={preset==='blank' ? blankTotalVotes : undefined} dark={dark} />
       )}
 
       {/* ── Body ─────────────────────────────────────────────────────────── */}
@@ -1736,7 +1746,7 @@ export default function RomaniaApp() {
         {/* Analysis — right */}
         {showAnalysis && !simOpen && !showCoal && (
           <RoAnalysisPanel
-            natPcts={natPcts} cameraSeats={cameraSeats}
+            natPcts={displayPcts} cameraSeats={cameraSeats}
             onClose={() => { setAnalysisOpen(false); triggerExit('analysis'); }}
             exiting={exitPanel==='analysis'} dark={dark} />
         )}
