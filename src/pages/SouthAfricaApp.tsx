@@ -292,13 +292,14 @@ function MapController({ layerRef }: { layerRef: React.MutableRefObject<L.GeoJSO
 }
 
 // ── Choropleth: province GeoJSON, thin visible borders, coloured by winner ────
-function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides, dark }: {
+function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides, provReporting, dark }: {
   natPcts: Record<SaPartyId, number>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   setTooltip: (t: ProvTooltipState) => void;
   onSelect: (id: SaProvId) => void;
   natPctsRef: React.MutableRefObject<Record<SaPartyId, number>>;
   overrides?: Record<string, Record<SaPartyId, number>>;
+  provReporting?: Partial<Record<SaProvId, number>>;
   declaredProvs?: Set<SaProvId>;
   dark?: boolean;
 }) {
@@ -307,11 +308,13 @@ function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPct
   const onSelectRef = useRef(onSelect);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
-  // Mutable refs so the style function always reads the latest values without
-  // needing to recreate the Leaflet layer on every data change.
-  const declaredProvsRef = useRef(declaredProvs);
-  const overridesRef     = useRef(overrides);
-  const darkRef          = useRef(dark);
+  // Mutable refs — updated before every setStyle/tooltip call so closures always read current values
+  const declaredProvsRef  = useRef(declaredProvs);
+  const overridesRef      = useRef(overrides);
+  const provReportingRef  = useRef(provReporting);
+  const darkRef           = useRef(dark);
+  // Tracks the last hovered province so the tooltip can be rebuilt when data changes
+  const lastHoverRef      = useRef<{ provId: SaProvId; clientX: number; clientY: number } | null>(null);
 
   const [geoData, setGeoData] = useState<GeoJSON.FeatureCollection | null>(null);
   useEffect(() => {
@@ -321,7 +324,6 @@ function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPct
   // Stable style function — reads from mutable refs, never recreated
   const getFeatureStyle = useCallback((feature: GeoJSON.Feature | undefined): L.PathOptions => {
     const dk = darkRef.current ?? false;
-    // Thin, visible dark line between provinces (not white/invisible)
     const borderColor = dk ? 'rgba(255,255,255,0.28)' : 'rgba(20,20,20,0.22)';
     const undeclaredFill = dk ? '#1e2a3a' : '#d1d5db';
     const provId = feature?.properties?.province_id as SaProvId | undefined;
@@ -335,9 +337,30 @@ function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPct
     const baseColor = winnerId ? partyColor(winnerId) : '#888';
     const margin = (sorted[0]?.[1] ?? 0) - (sorted[1]?.[1] ?? 0);
     return { fillColor: getProvFill(baseColor, margin, dk), fillOpacity: 0.88, weight: 0.5, color: borderColor, opacity: 1 };
-  }, [natPctsRef]); // stable: reads everything else from refs
+  }, [natPctsRef]);
 
-  // ① CREATE layer once — only when geoData changes (not on slider moves!)
+  // Hoisted tooltip builder — reads everything from refs so it's always current.
+  // Called on mousemove AND by effect ② so the tooltip refreshes instantly after
+  // a province's "Project Result" button is pressed (even without moving the mouse).
+  const rebuildTooltip = useCallback(() => {
+    const h = lastHoverRef.current;
+    if (!h) return;
+    const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+    const provVotes = SA_PROV_MAP[h.provId]?.votes2024 ?? 0;
+    // Scale raw votes by the province's reporting % (matches what the slider panel shows)
+    const reportingScale = (provReportingRef.current?.[h.provId] ?? 100) / 100;
+    const cur = overridesRef.current?.[h.provId] ?? calcProvVotes(natPctsRef.current, h.provId);
+    const parties = (Object.entries(cur) as [SaPartyId, number][])
+      .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6)
+      .map(([id, pct]) => ({ id, pct, raw: Math.round(pct / 100 * reportingScale * provVotes) }));
+    setTooltip({
+      x: h.clientX - rect.left, y: h.clientY - rect.top,
+      name: SA_PROV_MAP[h.provId]?.name ?? h.provId,
+      parties, leader: parties[0]?.id ?? null,
+    });
+  }, [containerRef, natPctsRef, setTooltip]); // all stable refs → callback never recreated
+
+  // ① CREATE layer once — only when geoData changes
   useEffect(() => {
     if (!geoData) return;
     if (layerRef.current) { layerRef.current.remove(); layerRef.current = null; }
@@ -346,54 +369,51 @@ function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPct
       ...(({ smoothFactor: 0 }) as unknown as object),
       style: (feature) => getFeatureStyle(feature as GeoJSON.Feature),
       onEachFeature: (feature, lyr) => {
-        const provId   = (feature as GeoJSON.Feature)?.properties?.province_id as SaProvId | undefined;
-        const provName = (feature as GeoJSON.Feature)?.properties?.name as string ?? (provId ?? '');
+        const provId = (feature as GeoJSON.Feature)?.properties?.province_id as SaProvId | undefined;
+        if (!provId) return;
 
-        lyr.on('click', () => { if (provId) { setTooltip(null); onSelectRef.current(provId); } });
-
-        const buildTooltip = (e: L.LeafletMouseEvent) => {
-          if (!provId) return;
-          const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
-          const provVotes = SA_PROV_MAP[provId]?.votes2024 ?? 0;
-          const cur = overridesRef.current?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
-          const parties = (Object.entries(cur) as [SaPartyId, number][])
-            .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6)
-            .map(([id, pct]) => ({ id, pct, raw: Math.round(pct / 100 * provVotes) }));
-          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: provName, parties, leader: parties[0]?.id ?? null });
-        };
-
+        lyr.on('click', () => { setTooltip(null); lastHoverRef.current = null; onSelectRef.current(provId); });
         lyr.on('mouseover', (e: L.LeafletMouseEvent) => {
           if (lyr instanceof L.Path) lyr.setStyle({ fillOpacity: 0.98, weight: 1.2 });
-          buildTooltip(e);
+          lastHoverRef.current = { provId, clientX: e.originalEvent.clientX, clientY: e.originalEvent.clientY };
+          rebuildTooltip();
         });
-        lyr.on('mousemove', buildTooltip);
-        lyr.on('mouseout', () => { if (lyr instanceof L.Path) layer.resetStyle(lyr); setTooltip(null); });
+        lyr.on('mousemove', (e: L.LeafletMouseEvent) => {
+          lastHoverRef.current = { provId, clientX: e.originalEvent.clientX, clientY: e.originalEvent.clientY };
+          rebuildTooltip();
+        });
+        lyr.on('mouseout', () => {
+          if (lyr instanceof L.Path) layer.resetStyle(lyr);
+          lastHoverRef.current = null;
+          setTooltip(null);
+        });
       },
     }).addTo(map);
 
     layerRef.current = layer;
     return () => { layer.remove(); layerRef.current = null; };
-  }, [map, geoData]); // ← no natPcts/declaredProvs/overrides/dark here!
+  }, [map, geoData]); // ← stable; rebuildTooltip/getFeatureStyle are also stable
 
-  // ② UPDATE styles only — cheap setStyle() call, no layer teardown/rebuild
+  // ② UPDATE styles + refs — also re-fires tooltip so it reflects new data instantly
   useEffect(() => {
-    declaredProvsRef.current = declaredProvs;
-    overridesRef.current     = overrides;
-    darkRef.current          = dark;
-    if (layerRef.current) {
-      layerRef.current.setStyle((f) => getFeatureStyle(f as GeoJSON.Feature));
-    }
-  }, [natPcts, declaredProvs, overrides, dark, getFeatureStyle]);
+    declaredProvsRef.current  = declaredProvs;
+    overridesRef.current      = overrides;
+    provReportingRef.current  = provReporting;
+    darkRef.current           = dark;
+    if (layerRef.current) layerRef.current.setStyle((f) => getFeatureStyle(f as GeoJSON.Feature));
+    rebuildTooltip(); // instant update if mouse is still over a province
+  }, [natPcts, declaredProvs, overrides, provReporting, dark, getFeatureStyle, rebuildTooltip]);
 
   return null;
 }
 
 
 // ── Map view ───────────────────────────────────────────────────────────────────
-function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
+function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides, provReporting }: {
   natPcts: Record<SaPartyId, number>; onSelect: (id: SaProvId) => void;
   dark: boolean; declaredProvs?: Set<SaProvId>;
   overrides?: Record<string, Record<SaPartyId, number>>;
+  provReporting?: Partial<Record<SaProvId, number>>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<ProvTooltipState>(null);
@@ -415,7 +435,8 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
         {/* Choropleth always rendered */}
         <SaChoroplethLayer natPcts={natPcts} containerRef={containerRef}
           setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
-          declaredProvs={declaredProvs} overrides={overrides} dark={dark} />
+          declaredProvs={declaredProvs} overrides={overrides}
+          provReporting={provReporting} dark={dark} />
       </MapContainer>
       {tooltip && (() => {
         const cw = containerRef.current?.clientWidth ?? 9999;
@@ -633,7 +654,7 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, activePart
   provId: SaProvId; natPcts: Record<SaPartyId, number>;
   onUpdate: (id: SaProvId, pcts: Record<SaPartyId, number>) => void;
   /** Called when "Project Result" is clicked — declares this province on the map */
-  onDeclare?: (pcts: Record<SaPartyId, number>) => void;
+  onDeclare?: (pcts: Record<SaPartyId, number>, reportingPct: number) => void;
   activeParties: Set<SaPartyId>;
   onClose: () => void; dark?: boolean;
   override?: Record<SaPartyId, number>;
@@ -858,7 +879,7 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, activePart
                 if (Math.abs(pctSum - 100) > 0.5) {
                   for (const p of SA_PARTIES) projected[p.id] = (pcts[p.id] ?? 0) / pctSum * 100;
                 }
-                onDeclare(projected);
+                onDeclare(projected, reportingPct);
               }}
               disabled={!canDeclare}
               className={`w-full py-2 text-[11px] font-mono font-bold rounded-[4px] border transition-colors ${
@@ -1752,6 +1773,8 @@ export default function SouthAfricaApp() {
   const [simProgress, setSimProgress]     = useState(0);
   const [simRunning, setSimRunning]       = useState(false);
   const [declaredProvs, setDeclaredProvs] = useState<Set<SaProvId> | undefined>();
+  // Per-province reporting % (set when "Project Result" is clicked in province panel)
+  const [provReporting, setProvReporting] = useState<Partial<Record<SaProvId, number>>>({});
   const simTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
   const natPctsAtSimStart = useRef<Record<SaPartyId, number>>(natPcts);
 
@@ -1821,10 +1844,11 @@ export default function SouthAfricaApp() {
   }
 
   /** Declare a single province result — marks it as reported on the map */
-  function handleDeclareProvince(provId: SaProvId, pcts: Record<SaPartyId, number>) {
+  function handleDeclareProvince(provId: SaProvId, pcts: Record<SaPartyId, number>, reportingPct = 100) {
     setProvOverrides(prev => ({ ...prev, [provId]: pcts }));
+    setProvReporting(prev => ({ ...prev, [provId]: reportingPct }));
     setDeclaredProvs(prev => {
-      const next = new Set(prev ?? []); // if undefined (non-blank mode), start fresh set
+      const next = new Set(prev ?? []); // if undefined (non-blank mode), start a fresh set
       next.add(provId);
       return next;
     });
@@ -2073,6 +2097,7 @@ export default function SouthAfricaApp() {
               dark={dark}
               declaredProvs={declaredProvs}
               overrides={provOverrides}
+              provReporting={provReporting}
             />
 
             {/* ── % Reporting widget — blank map + simulation modes only ── */}
@@ -2180,7 +2205,7 @@ export default function SouthAfricaApp() {
                 setProvOverrides(prev => ({ ...prev, [id]: pcts }));
                 if (preset !== 'blank') setPreset('custom');
               }}
-              onDeclare={(pcts) => handleDeclareProvince(selectedProv, pcts)}
+              onDeclare={(pcts, rpt) => handleDeclareProvince(selectedProv, pcts, rpt)}
               onClose={() => setSelectedProv(null)}
               dark={dark}
               override={provOverrides[selectedProv]}
