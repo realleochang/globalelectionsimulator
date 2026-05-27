@@ -348,18 +348,24 @@ function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPct
     if (!h) return;
     const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
     const provVotes = SA_PROV_MAP[h.provId]?.votes2024 ?? 0;
+    // Blank-map / simulation mode: declaredProvs is a Set (even if empty)
+    const inEventMode = declaredProvsRef.current !== undefined;
+    const storedRpt   = provReportingRef.current?.[h.provId];
     // Scale raw votes by the province's reporting % (matches what the slider panel shows)
-    const reportingScale = (provReportingRef.current?.[h.provId] ?? 100) / 100;
+    const reportingScale = (storedRpt ?? 100) / 100;
     const cur = overridesRef.current?.[h.provId] ?? calcProvVotes(natPctsRef.current, h.provId);
     const parties = (Object.entries(cur) as [SaPartyId, number][])
       .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6)
       .map(([id, pct]) => ({ id, pct, raw: Math.round(pct / 100 * reportingScale * provVotes) }));
-    const rpt = provReportingRef.current?.[h.provId];
+    // In event mode (blank map / sim): always show % Reporting badge, defaulting to 0
+    //   for provinces that haven't started reporting yet.
+    // In polling / baseline mode: never show the badge.
+    const reportingPct = inEventMode ? (storedRpt ?? 0) : undefined;
     setTooltip({
       x: h.clientX - rect.left, y: h.clientY - rect.top,
       name: SA_PROV_MAP[h.provId]?.name ?? h.provId,
       parties, leader: parties[0]?.id ?? null,
-      reportingPct: rpt,
+      reportingPct,
     });
   }, [containerRef, natPctsRef, setTooltip]); // all stable refs → callback never recreated
 
@@ -619,12 +625,28 @@ const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts,
   const listPctTotal = Object.values(natListPcts).reduce((s, v) => s + v, 0);
   const regPctTotal  = Object.values(natRegPcts).reduce((s, v) => s + v, 0);
 
+  // When provinces have been declared (blank-map / sim) use their reporting-scaled raw
+  // totals to compute a meaningful regional-ballot percentage display.
+  const totalProvRaw = useMemo(
+    () => provReportedRawVotes
+      ? Object.values(provReportedRawVotes).reduce((s, v) => s + v, 0)
+      : 0,
+    [provReportedRawVotes],
+  );
+
   const sorted = useMemo(
     () => SA_PARTIES
-      .filter(p => (totalSeatsMap[p.id] ?? 0) > 0 || (natListPcts[p.id] ?? 0) > 0)
-      .sort((a, b) => (totalSeatsMap[b.id] ?? 0) - (totalSeatsMap[a.id] ?? 0)
-                   || (natListPcts[b.id] ?? 0) - (natListPcts[a.id] ?? 0)),
-    [totalSeatsMap, natListPcts],
+      .filter(p =>
+        (totalSeatsMap[p.id] ?? 0) > 0 ||
+        (natListPcts[p.id] ?? 0) > 0 ||
+        (provReportedRawVotes?.[p.id] ?? 0) > 0,   // include parties with raw votes from declared provinces
+      )
+      .sort((a, b) =>
+        (totalSeatsMap[b.id] ?? 0) - (totalSeatsMap[a.id] ?? 0) ||
+        (natListPcts[b.id] ?? 0) - (natListPcts[a.id] ?? 0) ||
+        (provReportedRawVotes?.[b.id] ?? 0) - (provReportedRawVotes?.[a.id] ?? 0),
+      ),
+    [totalSeatsMap, natListPcts, provReportedRawVotes],
   );
 
   const leader = sorted[0]?.id ?? null;
@@ -642,7 +664,11 @@ const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts,
               ? (SA_SEATS_2024[party.id] ?? 0) - lSeats
               : (regSeatsMap[party.id] ?? 0);
             const listPct = listPctTotal > 0 ? (natListPcts[party.id] ?? 0) / listPctTotal * 100 : 0;
-            const regPct  = regPctTotal  > 0 ? (natRegPcts[party.id]  ?? 0) / regPctTotal  * 100 : 0;
+            // Derive regional % from actual reported raw votes when available (blank map / sim),
+            // so the % column isn't misleadingly 0% while provinces are being declared.
+            const regPct = provReportedRawVotes && totalProvRaw > 0
+              ? (provReportedRawVotes[party.id] ?? 0) / totalProvRaw * 100
+              : regPctTotal > 0 ? (natRegPcts[party.id] ?? 0) / regPctTotal * 100 : 0;
             const listRaw = isBaseline
               ? Math.round((SA_VOTE_RAW_2024[party.id] ?? 0))
               : Math.round((natListPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
@@ -760,30 +786,32 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportin
           </div>
         )}
 
-        {/* % Reporting slider */}
-        <div className="mt-2.5">
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[8.5px] font-mono font-bold uppercase tracking-[0.12em] text-ink-3">% Reporting</span>
-            <span className="text-[9px] font-mono font-bold tabular-nums"
-              style={{ color: reportingPct === 100 ? '#16a34a' : '#f59e0b' }}>
-              {reportingPct}%
-            </span>
+        {/* % Reporting slider — only in blank-map / election-night mode */}
+        {onDeclare && (
+          <div className="mt-2.5">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[8.5px] font-mono font-bold uppercase tracking-[0.12em] text-ink-3">% Reporting</span>
+              <span className="text-[9px] font-mono font-bold tabular-nums"
+                style={{ color: reportingPct === 100 ? '#16a34a' : '#f59e0b' }}>
+                {reportingPct}%
+              </span>
+            </div>
+            <input type="range" min={0} max={100} step={1} value={reportingPct}
+              onChange={e => {
+                const v = Number(e.target.value);
+                setReportingPct(v);
+                onReportingChangeRef.current?.(v);
+              }}
+              className="party-slider w-full"
+              style={{ '--party-color': reportingPct === 100 ? '#16a34a' : '#f59e0b', '--pct': `${reportingPct}%` } as React.CSSProperties} />
+            <div className="flex justify-between mt-0.5">
+              <span className="text-[7.5px] font-mono text-ink-3">0%</span>
+              <span className="text-[7.5px] font-mono text-ink-3 tabular-nums">
+                {Math.round(reportingPct / 100 * totalVotes).toLocaleString()} votes counted
+              </span>
+            </div>
           </div>
-          <input type="range" min={0} max={100} step={1} value={reportingPct}
-            onChange={e => {
-              const v = Number(e.target.value);
-              setReportingPct(v);
-              onReportingChangeRef.current?.(v);
-            }}
-            className="party-slider w-full"
-            style={{ '--party-color': reportingPct === 100 ? '#16a34a' : '#f59e0b', '--pct': `${reportingPct}%` } as React.CSSProperties} />
-          <div className="flex justify-between mt-0.5">
-            <span className="text-[7.5px] font-mono text-ink-3">0%</span>
-            <span className="text-[7.5px] font-mono text-ink-3 tabular-nums">
-              {Math.round(reportingPct / 100 * totalVotes).toLocaleString()} votes counted
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* Sliders — all active parties always shown */}
@@ -2340,8 +2368,8 @@ export default function SouthAfricaApp() {
                 setProvOverrides(prev => ({ ...prev, [id]: pcts }));
                 if (preset !== 'blank') setPreset('custom');
               }}
-              onDeclare={(pcts, rpt) => handleDeclareProvince(selectedProv, pcts, rpt)}
-              onReportingChange={handleReportingChange}
+              onDeclare={preset === 'blank' ? (pcts, rpt) => handleDeclareProvince(selectedProv, pcts, rpt) : undefined}
+              onReportingChange={preset === 'blank' ? handleReportingChange : undefined}
               onClose={() => setSelectedProv(null)}
               dark={dark}
               override={provOverrides[selectedProv]}

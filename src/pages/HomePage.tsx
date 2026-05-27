@@ -116,18 +116,6 @@ export const COUNTRIES = [
     ],
   },
   {
-    id: 'italy', path: '/italy', name: 'Italy', flag: '🇮🇹', demonym: 'Italian', mapColor: '#009246',
-    flagSrc: 'italy-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'General Election', subtitle: 'Camera dei Deputati',
-    lat: 42, lng: 12,
-    accent: 'linear-gradient(90deg,#009246,white,#CE2B37)',
-    locked: true as const,
-    parties: [
-      { color: '#1B3A6B', abbr: 'FdI' }, { color: '#CC0000', abbr: 'PD'  },
-      { color: '#009933', abbr: 'Lega' }, { color: '#0080C8', abbr: 'FI' },
-    ],
-  },
-  {
     id: 'south-africa', path: '/south-africa', name: 'South Africa', flag: '🇿🇦', demonym: 'South African', mapColor: '#FFB612',
     flagSrc: 'south-africa-flag.png', flagStyle: {} as React.CSSProperties,
     electionType: 'General Election', subtitle: 'National Assembly',
@@ -146,20 +134,20 @@ export type Country = typeof COUNTRIES[0];
 const ISO_TO_COLOR: Record<string, string> = {
   'GB': '#C8102E', 'FR': '#002395', 'CA': '#D52B1E', 'US': '#002868',
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
-  'IT': '#009246', 'ZA': '#FFB612', 'RO': '#FCD116',
+  'ZA': '#FFB612', 'RO': '#FCD116',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
-  'IT': 'italy', 'ZA': 'south-africa', 'RO': 'romania',
+  'ZA': 'south-africa', 'RO': 'romania',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
 const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
-  '380': 'IT', '710': 'ZA', '642': 'RO',
+  '710': 'ZA', '642': 'RO',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -901,7 +889,7 @@ function AboutOverlay({ dark, onClose }: { dark: boolean; onClose: () => void })
     'Elections Canada', 'Bundeswahlleiter (Germany)',
     "Ministère de l'Intérieur (France)", 'Tribunal Superior Electoral (Brazil)',
     'Australian Electoral Commission', 'Kiesraad (Netherlands)',
-    "Ministero dell'Interno (Italy)", 'Electoral Commission of South Africa',
+    'Electoral Commission of South Africa',
     'Autoritatea Electorală Permanentă (Romania)',
     'Wikipedia — Historical Elections', 'OECD Electoral Statistics',
     'BBC News', 'Reuters', 'Associated Press',
