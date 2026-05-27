@@ -1559,6 +1559,130 @@ function RoAnalysisPanel({ natPcts, cameraSeats, onClose, exiting, dark }: {
   );
 }
 
+// ── County Breakdown panel ─────────────────────────────────────────────────────
+function RoCountyBreakdownPanel({ natPcts, countyOverrides, onClose, exiting, dark }: {
+  natPcts: Record<RoPartyId, number>;
+  countyOverrides?: Record<string, Record<RoPartyId, number>>;
+  onClose: () => void; exiting?: boolean; dark?: boolean;
+}) {
+  type SortKey = 'name' | 'seats' | 'winner';
+  const [sortBy, setSortBy] = useState<SortKey>('name');
+  const [query, setQuery]   = useState('');
+
+  const rows = useMemo(() => RO_COUNTIES.map(county => {
+    const cv = countyOverrides?.[county.id] ?? calcCountyVotes(natPcts, county.id);
+    const sorted = (Object.entries(cv) as [RoPartyId, number][])
+      .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+    const winner    = sorted[0]?.[0] as RoPartyId | undefined;
+    const winnerPct = sorted[0]?.[1] ?? 0;
+    const seats     = RO_COUNTY_CAMERA_SEATS[county.id] ?? 0;
+    return { county, sorted, winner, winnerPct, seats };
+  }), [natPcts, countyOverrides]);
+
+  const displayRows = useMemo(() => {
+    const q = query.toLowerCase();
+    let filtered = q
+      ? rows.filter(r => r.county.name.toLowerCase().includes(q) || r.county.id.toLowerCase().includes(q))
+      : rows;
+    if (sortBy === 'seats')  return [...filtered].sort((a, b) => b.seats - a.seats || a.county.name.localeCompare(b.county.name));
+    if (sortBy === 'winner') return [...filtered].sort((a, b) => (a.winner ?? 'Z').localeCompare(b.winner ?? 'Z') || a.county.name.localeCompare(b.county.name));
+    return filtered; // 'name' — already alphabetical
+  }, [rows, sortBy, query]);
+
+  // County wins summary
+  const countyWins = useMemo(() => {
+    const w: Partial<Record<RoPartyId, number>> = {};
+    for (const r of rows) if (r.winner) w[r.winner] = (w[r.winner] ?? 0) + 1;
+    return Object.entries(w).sort(([, a], [, b]) => b - a) as [RoPartyId, number][];
+  }, [rows]);
+
+  const SortBtn = ({ k, label }: { k: SortKey; label: string }) => (
+    <button onClick={() => setSortBy(k)}
+      className={`px-2 py-0.5 rounded text-[8.5px] font-mono font-semibold uppercase tracking-wide transition-colors ${sortBy === k ? 'bg-gold text-white' : 'text-ink-3 hover:text-ink hover:bg-hover'}`}>
+      {label}
+    </button>
+  );
+
+  return (
+    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h2 className="text-[13px] font-bold text-ink leading-none">County Results</h2>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">42 constituencies · Camera Deputaților</div>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      {/* County-wins summary */}
+      <div className="px-3.5 py-2 border-b border-default shrink-0">
+        <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-1.5">County wins</div>
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+          {countyWins.map(([id, n]) => (
+            <div key={id} className="flex items-center gap-1">
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: partyColor(id) }} />
+              <span className="text-[9.5px] font-mono font-bold text-ink">{RO_PARTY_MAP[id]?.name}</span>
+              <span className="text-[9.5px] font-mono text-ink-3">{n}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Search + sort */}
+      <div className="px-3.5 py-2 border-b border-default shrink-0 flex items-center gap-2">
+        <input
+          value={query} onChange={e => setQuery(e.target.value)}
+          placeholder="Filter counties…"
+          className="flex-1 h-6 px-2 text-[10px] font-mono rounded border border-default bg-canvas text-ink placeholder:text-ink-3 outline-none focus:border-gold"
+        />
+        <div className="flex gap-0.5">
+          <SortBtn k="name"   label="A–Z" />
+          <SortBtn k="winner" label="Party" />
+          <SortBtn k="seats"  label="Seats" />
+        </div>
+      </div>
+
+      {/* County rows */}
+      <div className="flex-1 overflow-y-auto thin-scroll">
+        {displayRows.map(({ county, sorted, winner, seats }) => {
+          const wColor = winner ? partyColor(winner) : '#888';
+          const top4 = sorted.slice(0, 4);
+          const top4Sum = top4.reduce((s, [, v]) => s + v, 0);
+          return (
+            <div key={county.id}
+              className={`px-3.5 py-2 border-b border-default hover:bg-hover transition-colors cursor-default`}
+              style={{ borderLeftWidth: 3, borderLeftColor: wColor }}>
+              {/* Row 1: code · name · seats badge */}
+              <div className="flex items-center gap-1.5 mb-1">
+                <span className="text-[9px] font-mono font-bold w-6 shrink-0 tabular-nums" style={{ color: wColor }}>{county.id}</span>
+                <span className="text-[10px] font-semibold text-ink flex-1 truncate">{county.name}</span>
+                <span className="text-[8px] font-mono text-ink-3 shrink-0">{seats}✦</span>
+              </div>
+              {/* Row 2: stacked bar */}
+              <div className="h-2 rounded-full overflow-hidden flex mb-1" style={{ background: dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }}>
+                {top4.map(([id, pct]) => (
+                  <div key={id} style={{ width: `${(pct / (top4Sum || 1)) * 100}%`, background: partyColor(id as RoPartyId), flexShrink: 0 }} />
+                ))}
+              </div>
+              {/* Row 3: top party labels */}
+              <div className="flex gap-2">
+                {top4.slice(0, 3).map(([id, pct]) => (
+                  <div key={id} className="flex items-center gap-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: partyColor(id as RoPartyId) }} />
+                    <span className="text-[8px] font-mono" style={{ color: partyColor(id as RoPartyId) }}>
+                      {RO_PARTY_MAP[id as RoPartyId]?.name ?? id} {pct.toFixed(1)}%
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}
+
 // ── Tutorial panel ─────────────────────────────────────────────────────────────
 function RoTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exiting?: boolean; dark?: boolean }) {
   const H2 = ({ children }: { children: React.ReactNode }) => <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>;
@@ -1574,26 +1698,43 @@ function RoTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
-        <H2>Electoral System</H2>
-        <P>Romania uses a <strong>two-stage proportional representation</strong> system (Law 208/2015). Seats are first allocated county-by-county via Hare quota, then remaining seats go to a national D'Hondt redistribution.</P>
-        <Note>This simulator models the <strong>real two-stage system</strong>: Hare quota per county (Stage 1) + national D'Hondt remainder redistribution (Stage 2), including both entry thresholds.</Note>
-        <H2>Chamber of Deputies</H2>
-        <P>The lower house has <strong>331 seats</strong> (327 mainland + 4 diaspora). A majority requires <strong>166 seats</strong>. The Chamber is the primary chamber for confidence votes and forming a government.</P>
-        <H2>5% National Threshold</H2>
-        <P>A party needs at least <strong>5% of all valid votes nationwide</strong> to enter parliament. Parties below this are fully eliminated. In the scoreboard they appear faded.</P>
-        <H2>Alternative Threshold (Law 208/2015)</H2>
-        <P>A party that scores below 5% nationally can <em>still</em> enter parliament if it wins <strong>≥ 20% of the valid votes in at least 4 individual counties</strong>. This protects ethnic-minority parties like <strong>UDMR</strong>, which dominates Harghita (HR), Covasna (CV), Mureș (MS), and Satu Mare (SM) even when its national share falls below 5%.</P>
-        <Note>In the Simulation panel, the <strong>"alt"</strong> badge on UDMR means it qualifies via the 4-county route even if the national bar shows &lt;5%.</Note>
-        <H2>Romanian Parties</H2>
-        <P><strong>PSD</strong> (Social Democrats) leads a coalition with <strong>PNL</strong> (Liberals) and <strong>UDMR</strong> (Hungarian minority). The far-right bloc of <strong>AUR</strong>, <strong>SOS</strong>, and <strong>POT</strong> surged in 2024. <strong>USR</strong> is the main reformist anti-corruption force.</P>
-        <H2>Sliders</H2>
-        <P>Open <strong>▶ Simulation</strong> to adjust party vote shares. Lock a party (🔒) to keep it fixed while others adjust proportionally.</P>
-        <H2>Simulation</H2>
-        <P>Click <strong>▶ Run Simulation</strong> to watch Romania's 42 counties report results one by one, with live seat updates.</P>
-        <H2>Coalition Builder</H2>
-        <P>Click <strong>Coalition</strong> to toggle parties and check if a combination can reach the 166-seat Chamber majority.</P>
-        <H2>Map Modes</H2>
-        <P>Toggle <strong>Bubble Map</strong> for circles sized by winning margin, or leave off for choropleth coloring. Click any county to see its full breakdown.</P>
+
+        <H2>🗺 Map Presets</H2>
+        <P><strong>2024 Baseline</strong> loads the real December 2024 election result. <strong>2026 Polling</strong> loads the current polling average (AUR surging, SOS/POT below threshold). <strong>Blank Map</strong> starts with no counties projected — click each county to call it manually.</P>
+
+        <H2>🏛 Two-Stage Proportional System</H2>
+        <P>Romania uses a <strong>two-stage PR</strong> system under Law 208/2015. <strong>Stage 1</strong> allocates seats county-by-county via Hare quota (floor). <strong>Stage 2</strong> pools each party's remainder votes nationally and runs D'Hondt to fill the leftover seats (including 4 diaspora).</P>
+        <Note>This simulator models the real system: 331 seats, Hare per county → D'Hondt on remainders.</Note>
+
+        <H2>🚧 Entry Thresholds</H2>
+        <P><strong>National (5%):</strong> win ≥ 5% of all valid votes nationwide. Parties below this appear faded in the scoreboard.</P>
+        <P><strong>Alternative (Law 208/2015):</strong> win <strong>≥ 20% in at least 4 counties</strong> to enter even below 5% nationally. This protects <strong>UDMR</strong>, dominant in Harghita, Covasna, Mureș, and Satu Mare.</P>
+        <Note>In the Simulation panel: <strong>"alt"</strong> badge = qualifies via 4-county route; <strong>"elim"</strong> = truly eliminated.</Note>
+
+        <H2>🗂 County Results (Counties button)</H2>
+        <P>Click <strong>Counties</strong> in the toolbar for a full table of all 42 constituencies — stacked vote-share bars, leading party, and Camera seats per county. Filter by name or sort by party / seats.</P>
+
+        <H2>🖱 County Panel (click map)</H2>
+        <P>Click any county on the map to open its breakdown. View estimated vote splits and manually adjust percentages. In <strong>Blank Map</strong> mode, use <strong>▶ Project Results</strong> to call that county.</P>
+
+        <H2>▶ Simulation</H2>
+        <P>Open <strong>▶ Simulation</strong> and type national vote shares for each party. No auto-redistribution — adjust freely. If tracked parties exceed 100% the Run button is disabled.</P>
+        <P>Click <strong>▶ Run Simulation</strong>: the map resets to blank and all 42 counties report in <strong>5 random batches</strong> on a bell-curve schedule. Seats update live. The <strong>↩ Reference</strong> button shows the last preset's shares for comparison.</P>
+
+        <H2>🏟 Parliament</H2>
+        <P>Click <strong>Parliament</strong> for the hemicycle diagram (Camera Deputaților, 331 seats) with a majority bar and left-to-right party ordering.</P>
+
+        <H2>🤝 Coalition Builder</H2>
+        <P>Click <strong>Coalition</strong> to toggle parties in/out and check whether a combination reaches the <strong>166-seat majority</strong>.</P>
+
+        <H2>📊 Analysis</H2>
+        <P>Click <strong>Analysis</strong> for ENP (votes & seats), Gallagher index, county wins, most competitive / dominant counties, seats-to-votes ratios, and swing vs 2024.</P>
+
+        <H2>🫧 Bubble Map</H2>
+        <P>Toggle <strong>Bubble Map</strong> to overlay circles: colour = winner, size = winning margin. Hover for the county breakdown.</P>
+
+        <H2>🇷🇴 Parties</H2>
+        <P><strong>PSD</strong> Social Democrats · <strong>AUR</strong> far-right nationalist · <strong>PNL</strong> centre-right liberals · <strong>USR</strong> reformist anti-corruption · <strong>SOS</strong> hard-right · <strong>POT</strong> Georgescu-linked populist · <strong>UDMR</strong> Hungarian minority.</P>
       </div>
     </aside>
   );
@@ -1676,6 +1817,7 @@ export default function RomaniaApp() {
   const [parliOpen, setParliOpen]                 = useState(false);
   const [coalitionOpen, setCoalitionOpen]         = useState(false);
   const [analysisOpen, setAnalysisOpen]           = useState(false);
+  const [breakdownOpen, setBreakdownOpen]         = useState(false);
   const [tutorialOpen, setTutorialOpen]           = useState(false);
   const [exitPanel, setExitPanel]                 = useState<string | null>(null);
   const exitTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1762,11 +1904,12 @@ export default function RomaniaApp() {
   const btnMuted  = `${btnBase} border border-default text-ink-3 hover:bg-hover hover:text-ink`;
   const btnActive = `${btnBase} bg-ink/8 border border-default text-ink`;
 
-  const showCounty   = !!selectedCounty && !simOpen;
-  const showTutorial = tutorialOpen  || exitPanel === 'tutorial';
-  const showParli    = parliOpen     || exitPanel === 'parli';
-  const showCoal     = coalitionOpen || exitPanel === 'coal';
-  const showAnalysis = analysisOpen  || exitPanel === 'analysis';
+  const showCounty    = !!selectedCounty && !simOpen;
+  const showTutorial  = tutorialOpen   || exitPanel === 'tutorial';
+  const showParli     = parliOpen      || exitPanel === 'parli';
+  const showCoal      = coalitionOpen  || exitPanel === 'coal';
+  const showAnalysis  = analysisOpen   || exitPanel === 'analysis';
+  const showBreakdown = breakdownOpen  || exitPanel === 'breakdown';
 
   return (
     <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="ro">
@@ -1795,8 +1938,12 @@ export default function RomaniaApp() {
           }} className={coalitionOpen ? btnActive : btnMuted}>Coalition</button>
           <button onClick={() => {
             if (analysisOpen) { setAnalysisOpen(false); triggerExit('analysis'); }
-            else { setAnalysisOpen(true); setTutorialOpen(false); }
+            else { setAnalysisOpen(true); setBreakdownOpen(false); setTutorialOpen(false); }
           }} className={analysisOpen ? btnActive : btnMuted}>Analysis</button>
+          <button onClick={() => {
+            if (breakdownOpen) { setBreakdownOpen(false); triggerExit('breakdown'); }
+            else { setBreakdownOpen(true); setAnalysisOpen(false); setTutorialOpen(false); }
+          }} className={breakdownOpen ? btnActive : btnMuted}>Counties</button>
           <button onClick={() => setBubbleMap(v => !v)}
             className={bubbleMap ? `${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700` : btnMuted}>
             Bubble Map
@@ -2130,8 +2277,16 @@ export default function RomaniaApp() {
             exiting={exitPanel==='analysis'} dark={dark} />
         )}
 
+        {/* County Breakdown — right */}
+        {showBreakdown && !simOpen && !showCoal && !showAnalysis && (
+          <RoCountyBreakdownPanel
+            natPcts={displayPcts} countyOverrides={countyOverrides}
+            onClose={() => { setBreakdownOpen(false); triggerExit('breakdown'); }}
+            exiting={exitPanel==='breakdown'} dark={dark} />
+        )}
+
         {/* Tutorial — right */}
-        {showTutorial && !simOpen && !showCoal && !showAnalysis && (
+        {showTutorial && !simOpen && !showCoal && !showAnalysis && !showBreakdown && (
           <RoTutorialPanel
             onClose={() => { setTutorialOpen(false); triggerExit('tutorial'); }}
             exiting={exitPanel==='tutorial'} dark={dark} />

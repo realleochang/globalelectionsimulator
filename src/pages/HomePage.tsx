@@ -105,6 +105,17 @@ export const COUNTRIES = [
     ],
   },
   {
+    id: 'romania', path: '/romania', name: 'Romania', flag: '🇷🇴', demonym: 'Romanian', mapColor: '#FCD116',
+    flagSrc: 'romania-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'Legislative Election', subtitle: 'Camera Deputaților',
+    lat: 45, lng: 25,
+    accent: 'linear-gradient(90deg,#002B7F,#FCD116,#CE1126)',
+    parties: [
+      { color: '#CC0000', abbr: 'PSD'  }, { color: '#C8960C', abbr: 'AUR'  },
+      { color: '#F9A800', abbr: 'PNL'  }, { color: '#003DA5', abbr: 'USR'  },
+    ],
+  },
+  {
     id: 'italy', path: '/italy', name: 'Italy', flag: '🇮🇹', demonym: 'Italian', mapColor: '#009246',
     flagSrc: 'italy-flag.png', flagStyle: {} as React.CSSProperties,
     electionType: 'General Election', subtitle: 'Camera dei Deputati',
@@ -126,17 +137,6 @@ export const COUNTRIES = [
     parties: [
       { color: '#007A4D', abbr: 'ANC' }, { color: '#1565C0', abbr: 'DA'  },
       { color: '#B71C1C', abbr: 'MK'  }, { color: '#E53935', abbr: 'EFF' },
-    ],
-  },
-  {
-    id: 'romania', path: '/romania', name: 'Romania', flag: '🇷🇴', demonym: 'Romanian', mapColor: '#FCD116',
-    flagSrc: 'romania-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'Legislative Election', subtitle: 'Camera Deputaților',
-    lat: 45, lng: 25,
-    accent: 'linear-gradient(90deg,#002B7F,#FCD116,#CE1126)',
-    parties: [
-      { color: '#CC0000', abbr: 'PSD'  }, { color: '#C8960C', abbr: 'AUR'  },
-      { color: '#F9A800', abbr: 'PNL'  }, { color: '#003DA5', abbr: 'USR'  },
     ],
   },
 ];
