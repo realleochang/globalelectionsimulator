@@ -1834,7 +1834,7 @@ export default function SouthAfricaApp() {
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
 
           {/* Presets */}
-          <button onClick={loadBaseline}    className={preset === 'baseline'    ? btnGold : btnMuted}>2024 Results</button>
+          <button onClick={loadBaseline}    className={preset === 'baseline'    ? btnGold : btnMuted}>2024 Baseline</button>
           <button onClick={loadPolling2026} className={preset === 'polling2026' ? btnGold : btnMuted}>2026 Polling</button>
           <button onClick={loadBlank}       className={preset === 'blank'       ? btnGold : btnMuted}>Blank Map</button>
 
