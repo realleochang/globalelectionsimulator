@@ -1964,7 +1964,6 @@ export default function RomaniaApp() {
   const [simCameraSeats, setSimCameraSeats]   = useState<Partial<Record<RoPartyId, number>> | undefined>();
   const [simProgress, setSimProgress]         = useState(0);
   const [simRunning, setSimRunning]           = useState(false);
-  const [simTouched, setSimTouched]           = useState(false);
   const [declaredCounties, setDeclaredCounties] = useState<Set<RoCountyId> | undefined>();
   const simTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
   const natPctsAtSimStart = useRef<Record<RoPartyId, number>>(natPcts);
@@ -1984,7 +1983,6 @@ export default function RomaniaApp() {
   useEffect(() => {
     if (!simOpen) { setRefOpen(false); return; }
     setSimSortOrder([...RO_PARTIES].sort((a, b) => (natPcts[b.id] ?? 0) - (natPcts[a.id] ?? 0)).map(p => p.id));
-    setSimTouched(false);
     // Re-seed draft from current map state each time the panel opens
     setSimDraftPcts({ ...natPcts });
     // Capture the reference snapshot
@@ -1992,7 +1990,7 @@ export default function RomaniaApp() {
     setSimRefLabel(
       preset === '2024'         ? '2024 Baseline' :
       preset === 'polling2026'  ? '2026 Polling'  :
-      preset === 'blank'        ? 'Blank Map'     : 'Custom'
+      preset === 'blank'        ? '2024 Reference' : 'Custom'
     );
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [simOpen]); // natPcts / preset intentionally omitted — captures snapshot at panel-open only
@@ -2219,7 +2217,6 @@ export default function RomaniaApp() {
               {(() => {
                 const draftTrackedSum = RO_PARTIES.reduce((s, p) => s + (simDraftPcts[p.id] ?? 0), 0);
                 const draftOthers     = Math.max(0, 100 - draftTrackedSum);
-                const draftTotal      = draftTrackedSum + draftOthers; // = 100 when tracked ≤ 100
                 const overflow        = draftTrackedSum > 100.05;
                 return (
                   <>
@@ -2269,7 +2266,6 @@ export default function RomaniaApp() {
                                   const v = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
                                   // ← writes ONLY to draft; map (natPcts) is untouched
                                   setSimDraftPcts(prev => ({ ...prev, [party.id]: v }));
-                                  setSimTouched(true);
                                 }}
                                 onFocus={e => e.target.select()}
                                 className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none transition-colors"
@@ -2300,28 +2296,37 @@ export default function RomaniaApp() {
                           {/* Read-only display */}
                           <div className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md"
                             style={{ color: overflow ? '#ef4444' : '#9CA3AF', background: overflow ? 'rgba(239,68,68,0.08)' : 'rgba(156,163,175,0.08)', border: `1.5px solid ${overflow ? 'rgba(239,68,68,0.30)' : 'rgba(156,163,175,0.22)'}`, padding: '3px 4px' }}>
-                            {overflow ? `−${(draftTrackedSum - 100).toFixed(1)}` : draftOthers.toFixed(1)}
+                            {overflow ? '—' : draftOthers.toFixed(1)}
                           </div>
-                        </div>
-                        {/* Total indicator */}
-                        <div className={`flex items-center justify-between mt-1.5 text-[8px] font-mono ${overflow ? 'text-red-400' : 'text-emerald-500'}`}>
-                          <span>{overflow ? '⚠ parties exceed 100%' : draftTotal.toFixed(1) === '100.0' ? '✓ total = 100%' : `total = ${draftTotal.toFixed(1)}%`}</span>
-                          <span className="tabular-nums font-bold">{draftTotal.toFixed(1)}%</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
-                      {overflow && (
-                        <p className="text-[9px] font-mono text-red-400 text-center leading-tight">
-                          Parties sum to {draftTrackedSum.toFixed(1)}% — reduce values to ≤ 100%
-                        </p>
-                      )}
+                    {/* ── Total validity strip — always visible ── */}
+                    <div className={`mx-3 mb-2 px-3 py-2 rounded-lg border text-[9px] font-mono flex items-center justify-between gap-2 ${
+                      overflow
+                        ? 'border-red-500/30 bg-red-500/8 text-red-400'
+                        : draftTrackedSum < 99.9
+                          ? 'border-amber-500/30 bg-amber-500/6 text-amber-500'
+                          : 'border-emerald-500/30 bg-emerald-500/8 text-emerald-500'
+                    }`}>
+                      <span className="leading-tight">
+                        {overflow
+                          ? `⚠ Exceeds 100% — reduce by ${(draftTrackedSum - 100).toFixed(1)}pp`
+                          : draftTrackedSum < 99.9
+                            ? `ℹ ${draftOthers.toFixed(1)}% goes to Others — total OK`
+                            : `✓ Fully allocated — ready to run`}
+                      </span>
+                      <span className="font-bold tabular-nums shrink-0">
+                        {draftTrackedSum.toFixed(1)}%
+                      </span>
+                    </div>
+
+                    <div className="px-3.5 pb-3.5 pt-0 border-t border-default shrink-0 space-y-2 pt-2">
                       <button
-                        disabled={simRunning || !simTouched || overflow}
+                        disabled={simRunning || overflow}
                         onClick={() => {
                           stopSim();
-                          setSimTouched(false);
                           // Commit draft → natPcts so map updates when sim starts
                           const pcts = { ...simDraftPcts } as Record<RoPartyId, number>;
                           natPctsAtSimStart.current = pcts;
@@ -2370,7 +2375,7 @@ export default function RomaniaApp() {
                     : '▶ Run Simulation'}
                 </button>
                 {(simCameraSeats || declaredCounties) && (
-                  <button onClick={() => { resetSim(); setSimTouched(false); }} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
+                  <button onClick={() => { resetSim(); }} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
                     Reset
                   </button>
                 )}
