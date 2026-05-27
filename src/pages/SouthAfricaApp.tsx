@@ -273,6 +273,7 @@ type ProvTooltipState = {
   x: number; y: number; name: string;
   parties: { id: SaPartyId; pct: number; raw: number }[];
   leader: SaPartyId | null;
+  reportingPct?: number; // % of votes reported (from province panel slider)
 } | null;
 
 // ── Map controller (enforces smoothFactor:0 on zoom, like Germany) ────────────
@@ -353,10 +354,12 @@ function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPct
     const parties = (Object.entries(cur) as [SaPartyId, number][])
       .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6)
       .map(([id, pct]) => ({ id, pct, raw: Math.round(pct / 100 * reportingScale * provVotes) }));
+    const rpt = provReportingRef.current?.[h.provId];
     setTooltip({
       x: h.clientX - rect.left, y: h.clientY - rect.top,
       name: SA_PROV_MAP[h.provId]?.name ?? h.provId,
       parties, leader: parties[0]?.id ?? null,
+      reportingPct: rpt,
     });
   }, [containerRef, natPctsRef, setTooltip]); // all stable refs → callback never recreated
 
@@ -453,8 +456,19 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides, provRepo
           <div className="absolute pointer-events-none z-[1000]" style={{ left, top: Math.max(6, tooltip.y - 20), width: TW }}>
             <div style={{ background:tt.bg, borderRadius:10, border:`1px solid ${tt.border}`, boxShadow:tt.shadow, backdropFilter:'blur(10px)', padding:'12px 14px' }}>
               <div style={{ fontSize:13, fontWeight:700, color:tt.title }}>{tooltip.name}</div>
-              <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub, marginTop:2 }}>Provincial result · click to expand</div>
-              <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:5 }}>
+              {tooltip.reportingPct !== undefined && (
+                <div style={{ marginTop:4, display:'inline-flex', alignItems:'center', gap:4,
+                  background:'rgba(245,158,11,0.13)', border:'1px solid rgba(245,158,11,0.30)',
+                  borderRadius:4, padding:'2px 7px' }}>
+                  <span style={{ width:5, height:5, borderRadius:'50%', background:'#f59e0b', flexShrink:0, display:'inline-block' }} />
+                  <span style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:700,
+                    color:'#d97706', letterSpacing:'0.08em', textTransform:'uppercase' }}>
+                    {tooltip.reportingPct}% Reporting
+                  </span>
+                </div>
+              )}
+              <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub, marginTop:tooltip.reportingPct !== undefined ? 2 : 2 }}>Provincial result · click to expand</div>
+              <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:5 }}>
                 {tooltip.parties.map(({ id, pct, raw }, i) => {
                   const c = partyColor(id);
                   return (
@@ -565,12 +579,14 @@ const SaScoreboardTile = React.memo(function SaScoreboardTile({ partyId, listSea
 }); // React.memo — prevents re-renders when seats/pcts haven't changed
 
 // ── Scoreboard ─────────────────────────────────────────────────────────────────
-const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts, provOverrides, simTotalSeats, isBaseline }: {
+const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts, provOverrides, simTotalSeats, isBaseline, provReportedRawVotes }: {
   natListPcts: Record<SaPartyId, number>;
   natRegPcts: Record<SaPartyId, number>;
   provOverrides?: Record<string, Record<SaPartyId, number>>;
   simTotalSeats?: Partial<Record<SaPartyId, number>>;
   isBaseline?: boolean;
+  /** Reporting-scaled raw vote totals from declared provinces (blank-map mode) */
+  provReportedRawVotes?: Partial<Record<SaPartyId, number>>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -632,7 +648,9 @@ const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts,
               : Math.round((natListPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
             const regRaw = isBaseline
               ? Math.round((SA_VOTE_RAW_2024[party.id] ?? 0))
-              : Math.round((natRegPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
+              : provReportedRawVotes
+                ? (provReportedRawVotes[party.id] ?? 0)
+                : Math.round((natRegPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
             return (
               <SaScoreboardTile key={party.id} partyId={party.id}
                 listSeats={lSeats} regSeats={rSeats}
@@ -650,11 +668,13 @@ const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts,
 }); // React.memo
 
 // ── Province panel — WahlkreisPanel style (sliders + lock + edit + delta + ref) ─
-function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, activeParties, dark, override }: {
+function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportingChange, activeParties, dark, override }: {
   provId: SaProvId; natPcts: Record<SaPartyId, number>;
   onUpdate: (id: SaProvId, pcts: Record<SaPartyId, number>) => void;
   /** Called when "Project Result" is clicked — declares this province on the map */
   onDeclare?: (pcts: Record<SaPartyId, number>, reportingPct: number) => void;
+  /** Called on every % Reporting slider change so tooltip refreshes live */
+  onReportingChange?: (pct: number) => void;
   activeParties: Set<SaPartyId>;
   onClose: () => void; dark?: boolean;
   override?: Record<SaPartyId, number>;
@@ -674,9 +694,15 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, activePart
   const pctsRef = useRef(pcts);
   useEffect(() => { pctsRef.current = pcts; }, [pcts]);
 
+  // Keep a stable ref to onReportingChange so the province-change effect doesn't need it as a dep
+  const onReportingChangeRef = useRef(onReportingChange);
+  useEffect(() => { onReportingChangeRef.current = onReportingChange; }, [onReportingChange]);
+
   // Re-init when province changes
   useEffect(() => {
-    setPcts(initFromNat()); setLocks(new Set()); setEditId(null); setReportingPct(100);
+    setPcts(initFromNat()); setLocks(new Set()); setEditId(null);
+    setReportingPct(100);
+    onReportingChangeRef.current?.(100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provId]);
 
@@ -744,7 +770,11 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, activePart
             </span>
           </div>
           <input type="range" min={0} max={100} step={1} value={reportingPct}
-            onChange={e => setReportingPct(Number(e.target.value))}
+            onChange={e => {
+              const v = Number(e.target.value);
+              setReportingPct(v);
+              onReportingChangeRef.current?.(v);
+            }}
             className="party-slider w-full"
             style={{ '--party-color': reportingPct === 100 ? '#16a34a' : '#f59e0b', '--pct': `${reportingPct}%` } as React.CSSProperties} />
           <div className="flex justify-between mt-0.5">
@@ -1890,6 +1920,12 @@ export default function SouthAfricaApp() {
     el.addEventListener('wheel', h, { passive: false }); return () => el.removeEventListener('wheel', h);
   }, []);
 
+  /** Live-update reportingPct for the currently-selected province (slider moves without clicking Project Result) */
+  const handleReportingChange = useCallback((pct: number) => {
+    if (!selectedProv) return;
+    setProvReporting(prev => ({ ...prev, [selectedProv]: pct }));
+  }, [selectedProv]);
+
   // Derived seats — two-ballot
   const listSeatsMap = useMemo(() => calcSeats(natListPcts, SA_LIST_SEATS_TOTAL), [natListPcts]);
   const regSeatsMap  = useMemo(() => calcRegSeats(natPcts, provOverrides), [natPcts, provOverrides]);
@@ -1898,6 +1934,25 @@ export default function SouthAfricaApp() {
     if (preset === 'baseline') return SA_SEATS_2024 as Partial<Record<SaPartyId, number>>;
     return mergeSeats(listSeatsMap, regSeatsMap);
   }, [simSeats, listSeatsMap, regSeatsMap, preset]);
+
+  /**
+   * Aggregate raw votes from declared provinces, scaled by each province's % reporting.
+   * Used by SaScoreboard to show real raw vote counts instead of synthetic national totals.
+   * Only defined when at least one province has been declared (blank-map mode).
+   */
+  const provReportedRawVotes = useMemo<Partial<Record<SaPartyId, number>> | undefined>(() => {
+    if (!declaredProvs || declaredProvs.size === 0) return undefined;
+    const totals: Partial<Record<SaPartyId, number>> = {};
+    for (const provId of declaredProvs) {
+      const prov = SA_PROV_MAP[provId]; if (!prov) continue;
+      const pcts = provOverrides[provId]; if (!pcts) continue;
+      const rpt  = (provReporting[provId] ?? 100) / 100;
+      for (const p of SA_PARTIES) {
+        totals[p.id] = (totals[p.id] ?? 0) + Math.round((pcts[p.id] ?? 0) / 100 * rpt * prov.votes2024);
+      }
+    }
+    return totals;
+  }, [declaredProvs, provReporting, provOverrides]);
 
   // Button styles
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
@@ -2054,6 +2109,7 @@ export default function SouthAfricaApp() {
                 provOverrides={provOverrides}
                 simTotalSeats={simSeats}
                 isBaseline={preset === 'baseline'}
+                provReportedRawVotes={provReportedRawVotes}
               />
             </div>
           </div>
@@ -2204,6 +2260,7 @@ export default function SouthAfricaApp() {
                 if (preset !== 'blank') setPreset('custom');
               }}
               onDeclare={(pcts, rpt) => handleDeclareProvince(selectedProv, pcts, rpt)}
+              onReportingChange={handleReportingChange}
               onClose={() => setSelectedProv(null)}
               dark={dark}
               override={provOverrides[selectedProv]}
