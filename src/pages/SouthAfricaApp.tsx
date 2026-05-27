@@ -2270,9 +2270,16 @@ export default function SouthAfricaApp() {
             {declaredProvs !== undefined && (() => {
               const declared  = declaredProvs.size;
               const total     = SA_PROVINCES.length;
-              const votePct   = SA_PROVINCES.reduce(
-                (s, p) => s + (declaredProvs.has(p.id) ? p.votes2024 : 0), 0
-              ) / SA_GRAND_TOTAL_VOTES * 100;
+              // Weight each declared province by its actual reporting % so we get
+              // "votes actually counted so far", not the province's full 2024 turnout.
+              // Cap at 100 in case approximate province votes2024 values sum > grand total.
+              const votePct   = Math.min(100, SA_PROVINCES.reduce(
+                (s, p) => {
+                  if (!declaredProvs.has(p.id)) return s;
+                  const rpt = (provReporting[p.id] ?? 100) / 100;
+                  return s + p.votes2024 * rpt;
+                }, 0,
+              ) / SA_GRAND_TOTAL_VOTES * 100);
               const barPct    = (declared / total) * 100;
               const isDone    = declared === total && !simRunning; // only after all batches complete
               const accentClr = isDone ? '#16a34a' : simRunning ? '#f59e0b' : '#3b82f6';
