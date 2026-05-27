@@ -1690,29 +1690,39 @@ function SaTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
         <H2>Electoral System</H2>
-        <P>South Africa uses <strong>closed-list proportional representation</strong>. Voters cast a ballot for a party; the 400 National Assembly seats are divided proportionally using the Droop quota (simulated here with D'Hondt — nearly identical results).</P>
-        <Note>There is <strong>no formal threshold</strong>. Even tiny parties win seats. Roughly 0.25% of the national vote earns a single seat.</Note>
+        <P>South Africa uses a <strong>two-ballot system</strong>. The 400 National Assembly seats are split equally: <strong>200 National Compensatory seats</strong> (pure national list, set via the List Seats panel) and <strong>200 Regional seats</strong> (9 provinces, each with a fixed quota). Both ballots use D'Hondt proportional allocation.</P>
+        <Note>There is <strong>no formal threshold</strong>. Even tiny parties win seats — roughly 0.25% of the national vote earns a single seat.</Note>
 
         <H2>2024 Historic Election</H2>
         <P>In May 2024, the <strong>ANC fell below 50%</strong> for the first time since 1994, winning only 40.2%. The result was a <strong>Government of National Unity (GNU)</strong>: ANC + DA + IFP + 9 smaller parties holding 275+ seats.</P>
 
         <H2>Presets</H2>
-        <P><strong>2024 Results</strong> loads the official IEC national ballot figures. <strong>2026 Polling</strong> loads the Social Research Foundation poll (Feb–Mar 2026, n=2222): ANC 39%, DA 28%, MK 10%, EFF 6%, IFP 5%. <strong>Blank Map</strong> resets everything to zero.</P>
+        <P><strong>2024 Baseline</strong> loads the official IEC national ballot figures. <strong>2026 Polling</strong> (default) loads the Social Research Foundation poll (Feb–Mar 2026, n=2222): ANC 39%, DA 28%, MK 10%, EFF 6%, IFP 5%. <strong>Blank Map</strong> resets everything to zero so you can enter results by hand.</P>
 
-        <H2>Map Modes</H2>
-        <P>Toggle between <strong>Map</strong> (province choropleth with 52 district borders) and <strong>Bubbles</strong> (circle markers sized by margin). Colour intensity scales with the winner's margin of victory.</P>
+        <H2>Choropleth Map</H2>
+        <P>The map colours each of the <strong>9 provinces</strong> by winning party. Colour intensity scales with the winner's margin of victory. Hover over any province for a live tooltip showing the top parties, their vote shares, raw vote counts, and — once you've projected a result — a gold <em>% Reporting</em> badge.</P>
 
         <H2>Province Panel</H2>
-        <P>Click any province on the map to open its detail panel. Drag the <strong>party-coloured sliders</strong> to adjust provincial vote shares. Lock any party (🔒) to keep it fixed while others redistribute proportionally. Click any percentage to type an exact value. The <strong>delta</strong> (±pp) shows the change from the 2024 baseline; expand <em>2024 Reference</em> to see the full baseline column.</P>
+        <P>Click any province to open its detail panel. Drag <strong>party-coloured sliders</strong> to adjust vote shares; lock any party (🔒) to hold it fixed while the others redistribute proportionally. Click any percentage to type an exact value. The <strong>delta</strong> (±pp) shows the swing from the 2024 baseline; expand <em>2024 Reference</em> to compare.</P>
+        <P>The <strong>% Reporting</strong> slider scales the raw vote count shown — useful when only a fraction of ballots are in. Click <strong>⊞ Project Result</strong> to declare that province on the map and send its reporting-scaled raw votes to the scoreboard. The scoreboard and tooltip update live as you move the slider.</P>
+
+        <H2>List Seats Panel</H2>
+        <P>Open <strong>List Seats</strong> to set the <strong>National Compensatory Ballot</strong> percentages independently. Click <em>Project Result</em> there to push those percentages to the list-seat column of the scoreboard without touching the province results you've entered by hand.</P>
+
+        <H2>Parties Panel</H2>
+        <P>Use the <strong>Parties</strong> panel to enable or disable individual parties. Deactivating a party zeros its vote share and redistributes proportionally. Quick-select buttons let you jump to <em>Major</em>, <em>Top 5</em>, or <em>All</em> parties.</P>
 
         <H2>Simulation</H2>
         <P>Open <strong>▶ Simulation</strong> to set national vote shares and a <strong>duration</strong> (30s → 5m). Click <em>Run</em> and watch provinces declare one by one, updating the scoreboard and parliament in real time. The map auto-switches to Blank Map and reveals provinces as they come in.</P>
+
+        <H2>% Reporting Overlay</H2>
+        <P>In Blank Map and Simulation modes a widget in the bottom-left corner tracks how many of the <strong>9 provinces</strong> have been declared and what share of the total 2024 vote they represent.</P>
 
         <H2>Parliament</H2>
         <P>The <strong>Parliament</strong> button opens the National Assembly hemicycle — 400 seats across 12 arcs, coloured by party in left-to-right ideological order.</P>
 
         <H2>Breakdown</H2>
-        <P>The <strong>Breakdown</strong> panel shows the national seat bar and a province-by-province results table: winner, margin, and the top challengers for each of the 9 provinces.</P>
+        <P>The <strong>Breakdown</strong> panel shows the national seat bar and a province-by-province results table: winner, margin, and top challengers for each of the 9 provinces.</P>
 
         <H2>Coalition Builder</H2>
         <P>Toggle parties on and off to see whether a combination clears the <strong>201-seat majority</strong> threshold. Use the preset buttons for common coalition scenarios.</P>
