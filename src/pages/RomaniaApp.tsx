@@ -120,66 +120,66 @@ const RO_NAME_TO_ID: Record<string, RoCountyId> = {
   'Vaslui': 'VS',        'Vrancea': 'VN',
 };
 
-// ── Estimated valid votes cast per county (Camera 2024) ───────────────────────
-// Source: Romania_2024_Chamber_of_Deputies_Results.xlsx
+// ── Official valid votes cast per county (Camera Deputaților 2024) ────────────
+// Source: rezultatevot.ro API, election ID 93, fetched May 2026
 const RO_COUNTY_VALID_VOTES_2024: Record<RoCountyId, number> = {
-  B:  859_183, AB: 148_135, AR: 207_389, AG: 266_643, BC: 296_270,
-  BH: 266_643, BN: 148_135, BT: 177_762, BR: 148_135, BV: 266_643,
-  BZ: 207_389, CL: 118_508, CS: 148_135, CJ: 296_270, CT: 325_897,
-  CV: 118_508, DB: 207_389, DJ: 296_270, GL: 266_643, GR: 118_508,
-  GJ: 148_135, HR: 148_135, HD: 177_762, IL: 118_508, IS: 355_524,
-  IF: 148_135, MM: 207_389, MH: 118_508, MS: 237_016, NT: 237_016,
-  OT: 177_762, PH: 325_897, SJ: 118_508, SM: 148_135, SB: 177_762,
-  SV: 296_270, TR: 148_135, TM: 296_270, TL: 118_508, VL: 177_762,
-  VS: 207_389, VN: 148_135,
+  AB: 156_641, AR: 180_523, AG: 265_229, BC: 237_158, BH: 275_704,
+  BN: 122_418, BT: 148_132, BR: 124_366, BV: 258_512, B:  859_470,
+  BZ: 181_880, CL: 107_842, CS: 105_736, CJ: 335_422, CT: 286_738,
+  CV:  94_180, DB: 201_333, DJ: 276_240, GL: 215_575, GR: 104_466,
+  GJ: 147_707, HR: 152_826, HD: 175_216, IL:  90_599, IS: 323_080,
+  IF: 227_456, MM: 181_442, MH: 112_690, MS: 233_574, NT: 189_511,
+  OT: 175_454, PH: 309_352, SJ: 102_204, SM: 137_384, SB: 179_655,
+  SV: 263_887, TR: 131_463, TM: 303_386, TL:  78_492, VL: 154_155,
+  VS: 135_275, VN: 133_444,
 };
 
-// ── 2024 county results — actual percentages of all valid votes cast ──────────
-// Source: Romania_2024_Chamber_of_Deputies_Results.xlsx
-// null entries → party did not cross county threshold (treated as 0 for swing model)
-const RO_COUNTY_RESULTS_2024: Record<RoCountyId, Record<RoPartyId, number>> = {
-  B:  { PSD:21.81, AUR:12.61, PNL:13.50, USR:23.43, SOS: 6.13, POT: 5.16, UDMR: 0     },
-  AB: { PSD:17.23, AUR:19.17, PNL:23.40, USR: 8.64, SOS: 5.16, POT: 9.20, UDMR: 0     },
-  AR: { PSD:15.61, AUR:23.50, PNL:19.88, USR: 9.03, SOS: 7.27, POT: 7.05, UDMR: 7.12  },
-  AG: { PSD:27.50, AUR:20.76, PNL:10.75, USR:11.62, SOS: 6.42, POT: 8.12, UDMR: 0     },
-  BC: { PSD:23.91, AUR:17.26, PNL:11.23, USR:10.53, SOS:10.51, POT: 6.41, UDMR: 0     },
-  BH: { PSD:13.22, AUR:11.29, PNL:32.04, USR: 0,    SOS: 0,    POT: 0,    UDMR:22.55  },
-  BN: { PSD:31.29, AUR:16.97, PNL:15.64, USR: 6.78, SOS: 5.92, POT: 8.52, UDMR: 0     },
-  BT: { PSD:30.94, AUR:18.90, PNL:18.14, USR: 5.18, SOS: 7.89, POT: 6.37, UDMR: 0     },
-  BR: { PSD:30.56, AUR:18.49, PNL:14.62, USR: 7.51, SOS: 9.68, POT: 5.53, UDMR: 0     },
-  BV: { PSD:17.37, AUR:15.66, PNL:15.48, USR:19.22, SOS: 5.99, POT: 6.16, UDMR: 5.68  },
-  BZ: { PSD:43.43, AUR:15.12, PNL: 7.99, USR: 7.56, SOS: 6.25, POT: 5.97, UDMR: 0     },
-  CL: { PSD:30.16, AUR:21.32, PNL:17.27, USR: 6.35, SOS: 7.78, POT: 5.10, UDMR: 0     },
-  CS: { PSD:29.68, AUR:20.39, PNL:12.15, USR: 6.91, SOS: 6.17, POT: 6.69, UDMR: 0     },
-  CJ: { PSD:13.30, AUR:14.37, PNL:21.40, USR:15.27, SOS: 0,    POT: 5.47, UDMR:13.07  },
-  CT: { PSD:18.20, AUR:20.29, PNL:13.03, USR:13.12, SOS:10.41, POT: 6.77, UDMR: 0     },
-  CV: { PSD: 5.44, AUR: 0,    PNL: 0,    USR: 0,    SOS: 0,    POT: 0,    UDMR:76.95  },
-  DB: { PSD:35.24, AUR:17.84, PNL:11.95, USR: 8.57, SOS: 7.62, POT: 7.91, UDMR: 0     },
-  DJ: { PSD:41.26, AUR:17.67, PNL:11.60, USR: 9.17, SOS: 0,    POT: 5.99, UDMR: 0     },
-  GL: { PSD:29.82, AUR:21.13, PNL:10.58, USR:10.83, SOS: 8.86, POT: 0,    UDMR: 0     },
-  GR: { PSD:19.46, AUR:18.50, PNL:34.73, USR: 5.46, SOS: 6.74, POT: 0,    UDMR: 0     },
-  GJ: { PSD:33.92, AUR:25.99, PNL:10.15, USR: 9.55, SOS: 0,    POT: 6.50, UDMR: 0     },
-  HR: { PSD: 0,    AUR: 0,    PNL: 0,    USR: 0,    SOS: 0,    POT: 0,    UDMR:88.00  },
-  HD: { PSD:27.82, AUR:20.31, PNL:13.80, USR: 8.58, SOS: 6.86, POT: 8.79, UDMR: 0     },
-  IL: { PSD:34.49, AUR:23.69, PNL: 8.78, USR: 8.05, SOS:10.38, POT: 0,    UDMR: 0     },
-  IS: { PSD:21.39, AUR:16.64, PNL:14.59, USR:14.04, SOS: 7.66, POT: 6.00, UDMR: 0     },
-  IF: { PSD:14.50, AUR:17.84, PNL:20.51, USR:17.63, SOS: 6.71, POT: 7.95, UDMR: 0     },
-  MM: { PSD:21.55, AUR:17.84, PNL:13.94, USR: 9.62, SOS: 5.38, POT: 5.65, UDMR: 6.14  },
-  MH: { PSD:41.05, AUR:20.60, PNL:16.20, USR: 0,    SOS: 5.30, POT: 5.04, UDMR: 0     },
-  MS: { PSD:13.87, AUR:13.87, PNL:10.12, USR: 7.62, SOS: 5.07, POT: 0,    UDMR:39.12  },
-  NT: { PSD:23.99, AUR:21.45, PNL:12.60, USR: 9.89, SOS: 9.44, POT: 6.46, UDMR: 0     },
-  OT: { PSD:41.34, AUR:17.96, PNL:10.26, USR: 6.03, SOS: 6.05, POT: 5.94, UDMR: 0     },
-  PH: { PSD:23.48, AUR:17.00, PNL:13.22, USR:11.56, SOS: 8.16, POT: 9.22, UDMR: 0     },
-  SJ: { PSD:20.70, AUR:13.26, PNL:18.17, USR: 6.81, SOS: 0,    POT: 0,    UDMR:24.29  },
-  SM: { PSD:12.52, AUR: 9.88, PNL:13.33, USR: 5.98, SOS: 0,    POT: 0,    UDMR:41.55  },
-  SB: { PSD:14.22, AUR:16.99, PNL:18.98, USR:16.22, SOS: 7.73, POT: 7.47, UDMR: 0     },
-  SV: { PSD:21.02, AUR:25.26, PNL:12.48, USR: 6.96, SOS: 8.95, POT: 6.63, UDMR: 0     },
-  TR: { PSD:40.32, AUR:17.29, PNL:14.26, USR: 5.46, SOS: 5.34, POT: 0,    UDMR: 0     },
-  TM: { PSD:18.03, AUR:18.38, PNL:12.63, USR:19.59, SOS: 6.83, POT: 6.45, UDMR: 0     },
-  TL: { PSD:23.98, AUR:22.84, PNL:10.24, USR: 8.34, SOS:10.53, POT: 7.46, UDMR: 0     },
-  VL: { PSD:29.12, AUR:21.65, PNL:12.56, USR: 7.43, SOS: 5.77, POT: 6.34, UDMR: 0     },
-  VS: { PSD:30.53, AUR:18.21, PNL: 8.34, USR: 9.76, SOS: 7.98, POT: 5.98, UDMR: 0     },
-  VN: { PSD:25.28, AUR:20.47, PNL:17.19, USR: 7.13, SOS: 6.30, POT: 5.34, UDMR: 0     },
+// ── 2024 county results — official percentages of all valid votes cast ────────
+// Source: rezultatevot.ro API, election ID 93, fetched May 2026
+// POT absent from GL/IL/MS — party did not field candidates in those counties
+const RO_COUNTY_RESULTS_2024: Record<RoCountyId, Partial<Record<RoPartyId, number>>> = {
+  AB: { PSD:17.23, AUR:19.17, PNL:23.40, USR: 8.64, SOS: 5.16, POT: 9.20, UDMR: 3.65 },
+  AR: { PSD:15.61, AUR:23.50, PNL:19.88, USR: 9.03, SOS: 7.27, POT: 7.05, UDMR: 7.12 },
+  AG: { PSD:27.49, AUR:20.75, PNL:10.74, USR:11.62, SOS: 6.44, POT: 8.12, UDMR: 0.15 },
+  BC: { PSD:23.91, AUR:17.26, PNL:11.23, USR:10.53, SOS:10.51, POT: 6.41, UDMR: 1.38 },
+  BH: { PSD:13.22, AUR:11.39, PNL:32.04, USR: 3.09, SOS: 3.53, POT: 4.36, UDMR:22.55 },
+  BN: { PSD:31.29, AUR:16.97, PNL:15.64, USR: 6.78, SOS: 5.92, POT: 8.52, UDMR: 4.61 },
+  BT: { PSD:30.94, AUR:18.90, PNL:18.14, USR: 5.18, SOS: 7.89, POT: 6.37, UDMR: 0.57 },
+  BR: { PSD:30.56, AUR:18.49, PNL:14.62, USR: 7.51, SOS: 9.68, POT: 5.53, UDMR: 0.31 },
+  BV: { PSD:17.37, AUR:15.66, PNL:15.48, USR:19.22, SOS: 5.99, POT: 6.16, UDMR: 5.68 },
+  B:  { PSD:21.81, AUR:12.60, PNL:13.50, USR:23.44, SOS: 6.13, POT: 5.16, UDMR: 0.35 },
+  BZ: { PSD:43.43, AUR:15.12, PNL: 7.99, USR: 7.56, SOS: 6.25, POT: 5.97, UDMR: 0.21 },
+  CL: { PSD:30.16, AUR:21.34, PNL:17.24, USR: 6.35, SOS: 7.78, POT: 5.10, UDMR: 0.27 },
+  CS: { PSD:29.68, AUR:20.39, PNL:12.15, USR: 6.91, SOS: 6.17, POT: 6.69, UDMR: 1.05 },
+  CJ: { PSD:13.50, AUR:14.41, PNL:19.78, USR:14.91, SOS: 4.21, POT: 5.12, UDMR:12.87 },
+  CT: { PSD:18.20, AUR:20.29, PNL:13.03, USR:13.12, SOS:10.41, POT: 6.77, UDMR: 0.30 },
+  CV: { PSD: 5.44, AUR: 4.20, PNL: 2.90, USR: 2.57, SOS: 1.64, POT: 1.24, UDMR:76.95 },
+  DB: { PSD:35.24, AUR:17.84, PNL:11.95, USR: 8.57, SOS: 7.62, POT: 7.91, UDMR: 0.16 },
+  DJ: { PSD:41.26, AUR:17.67, PNL:11.60, USR: 9.17, SOS: 4.48, POT: 5.99, UDMR: 0.24 },
+  GL: { PSD:29.84, AUR:21.12, PNL:10.57, USR:10.83, SOS: 8.86,             UDMR: 0.34 },
+  GR: { PSD:19.46, AUR:18.50, PNL:34.73, USR: 5.46, SOS: 6.74, POT: 5.63, UDMR: 0.25 },
+  GJ: { PSD:33.92, AUR:25.99, PNL:10.15, USR: 9.55, SOS: 4.96, POT: 6.50, UDMR: 0.48 },
+  HR: { PSD: 3.00, AUR: 2.32, PNL: 1.52, USR: 1.13, SOS: 0.94, POT: 0.76, UDMR:88.00 },
+  HD: { PSD:26.30, AUR:20.03, PNL:13.86, USR: 8.24, SOS: 5.94, POT: 9.36, UDMR: 2.94 },
+  IL: { PSD:34.49, AUR:23.69, PNL: 8.78, USR: 8.05, SOS:10.38,             UDMR: 0.36 },
+  IS: { PSD:21.39, AUR:16.64, PNL:14.59, USR:14.04, SOS: 7.66, POT: 6.00, UDMR: 0.32 },
+  IF: { PSD:14.50, AUR:17.84, PNL:20.50, USR:17.63, SOS: 6.71, POT: 7.96, UDMR: 0.21 },
+  MM: { PSD:21.55, AUR:17.84, PNL:13.97, USR: 9.62, SOS: 5.38, POT: 5.65, UDMR: 6.14 },
+  MH: { PSD:41.05, AUR:20.60, PNL:16.20, USR: 4.70, SOS: 5.30, POT: 5.04, UDMR: 0.23 },
+  MS: { PSD:13.87, AUR:13.87, PNL:10.12, USR: 7.62, SOS: 5.07,             UDMR:39.12 },
+  NT: { PSD:23.99, AUR:21.45, PNL:12.60, USR: 9.89, SOS: 9.44, POT: 6.46, UDMR: 0.75 },
+  OT: { PSD:41.30, AUR:18.03, PNL:10.25, USR: 6.03, SOS: 6.04, POT: 5.93, UDMR: 0.17 },
+  PH: { PSD:23.48, AUR:17.00, PNL:13.22, USR:11.56, SOS: 8.16, POT: 9.22, UDMR: 0.23 },
+  SJ: { PSD:20.70, AUR:12.67, PNL:18.17, USR: 6.81, SOS: 3.77, POT: 4.83, UDMR:24.29 },
+  SM: { PSD:12.52, AUR: 9.88, PNL:13.33, USR: 5.98, SOS: 3.64, POT: 3.83, UDMR:41.55 },
+  SB: { PSD:14.22, AUR:16.99, PNL:18.99, USR:16.22, SOS: 7.73, POT: 7.47, UDMR: 1.89 },
+  SV: { PSD:21.02, AUR:25.26, PNL:12.48, USR: 6.96, SOS: 8.95, POT: 6.63, UDMR: 0.39 },
+  TR: { PSD:40.32, AUR:17.29, PNL:14.26, USR: 5.46, SOS: 5.34, POT: 4.98, UDMR: 0.24 },
+  TM: { PSD:18.03, AUR:18.38, PNL:12.63, USR:19.59, SOS: 6.83, POT: 6.45, UDMR: 3.01 },
+  TL: { PSD:23.98, AUR:22.84, PNL:10.24, USR: 8.34, SOS:10.53, POT: 7.46, UDMR: 0.34 },
+  VL: { PSD:29.12, AUR:21.65, PNL:12.56, USR: 7.43, SOS: 5.77, POT: 6.34, UDMR: 0.25 },
+  VS: { PSD:30.53, AUR:18.21, PNL: 8.34, USR: 9.76, SOS: 7.97, POT: 5.98, UDMR: 0.40 },
+  VN: { PSD:25.28, AUR:20.47, PNL:17.19, USR: 7.13, SOS: 6.30, POT: 5.34, UDMR: 0.20 },
 };
 
 // ── D'Hondt with 5% threshold ──────────────────────────────────────────────────
@@ -220,7 +220,7 @@ function calcCountyVotes(natPcts: Record<RoPartyId, number>, countyId: RoCountyI
 
   // National share of the unlisted group — used to split the remainder
   const unlistedNatSum = RO_PARTIES
-    .filter(p => !(base[p.id] > 0))
+    .filter(p => !((base[p.id] ?? 0) > 0))
     .reduce((s, p) => s + (RO_VOTE_PCT_2024[p.id] ?? 0), 0);
 
   const raw: Record<RoPartyId, number> = {} as Record<RoPartyId, number>;
@@ -230,8 +230,9 @@ function calcCountyVotes(natPcts: Record<RoPartyId, number>, countyId: RoCountyI
     const oldNat = RO_VOTE_PCT_2024[p.id] ?? 0;
     const newNat = natPcts[p.id] ?? 0;
     // Effective county baseline: real data if listed, otherwise proportional share of remainder
-    const countyBase = (base[p.id] ?? 0) > 0
-      ? base[p.id]
+    const baseVal = base[p.id] ?? 0;
+    const countyBase = baseVal > 0
+      ? baseVal
       : unlistedNatSum > 0 ? (oldNat / unlistedNatSum) * remainderPct : 0;
 
     const v = newNat === 0 ? 0 : oldNat === 0 ? newNat : countyBase * (newNat / oldNat);
