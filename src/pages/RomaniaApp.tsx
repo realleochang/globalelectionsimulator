@@ -497,8 +497,8 @@ function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLea
       className={`cand-col${isLeader ? ' is-leader' : ''}${isWinner ? ' is-winner' : ''}`}
       style={{
         '--cand-color': color, '--cand-color-alpha': colorAlpha,
-        borderColor: (isLeader || isWinner) ? color : hexToRgba(color, belowThreshold ? 0.18 : 0.30),
-        opacity: belowThreshold ? 0.55 : 1,
+        borderColor: (isLeader || isWinner) ? color : hexToRgba(color, belowThreshold && seats === 0 ? 0.18 : 0.30),
+        opacity: belowThreshold && seats === 0 ? 0.55 : 1,
       } as React.CSSProperties}
     >
       <div style={{ position: 'relative' }}>
