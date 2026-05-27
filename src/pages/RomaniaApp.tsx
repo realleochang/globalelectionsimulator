@@ -170,6 +170,9 @@ const RO_COUNTY_VALID_VOTES_2024: Record<RoCountyId, number> = {
   VS: 135_275, VN: 133_444,
 };
 
+// Sum of all 42 county valid votes (excludes ~767k diaspora) — used for reporting % widget
+const RO_TOTAL_MAINLAND_VOTES = Object.values(RO_COUNTY_VALID_VOTES_2024).reduce((s, v) => s + v, 0);
+
 // ── Official Camera Deputaților seats per county (2024) ───────────────────────
 // Allocated by Hamilton/largest-remainder method from valid votes.
 // 42 counties sum to 327 mainland seats; 4 diaspora seats → 331 total.
@@ -513,7 +516,7 @@ function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLea
             </svg>
           </span>
         )}
-        {belowThreshold && (
+        {belowThreshold && party.thresholdType !== 'regional' && (
           <span style={{ position:'absolute', bottom:2, right:2, fontSize:8, background:'rgba(0,0,0,0.45)', color:'#fff', borderRadius:2, padding:'0 2px', fontFamily:'monospace' }}>
             &lt;5%
           </span>
@@ -1591,6 +1594,52 @@ function RoTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
   );
 }
 
+// ── Reporting widget (bottom-left of map, Canada-style) ───────────────────────
+function RoReportingWidget({ projectedCounties, declaredCounties, isSim, dark }: {
+  projectedCounties: Set<RoCountyId>;
+  declaredCounties?: Set<RoCountyId>;
+  isSim: boolean;
+  dark?: boolean;
+}) {
+  const bg     = dark ? 'rgba(7,13,28,0.88)'      : 'rgba(255,255,255,0.92)';
+  const border = dark ? 'rgba(255,255,255,0.09)'   : 'rgba(0,0,0,0.09)';
+  const ink2   = dark ? 'rgba(255,255,255,0.45)'   : 'rgba(0,0,0,0.42)';
+  const accentColor = isSim ? '#3b82f6' : '#16a34a';
+
+  const counties = isSim ? (declaredCounties ?? new Set<RoCountyId>()) : projectedCounties;
+  const count    = counties.size;
+  const total    = RO_COUNTIES.length; // 42 mainland
+
+  let reportedVotes = 0;
+  for (const id of counties) reportedVotes += RO_COUNTY_VALID_VOTES_2024[id as RoCountyId] ?? 0;
+  const reportedPct = total > 0 ? Math.min(100, (reportedVotes / RO_TOTAL_MAINLAND_VOTES) * 100) : 0;
+
+  return (
+    <div className="absolute bottom-8 left-3 z-[1001] pointer-events-none select-none"
+      style={{ background: bg, border: `1px solid ${border}`, borderRadius: 10,
+        backdropFilter: 'blur(10px)', padding: '10px 13px', minWidth: 176,
+        boxShadow: '0 4px 20px rgba(0,0,0,0.18)' }}>
+      <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.15em] mb-1.5" style={{ color: ink2 }}>
+        {isSim ? '⚡ Live Count' : '📊 Results'}
+      </div>
+      <div className="text-[13px] font-black font-mono text-ink leading-none">
+        {count} <span className="text-[10px] font-semibold" style={{ color: ink2 }}>/ {total}</span>
+      </div>
+      <div className="text-[9px] font-mono mt-0.5 mb-2" style={{ color: ink2 }}>
+        {isSim ? 'counties declared' : 'counties projected'}
+      </div>
+      <div className="h-1.5 rounded-full overflow-hidden"
+        style={{ background: dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)' }}>
+        <div className="h-full rounded-full transition-all duration-500"
+          style={{ width: `${reportedPct}%`, background: accentColor }} />
+      </div>
+      <div className="text-[9px] font-mono font-bold mt-1 text-right" style={{ color: accentColor }}>
+        {reportedPct.toFixed(1)}% of votes
+      </div>
+    </div>
+  );
+}
+
 // ── Main app ───────────────────────────────────────────────────────────────────
 export default function RomaniaApp() {
   const navigate = useNavigate();
@@ -1642,16 +1691,28 @@ export default function RomaniaApp() {
   const simTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
   const natPctsAtSimStart = useRef<Record<RoPartyId, number>>(natPcts);
 
+  // Reference snapshot (last loaded preset) for the ↩ popup in sim panel
+  const [simRefPcts,  setSimRefPcts]  = useState<Record<RoPartyId, number> | null>(null);
+  const [simRefLabel, setSimRefLabel] = useState<string>('');
+  const [refOpen,     setRefOpen]     = useState(false);
+
   // Stable sort order: captured when sim panel opens, not reshuffled on every keystroke
   const [simSortOrder, setSimSortOrder] = useState<RoPartyId[]>(() =>
     [...RO_PARTIES].sort((a, b) => (RO_VOTE_PCT_2026_POLLING[b.id] ?? 0) - (RO_VOTE_PCT_2026_POLLING[a.id] ?? 0)).map(p => p.id)
   );
   useEffect(() => {
-    if (!simOpen) return;
+    if (!simOpen) { setRefOpen(false); return; }
     setSimSortOrder([...RO_PARTIES].sort((a, b) => (natPcts[b.id] ?? 0) - (natPcts[a.id] ?? 0)).map(p => p.id));
     setSimTouched(false);
+    // Capture the reference snapshot
+    setSimRefPcts({ ...natPcts });
+    setSimRefLabel(
+      preset === '2024'         ? '2024 Baseline' :
+      preset === 'polling2026'  ? '2026 Polling'  :
+      preset === 'blank'        ? 'Blank Map'     : 'Custom'
+    );
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [simOpen]); // natPcts intentionally omitted — captures order at panel-open only
+  }, [simOpen]); // natPcts / preset intentionally omitted — captures snapshot at panel-open only
 
   function stopSim() { simTimersRef.current.forEach(clearTimeout); simTimersRef.current = []; setSimRunning(false); }
   function resetSim() { stopSim(); setSimCameraSeats(undefined); setDeclaredCounties(undefined); setSimProgress(0); }
@@ -1762,184 +1823,286 @@ export default function RomaniaApp() {
           />
         )}
 
-        {/* Map */}
-        <RoMapView
-          natPcts={natPcts} selectedCounty={selectedCounty}
-          onSelect={id => setSelectedCounty(prev => prev === id ? null : id)}
-          dark={dark} bubbleMap={bubbleMap} declaredCounties={declaredCounties}
-          overrides={countyOverrides}
-          blankMode={preset === 'blank'} projectedCounties={projectedCounties}
-        />
+        {/* Map + reporting widget */}
+        <div className="relative flex-1 min-w-0 min-h-0">
+          <RoMapView
+            natPcts={natPcts} selectedCounty={selectedCounty}
+            onSelect={id => setSelectedCounty(prev => prev === id ? null : id)}
+            dark={dark} bubbleMap={bubbleMap} declaredCounties={declaredCounties}
+            overrides={countyOverrides}
+            blankMode={preset === 'blank'} projectedCounties={projectedCounties}
+          />
+          {/* Reporting widget — shown in blank map mode or during/after sim */}
+          {(preset === 'blank' || simRunning || simCameraSeats != null) && (
+            <RoReportingWidget
+              projectedCounties={projectedCounties}
+              declaredCounties={declaredCounties}
+              isSim={simRunning || (simCameraSeats != null && preset !== 'blank')}
+              dark={dark}
+            />
+          )}
+        </div>
 
-        {/* Simulation panel */}
+        {/* Simulation panel — wrapped in relative so reference popup can float left */}
         {simOpen && (
-          <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
-            <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0 flex items-center justify-between">
-              <div>
-                <h2 className="text-[14px] font-bold text-ink leading-none">Simulation</h2>
-                <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Vote shares · Two-stage PR · 5%/Alt threshold</p>
-              </div>
-              <button onClick={() => setSimOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-2.5">
-              {simSortOrder.map(partyId => {
-                const party = RO_PARTY_MAP[partyId];
-                if (!party) return null;
-                const pct = natPcts[party.id] ?? 0;
-                const isLocked = locks.has(party.id);
-                const color = partyColor(party.id);
-                const isRegional = party.thresholdType === 'regional';
-                // Threshold badge logic
-                const belowStd = pct < RO_THRESHOLD;
-                // For regional parties, check if they'd qualify via alt threshold
-                // (≥20% in ≥4 counties) — approximate from current swing model
-                const altQualifies = isRegional && (() => {
-                  let cnt = 0;
-                  for (const cId of Object.keys(RO_COUNTY_CAMERA_SEATS) as RoCountyId[]) {
-                    if ((calcCountyVotes(natPcts, cId)[partyId] ?? 0) >= 20) cnt++;
-                  }
-                  return cnt >= 4;
-                })();
-                return (
-                  <div key={party.id}>
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
-                      <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{party.fullName}</span>
-                      {/* Threshold badge */}
-                      {isRegional ? (
-                        belowStd && !altQualifies
-                          ? <span title="Below 5% national AND cannot reach ≥20% in 4 counties" className="text-[7px] font-mono text-red-400 shrink-0">elim</span>
-                          : belowStd && altQualifies
-                            ? <span title="Qualifies via ≥20% in 4 counties (alternative threshold)" className="text-[7px] font-mono text-amber-500 shrink-0">alt</span>
-                            : null
-                      ) : (
-                        belowStd && pct > 0 && <span title="Below 5% national threshold — eliminated" className="text-[7px] font-mono text-red-400 shrink-0">&lt;5%</span>
-                      )}
-                      <button
-                        onClick={() => setLocks(prev => { const n = new Set(prev); n.has(party.id) ? n.delete(party.id) : n.add(party.id); return n; })}
-                        className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked ? 'text-gold' : 'text-ink-3 hover:text-ink'}`}
-                        title={isLocked ? 'Unlock' : 'Lock'}>
-                        {isLocked
-                          ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                          : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                        }
-                      </button>
-                      <input
-                        type="number" min={0} max={60} step={0.1}
-                        value={pct.toFixed(1)}
-                        disabled={isLocked}
-                        onChange={e => {
-                          const v = Math.max(0, Math.min(60, parseFloat(e.target.value) || 0));
-                          setNatPcts(redistributePcts(natPcts, party.id, v, locks));
-                          setPreset('custom');
-                          setSimTouched(true);
-                        }}
-                        onFocus={e => e.target.select()}
-                        className="text-[10px] font-mono font-semibold tabular-nums w-10 text-right bg-transparent border-b border-transparent focus:border-ink-3 outline-none disabled:opacity-40"
-                        style={{ color }}
-                      />
-                    </div>
-                    {/* Mini progress bar */}
-                    <div className="flex items-center gap-1">
-                      <span className="text-[8px] font-mono text-ink-3 w-8 shrink-0">{party.name}</span>
-                      <div className="flex-1 h-1.5 rounded-full overflow-hidden" style={{ background: hexToRgba(color, 0.12) }}>
-                        <div style={{ width: `${Math.min(pct / 50 * 100, 100)}%`, background: color, height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
+          <div className="relative shrink-0">
 
-              {/* ── Others row (residual = 100 − tracked sum) ──────────────── */}
-              {(() => {
-                const trackedSum = RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
-                const otherPct = Math.max(0, 100 - trackedSum);
-                return (
-                  <div className="pt-1 border-t border-default mt-1">
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-gray-400" />
-                      <span className="text-[10px] font-medium text-ink-3 flex-1 truncate leading-none">Others (minor / sub-threshold)</span>
-                      <input
-                        type="number" min={0} max={100} step={0.1}
-                        value={otherPct.toFixed(1)}
-                        onChange={e => {
-                          const newOthers = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
-                          const targetTracked = 100 - newOthers;
-                          const lockedSum = RO_PARTIES.filter(p => locks.has(p.id)).reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
-                          const unlocked = RO_PARTIES.filter(p => !locks.has(p.id));
-                          const unlockedSum = unlocked.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
-                          const available = Math.max(0, targetTracked - lockedSum);
-                          const next = { ...natPcts };
-                          if (unlockedSum > 0) {
-                            for (const p of unlocked) next[p.id] = (natPcts[p.id] ?? 0) / unlockedSum * available;
-                          } else if (unlocked.length > 0) {
-                            for (const p of unlocked) next[p.id] = available / unlocked.length;
+            {/* ── Reference popup (floats LEFT of sim panel) ── */}
+            {refOpen && simRefPcts && (
+              <div className="absolute right-full top-0 bottom-0 w-52 z-[1002] overflow-y-auto thin-scroll"
+                style={{
+                  background: dark ? 'rgba(7,13,28,0.97)' : 'rgba(255,255,255,0.98)',
+                  borderLeft: `1px solid ${dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)'}`,
+                  borderRight: `1px solid ${dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.07)'}`,
+                  boxShadow: '-4px 0 20px rgba(0,0,0,0.15)',
+                }}>
+                <div className="px-3 pt-3 pb-2 border-b border-default flex items-center justify-between">
+                  <div>
+                    <p className="text-[11px] font-bold text-ink leading-none">Reference</p>
+                    <p className="text-[8px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">{simRefLabel}</p>
+                  </div>
+                  <button onClick={() => setRefOpen(false)} className="w-5 h-5 flex items-center justify-center rounded text-ink-3 hover:text-ink hover:bg-hover text-sm">×</button>
+                </div>
+                <div className="px-3 py-2 space-y-2">
+                  {simSortOrder.map(id => {
+                    const party = RO_PARTY_MAP[id]; if (!party) return null;
+                    const refPct  = simRefPcts[id] ?? 0;
+                    const curPct  = natPcts[id] ?? 0;
+                    const delta   = curPct - refPct;
+                    const color   = partyColor(id);
+                    return (
+                      <div key={id}>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                          <span className="text-[9px] font-medium text-ink flex-1 truncate">{party.name}</span>
+                          <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color }}>{refPct.toFixed(1)}%</span>
+                          {Math.abs(delta) >= 0.1 && (
+                            <span className={`text-[8px] font-mono tabular-nums ${delta > 0 ? 'text-emerald-500' : 'text-red-400'}`}>
+                              {delta > 0 ? '+' : ''}{delta.toFixed(1)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="h-1 rounded-full overflow-hidden" style={{ background: hexToRgba(color, 0.12) }}>
+                          <div style={{ width: `${Math.min(refPct / 50 * 100, 100)}%`, background: color, height: '100%', borderRadius: '9999px' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {(() => {
+                    const refOther = Math.max(0, 100 - Object.values(simRefPcts).reduce((s, v) => s + v, 0));
+                    return refOther >= 0.1 ? (
+                      <div>
+                        <div className="flex items-center gap-1.5 mb-0.5">
+                          <span className="w-1.5 h-1.5 rounded-full shrink-0 bg-gray-400" />
+                          <span className="text-[9px] font-medium text-ink-3 flex-1">Others</span>
+                          <span className="text-[10px] font-mono font-bold tabular-nums text-ink-3">{refOther.toFixed(1)}%</span>
+                        </div>
+                        <div className="h-1 rounded-full overflow-hidden bg-ink/8">
+                          <div style={{ width: `${Math.min(refOther / 50 * 100, 100)}%`, background: '#9CA3AF', height: '100%', borderRadius: '9999px' }} />
+                        </div>
+                      </div>
+                    ) : null;
+                  })()}
+                </div>
+              </div>
+            )}
+
+            <aside className={`w-72 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide h-full`}>
+              <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0 flex items-center gap-2">
+                <div className="flex-1 min-w-0">
+                  <h2 className="text-[14px] font-bold text-ink leading-none">Simulation</h2>
+                  <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Two-stage PR · 5% / alt threshold</p>
+                </div>
+                {/* Reference popup toggle */}
+                <button
+                  onClick={() => setRefOpen(v => !v)}
+                  title={`Compare against ${simRefLabel}`}
+                  className={`shrink-0 h-6 px-2 rounded-[4px] text-[9px] font-mono font-semibold uppercase tracking-wide transition-colors border ${
+                    refOpen
+                      ? 'bg-gold/15 border-gold/40 text-gold'
+                      : 'border-default text-ink-3 hover:text-ink hover:bg-hover'
+                  }`}>
+                  ↩ {simRefLabel}
+                </button>
+                <button onClick={() => setSimOpen(false)} className="w-6 h-6 shrink-0 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-3 py-3 thin-scroll space-y-2">
+                {simSortOrder.map(partyId => {
+                  const party = RO_PARTY_MAP[partyId];
+                  if (!party) return null;
+                  const pct = natPcts[party.id] ?? 0;
+                  const isLocked = locks.has(party.id);
+                  const color = partyColor(party.id);
+                  const isRegional = party.thresholdType === 'regional';
+                  const belowStd = pct < RO_THRESHOLD;
+                  const altQualifies = isRegional && (() => {
+                    let cnt = 0;
+                    for (const cId of Object.keys(RO_COUNTY_CAMERA_SEATS) as RoCountyId[]) {
+                      if ((calcCountyVotes(natPcts, cId)[partyId] ?? 0) >= 20) cnt++;
+                    }
+                    return cnt >= 4;
+                  })();
+                  return (
+                    <div key={party.id} className={`rounded-lg px-2.5 py-2 transition-colors ${dark ? 'bg-white/[0.04] hover:bg-white/[0.07]' : 'bg-black/[0.025] hover:bg-black/[0.05]'}`}>
+                      {/* Row 1: dot · name · threshold badge · lock */}
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                        <span className="text-[10px] font-semibold text-ink flex-1 truncate leading-none">{party.fullName}</span>
+                        {isRegional ? (
+                          belowStd && !altQualifies
+                            ? <span title="Below 5% AND alt-threshold unreachable" className="text-[7px] font-mono text-red-400 shrink-0 px-1 py-px rounded border border-red-400/30">elim</span>
+                            : belowStd && altQualifies
+                              ? <span title="Qualifies via ≥20% in 4+ counties" className="text-[7px] font-mono text-amber-500 shrink-0 px-1 py-px rounded border border-amber-500/30">alt</span>
+                              : null
+                        ) : (
+                          belowStd && pct > 0 && (
+                            <span title="Below 5% threshold" className="text-[7px] font-mono text-red-400 shrink-0 px-1 py-px rounded border border-red-400/30">&lt;5%</span>
+                          )
+                        )}
+                        <button
+                          onClick={() => setLocks(prev => { const n = new Set(prev); n.has(party.id) ? n.delete(party.id) : n.add(party.id); return n; })}
+                          className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked ? 'text-gold' : 'text-ink-3 hover:text-ink'}`}
+                          title={isLocked ? 'Unlock' : 'Lock'}>
+                          {isLocked
+                            ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
+                            : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
                           }
-                          setNatPcts(next);
-                          setPreset('custom');
-                          setSimTouched(true);
-                        }}
-                        onFocus={e => e.target.select()}
-                        className="text-[10px] font-mono font-semibold tabular-nums w-10 text-right bg-transparent border-b border-transparent focus:border-ink-3 outline-none text-ink-3"
-                      />
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-[8px] font-mono text-ink-3 w-8 shrink-0">OTH</span>
-                      <div className="flex-1 h-1.5 rounded-full overflow-hidden bg-ink/8">
-                        <div style={{ width: `${Math.min(otherPct / 50 * 100, 100)}%`, background: '#9CA3AF', height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
+                        </button>
+                      </div>
+                      {/* Row 2: abbrev · bar · input box */}
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-mono font-bold w-7 shrink-0" style={{ color: hexToRgba(color, 0.7) }}>{party.name}</span>
+                        <div className="flex-1 h-2 rounded-full overflow-hidden cursor-pointer" style={{ background: hexToRgba(color, 0.12) }}
+                          onClick={() => { if (!isLocked) { /* click bar = nudge focus */ } }}>
+                          <div style={{ width: `${Math.min(pct / 55 * 100, 100)}%`, background: color, height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
+                        </div>
+                        {/* Prominent styled input */}
+                        <input
+                          type="number" min={0} max={60} step={0.1}
+                          value={pct.toFixed(1)}
+                          disabled={isLocked}
+                          onChange={e => {
+                            const v = Math.max(0, Math.min(60, parseFloat(e.target.value) || 0));
+                            setNatPcts(redistributePcts(natPcts, party.id, v, locks));
+                            setPreset('custom');
+                            setSimTouched(true);
+                          }}
+                          onFocus={e => e.target.select()}
+                          className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none disabled:opacity-35 transition-colors"
+                          style={{
+                            color,
+                            background: hexToRgba(color, isLocked ? 0.04 : 0.10),
+                            border: `1.5px solid ${hexToRgba(color, isLocked ? 0.12 : 0.35)}`,
+                            padding: '3px 4px',
+                          }}
+                        />
                       </div>
                     </div>
-                    <p className="text-[7.5px] font-mono text-ink-3 mt-1 leading-tight opacity-70">
-                      Total: {(RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0) + otherPct).toFixed(1)}%
-                    </p>
-                  </div>
-                );
-              })()}
-            </div>
-            <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
-              <button
-                disabled={simRunning || !simTouched}
-                onClick={() => {
-                  stopSim();
-                  setSimTouched(false);
-                  natPctsAtSimStart.current = { ...natPcts };
-                  const allCounties = [...RO_COUNTIES].sort(() => Math.random() - 0.5);
-                  const NCHUNKS = 12;
-                  const chunkTimes = roBellCurveTimes(NCHUNKS, 30_000);
-                  const chunks: RoCounty[][] = Array.from({ length: NCHUNKS }, () => []);
-                  allCounties.forEach((c, i) => chunks[i % NCHUNKS].push(c));
-                  setSimRunning(true); setSimProgress(0); setSimCameraSeats(undefined); setDeclaredCounties(new Set());
-                  let declared = new Set<RoCountyId>();
-                  const timers: ReturnType<typeof setTimeout>[] = [];
-                  for (let ci = 0; ci < NCHUNKS; ci++) {
-                    const chunk = chunks[ci]; const t = chunkTimes[ci];
-                    timers.push(setTimeout(() => {
-                      for (const c of chunk) declared.add(c.id);
-                      const snap = new Set(declared);
-                      setDeclaredCounties(snap);
-                      setSimProgress(snap.size);
-                      const partial = calcPartialSeats(natPctsAtSimStart.current, snap);
-                      setSimCameraSeats(partial.camera);
-                      if (snap.size >= RO_COUNTIES.length) {
-                        setSimCameraSeats(calcSeatsTwoStage(natPctsAtSimStart.current));
-                        setSimRunning(false);
-                      }
-                    }, t));
-                  }
-                  simTimersRef.current = timers;
-                }}
-                className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                {simRunning
-                  ? `${simProgress}/${RO_COUNTIES.length} counties reporting…`
-                  : '▶ Run Simulation'}
-              </button>
-              {(simCameraSeats || declaredCounties) && (
-                <button onClick={() => { resetSim(); setSimTouched(false); }} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
-                  Reset
+                  );
+                })}
+
+                {/* ── Others row ─────────────────────────────────────────── */}
+                {(() => {
+                  const trackedSum = RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
+                  const otherPct = Math.max(0, 100 - trackedSum);
+                  return (
+                    <div className={`rounded-lg px-2.5 py-2 border-t border-default mt-0.5 pt-2 ${dark ? 'bg-white/[0.02]' : 'bg-black/[0.015]'}`}>
+                      <div className="flex items-center gap-1.5 mb-1.5">
+                        <span className="w-2 h-2 rounded-full shrink-0 bg-gray-400" />
+                        <span className="text-[10px] font-semibold text-ink-3 flex-1 truncate leading-none">Others</span>
+                        <span className="text-[7.5px] font-mono text-ink-3 opacity-60">sub-threshold + minor</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[8px] font-mono font-bold w-7 shrink-0 text-gray-400">OTH</span>
+                        <div className="flex-1 h-2 rounded-full overflow-hidden bg-ink/8">
+                          <div style={{ width: `${Math.min(otherPct / 55 * 100, 100)}%`, background: '#9CA3AF', height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
+                        </div>
+                        <input
+                          type="number" min={0} max={100} step={0.1}
+                          value={otherPct.toFixed(1)}
+                          onChange={e => {
+                            const newOthers = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
+                            const targetTracked = 100 - newOthers;
+                            const lockedSum = RO_PARTIES.filter(p => locks.has(p.id)).reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
+                            const unlocked = RO_PARTIES.filter(p => !locks.has(p.id));
+                            const unlockedSum = unlocked.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
+                            const available = Math.max(0, targetTracked - lockedSum);
+                            const next = { ...natPcts };
+                            if (unlockedSum > 0) for (const p of unlocked) next[p.id] = (natPcts[p.id] ?? 0) / unlockedSum * available;
+                            else if (unlocked.length > 0) for (const p of unlocked) next[p.id] = available / unlocked.length;
+                            setNatPcts(next); setPreset('custom'); setSimTouched(true);
+                          }}
+                          onFocus={e => e.target.select()}
+                          className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none transition-colors"
+                          style={{
+                            color: '#9CA3AF',
+                            background: 'rgba(156,163,175,0.10)',
+                            border: '1.5px solid rgba(156,163,175,0.30)',
+                            padding: '3px 4px',
+                          }}
+                        />
+                      </div>
+                      <p className="text-[7.5px] font-mono text-ink-3 mt-1.5 text-right opacity-60">
+                        Total: {(trackedSum + otherPct).toFixed(1)}%
+                      </p>
+                    </div>
+                  );
+                })()}
+              </div>
+
+              <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
+                <button
+                  disabled={simRunning || !simTouched}
+                  onClick={() => {
+                    stopSim();
+                    setSimTouched(false);
+                    natPctsAtSimStart.current = { ...natPcts };
+
+                    // 5 random batches — first fires immediately, rest on bell-curve schedule
+                    const shuffled = [...RO_COUNTIES].sort(() => Math.random() - 0.5);
+                    const N = 5;
+                    const batches: RoCounty[][] = Array.from({ length: N }, () => []);
+                    shuffled.forEach((c, i) => batches[i % N].push(c));
+
+                    // Bell-curve times for batches 1-4 (batch 0 = immediate)
+                    const laterTimes = roBellCurveTimes(N - 1, 26_000).map(t => t + 3_000);
+                    const times = [0, ...laterTimes];
+
+                    setSimRunning(true); setSimProgress(0); setSimCameraSeats(undefined); setDeclaredCounties(new Set());
+                    const localDeclared = new Set<RoCountyId>();
+                    const timers: ReturnType<typeof setTimeout>[] = [];
+
+                    for (let bi = 0; bi < N; bi++) {
+                      const batch = batches[bi]; const t = times[bi];
+                      timers.push(setTimeout(() => {
+                        for (const c of batch) localDeclared.add(c.id);
+                        const snap = new Set(localDeclared);
+                        setDeclaredCounties(snap);
+                        setSimProgress(snap.size);
+                        const partial = calcPartialSeats(natPctsAtSimStart.current, snap);
+                        setSimCameraSeats(partial.camera);
+                        if (snap.size >= RO_COUNTIES.length) {
+                          setSimCameraSeats(calcSeatsTwoStage(natPctsAtSimStart.current));
+                          setSimRunning(false);
+                        }
+                      }, t));
+                    }
+                    simTimersRef.current = timers;
+                  }}
+                  className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 transition-colors">
+                  {simRunning
+                    ? `${simProgress}/${RO_COUNTIES.length} counties reporting…`
+                    : '▶ Run Simulation'}
                 </button>
-              )}
-            </div>
-          </aside>
+                {(simCameraSeats || declaredCounties) && (
+                  <button onClick={() => { resetSim(); setSimTouched(false); }} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
+                    Reset
+                  </button>
+                )}
+              </div>
+            </aside>
+          </div>
         )}
 
         {/* Coalition — right */}
