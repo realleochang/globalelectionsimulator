@@ -1369,7 +1369,7 @@ function SaSimulationPanel({ onStart, onClose, simRunning, simProgress, stopSim,
         {/* Progress bar */}
         {simRunning && (
           <div>
-            <div className="text-[9px] font-mono text-ink-3 mb-1">{simProgress} / {SA_PROVINCES.length} provinces declared</div>
+            <div className="text-[9px] font-mono text-ink-3 mb-1">{simProgress} / {SA_PROVINCES.length} provinces reporting</div>
             <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.07)' }}>
               <div className="h-full bg-emerald-500 transition-all duration-300"
                 style={{ width: `${(simProgress / SA_PROVINCES.length) * 100}%` }} />
@@ -1837,35 +1837,101 @@ export default function SouthAfricaApp() {
     setNatListPcts(pcts); // keep list ballot in sync with regional when simulation runs
     setPreset('blank');
     setProvOverrides({});
+    setProvReporting({});
     setDeclaredProvs(new Set());
     setSimSeats(undefined);
     setSimProgress(0);
     setSimRunning(true);
-    setScoreboardVisible(false);
+    setScoreboardVisible(true); // show scoreboard immediately for live results
 
-    const allProvs = [...SA_PROVINCES].sort(() => Math.random() - 0.5);
+    // ── Pre-compute each province's final vote shares ────────────────────────
+    const provVoteShares: Partial<Record<SaProvId, Record<SaPartyId, number>>> = {};
+    for (const prov of SA_PROVINCES) {
+      provVoteShares[prov.id] = calcProvVotes(pcts, prov.id);
+    }
+
+    // ── Bell-curve batch scheduling ──────────────────────────────────────────
+    const N_BATCHES = 5;
+
+    const schedules: Array<{
+      provId: SaProvId;
+      batchTimes: number[];   // absolute ms from t=0 (after normalisation)
+      cumPcts: number[];      // cumulative reporting % at each batch [e.g. 18,41,63,82,100]
+    }> = [];
+
+    for (const prov of SA_PROVINCES) {
+      // Province "centre" time: normal(mean=0.5, σ=0.20), clamped [0.12, 0.88]
+      const centerFrac = Math.max(0.12, Math.min(0.88, 0.5 + saRandNormal() * 0.20));
+      const centerMs   = centerFrac * durationMs;
+
+      // Spread window: each province's 5 batches span 20–30 % of duration
+      const spreadMs = (0.20 + Math.random() * 0.10) * durationMs;
+      const lo = centerMs - spreadMs / 2;
+      const hi = centerMs + spreadMs / 2;
+
+      // 5 batch times drawn uniformly from that window, then sorted
+      const batchTimes = Array.from({ length: N_BATCHES }, () => lo + Math.random() * (hi - lo))
+        .sort((a, b) => a - b);
+
+      // 4 random cut-points → cumulative reporting %: e.g. [18, 41, 63, 82, 100]
+      const cuts = Array.from({ length: N_BATCHES - 1 }, () => Math.random() * 100)
+        .sort((a, b) => a - b);
+      const cumPcts = [...cuts, 100];
+
+      schedules.push({ provId: prov.id, batchTimes, cumPcts });
+    }
+
+    // Normalise: shift all times so the earliest first-batch fires at t=0 (immediate)
+    const minFirst = Math.min(...schedules.map(s => s.batchTimes[0]));
+    const maxAllowed = durationMs * 0.98;
+    for (const s of schedules) {
+      s.batchTimes = s.batchTimes.map(t => Math.min(Math.max(0, t - minFirst), maxAllowed));
+    }
+
+    // ── Schedule all batch timers ─────────────────────────────────────────────
     const timers: ReturnType<typeof setTimeout>[] = [];
-    let declared = new Set<SaProvId>();
 
-    allProvs.forEach(prov => {
-      const raw = 0.5 + saRandNormal() * 0.16;
-      const t = Math.max(0.04, Math.min(0.97, raw)) * durationMs;
+    // Mutable closure state — avoids React closure staleness; updated synchronously
+    // in each callback before calling setState.
+    let curDeclared  = new Set<SaProvId>();
+    let curOverrides: Record<string, Record<SaPartyId, number>> = {};
+    let curReporting: Partial<Record<SaProvId, number>> = {};
+    let fullyDone    = 0; // provinces that have reached 100 %
 
-      timers.push(setTimeout(() => {
-        declared = new Set(declared);
-        declared.add(prov.id);
-        setDeclaredProvs(new Set(declared));
-        setSimProgress(declared.size);
-        setSimSeats(calcPartialSeats(natPctsAtSimStart.current, declared));
-        if (declared.size >= SA_PROVINCES.length) {
-          setSimSeats(mergeSeats(
-            calcSeats(natPctsAtSimStart.current, SA_LIST_SEATS_TOTAL),
-            calcRegSeats(natPctsAtSimStart.current),
-          ));
-          setSimRunning(false);
-        }
-      }, t));
-    });
+    for (const { provId, batchTimes, cumPcts } of schedules) {
+      for (let b = 0; b < N_BATCHES; b++) {
+        const rptPct  = Math.round(cumPcts[b]);
+        const isFirst = b === 0;
+        const isFinal = b === N_BATCHES - 1;
+        const t       = batchTimes[b];
+
+        timers.push(setTimeout(() => {
+          // First batch: province appears on map and gets its vote-share override
+          if (isFirst) {
+            curDeclared  = new Set([...curDeclared, provId]);
+            curOverrides = { ...curOverrides, [provId]: provVoteShares[provId]! };
+          }
+          curReporting = { ...curReporting, [provId]: rptPct };
+          if (isFinal) fullyDone++;
+
+          // Push all state together so React batches into one render
+          setDeclaredProvs(new Set(curDeclared));
+          setProvOverrides({ ...curOverrides });
+          setProvReporting({ ...curReporting });
+          setSimProgress(curDeclared.size); // provinces reporting (≥ 1st batch)
+          setSimSeats(calcPartialSeats(natPctsAtSimStart.current, curDeclared));
+
+          // All provinces at 100 % — compute final authoritative seat tally
+          if (isFinal && fullyDone >= SA_PROVINCES.length) {
+            setSimSeats(mergeSeats(
+              calcSeats(natPctsAtSimStart.current, SA_LIST_SEATS_TOTAL),
+              calcRegSeats(natPctsAtSimStart.current),
+            ));
+            setSimRunning(false);
+          }
+        }, t));
+      }
+    }
 
     simTimersRef.current = timers;
   }
@@ -2014,15 +2080,20 @@ export default function SouthAfricaApp() {
             {inactiveCount > 0 ? `Parties (${activeParties.size})` : 'Parties'}
           </button>
 
-          {/* List Seats — like Germany's "List Seats" / ZweitstimmenPanel */}
+          {/* List Seats — locked during live simulation */}
           <button
             onClick={() => {
+              if (simRunning) return;
               if (listOpen) { setListExiting(true); setTimeout(() => { setListExiting(false); setListOpen(false); }, 280); }
               else { setListOpen(true); }
             }}
-            className={listOpen ? btnActive : preset === 'blank'
-              ? `${btnBase} border-2 border-gold text-gold animate-pulse hover:bg-gold hover:text-white`
-              : btnMuted}
+            disabled={simRunning}
+            title={simRunning ? 'Unavailable during simulation' : undefined}
+            className={simRunning
+              ? `${btnBase} border border-default text-ink-3 opacity-40 cursor-not-allowed`
+              : listOpen ? btnActive : preset === 'blank'
+                ? `${btnBase} border-2 border-gold text-gold animate-pulse hover:bg-gold hover:text-white`
+                : btnMuted}
           >List Seats</button>
 
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
@@ -2172,7 +2243,7 @@ export default function SouthAfricaApp() {
                 (s, p) => s + (declaredProvs.has(p.id) ? p.votes2024 : 0), 0
               ) / SA_GRAND_TOTAL_VOTES * 100;
               const barPct    = (declared / total) * 100;
-              const isDone    = declared === total;
+              const isDone    = declared === total && !simRunning; // only after all batches complete
               const accentClr = isDone ? '#16a34a' : simRunning ? '#f59e0b' : '#3b82f6';
               const bg        = dark ? 'rgba(13,27,46,0.93)' : 'rgba(255,255,255,0.95)';
               const border    = dark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.09)';
