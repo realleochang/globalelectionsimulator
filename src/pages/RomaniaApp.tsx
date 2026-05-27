@@ -2042,7 +2042,10 @@ export default function RomaniaApp() {
                           const pcts = { ...simDraftPcts } as Record<RoPartyId, number>;
                           natPctsAtSimStart.current = pcts;
                           setNatPcts(pcts);
-                          setPreset('custom');
+                          // Switch to blank map so the map starts gray and counties
+                          // light up one batch at a time (election-night feel)
+                          setPreset('blank');
+                          setProjectedCounties(new Set());
 
                     // 5 random batches — first fires immediately, rest on bell-curve schedule
                     const shuffled = [...RO_COUNTIES].sort(() => Math.random() - 0.5);
@@ -2064,6 +2067,8 @@ export default function RomaniaApp() {
                         for (const c of batch) localDeclared.add(c.id);
                         const snap = new Set(localDeclared);
                         setDeclaredCounties(snap);
+                        // Also project each declared county so blank-map colouring kicks in
+                        setProjectedCounties(new Set(snap) as Set<RoCountyId>);
                         setSimProgress(snap.size);
                         const partial = calcPartialSeats(natPctsAtSimStart.current, snap);
                         setSimCameraSeats(partial.camera);
