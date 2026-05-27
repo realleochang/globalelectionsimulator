@@ -2098,18 +2098,24 @@ export default function SouthAfricaApp() {
           {/* Presets */}
           <button onClick={loadBaseline}    className={preset === 'baseline'    ? btnGold : btnMuted}>2024 Baseline</button>
           <button onClick={loadPolling2026} className={preset === 'polling2026' ? btnGold : btnMuted}>2026 Polling</button>
-          <button onClick={loadBlank}       className={preset === 'blank'       ? btnGold : btnMuted}>Blank Map</button>
+          <button onClick={() => { if (!simRunning) loadBlank(); }} disabled={simRunning}
+            className={simRunning ? `${btnBase} border border-default text-ink-3 opacity-40 cursor-not-allowed` : preset === 'blank' ? btnGold : btnMuted}
+            title={simRunning ? 'Unavailable during simulation' : undefined}>Blank Map</button>
 
           {/* Parties — toggle which parties participate */}
           <button
             onClick={() => {
+              if (simRunning) return;
               if (partiesOpen) { setPartiesExiting(true); setTimeout(() => { setPartiesExiting(false); setPartiesOpen(false); }, 280); }
               else { setPartiesOpen(true); }
             }}
-            className={partiesOpen ? btnActive : inactiveCount > 0
-              ? `${btnBase} border border-amber-400 text-amber-600 hover:bg-amber-400 hover:text-white`
-              : btnMuted}
-            title={inactiveCount > 0 ? `${inactiveCount} parties excluded` : 'Select parties for the election'}
+            disabled={simRunning}
+            className={simRunning
+              ? `${btnBase} border border-default text-ink-3 opacity-40 cursor-not-allowed`
+              : partiesOpen ? btnActive : inactiveCount > 0
+                ? `${btnBase} border border-amber-400 text-amber-600 hover:bg-amber-400 hover:text-white`
+                : btnMuted}
+            title={simRunning ? 'Unavailable during simulation' : inactiveCount > 0 ? `${inactiveCount} parties excluded` : 'Select parties for the election'}
           >
             {inactiveCount > 0 ? `Parties (${activeParties.size})` : 'Parties'}
           </button>
@@ -2262,7 +2268,7 @@ export default function SouthAfricaApp() {
           <div className="flex-1 min-w-0 relative">
             <SaMapView
               natPcts={natPcts}
-              onSelect={id => setSelectedProv(prev => prev === id ? null : id)}
+              onSelect={id => { if (!simRunning) setSelectedProv(prev => prev === id ? null : id); }}
               dark={dark}
               declaredProvs={declaredProvs}
               overrides={provOverrides}
