@@ -1830,17 +1830,15 @@ export default function SouthAfricaApp() {
     simTimersRef.current = timers;
   }
 
-  /** Instantly project List Seats sliders as the national result (no animation) */
-  function handleProject(pcts: Record<SaPartyId, number>) {
-    stopSim();
-    setNatPcts(pcts);
+  /**
+   * Project ONLY the national list ballot pcts (from the List Seats panel).
+   * Does NOT touch natPcts, provOverrides, or declaredProvs — the player
+   * enters regional/province results by hand via province panels.
+   */
+  function handleProjectListOnly(pcts: Record<SaPartyId, number>) {
     setNatListPcts(pcts);
-    setPreset('custom');
-    setProvOverrides({});
-    setDeclaredProvs(undefined); // show all provinces coloured
-    setSimSeats(undefined);
-    setSimProgress(0);
     setScoreboardVisible(true);
+    if (preset !== 'blank') setPreset('custom');
   }
 
   /** Declare a single province result — marks it as reported on the map */
@@ -2185,7 +2183,7 @@ export default function SouthAfricaApp() {
               }}
               regSeatsMap={regSeatsMap}
               activeParties={activeParties}
-              onProject={handleProject}
+              onProject={handleProjectListOnly}
               onClose={() => {
                 setListExiting(true);
                 setTimeout(() => { setListExiting(false); setListOpen(false); }, 280);
