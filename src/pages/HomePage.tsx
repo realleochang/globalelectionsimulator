@@ -122,9 +122,8 @@ export const COUNTRIES = [
     lat: -29, lng: 25,
     accent: 'linear-gradient(90deg,#007A4D,#FFB612,#003DA5)',
     parties: [
+      { color: '#E53935', abbr: 'EFF' }, { color: '#B71C1C', abbr: 'MK'  },
       { color: '#007A4D', abbr: 'ANC' }, { color: '#1565C0', abbr: 'DA'  },
-      { color: '#B71C1C', abbr: 'MK'  }, { color: '#E53935', abbr: 'EFF' },
-      { color: '#6A1B9A', abbr: 'IFP' }, { color: '#1E88E5', abbr: 'PA'  },
     ],
   },
 ];
@@ -1133,7 +1132,7 @@ export default function HomePage() {
           <a href="https://ko-fi.com/globalelectionsimulator" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-3 py-1 rounded-full text-white font-mono font-black text-[8px] uppercase tracking-[0.18em] leading-none"
             style={{ background: 'linear-gradient(90deg,#e05c00,#e8a020,#c8a020,#e05c00)', backgroundSize: '200% 100%', animation: 'donateCycle 2.8s linear infinite' }}>
-            Tip
+            Donate
           </a>
           <a href="https://discord.gg/MzQ4fXnY3K" target="_blank" rel="noopener noreferrer"
             className="flex items-center gap-1.5 px-2.5 py-1 rounded-full border transition-colors"
