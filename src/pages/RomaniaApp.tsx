@@ -233,30 +233,6 @@ const RO_COUNTY_RESULTS_2024: Record<RoCountyId, Partial<Record<RoPartyId, numbe
   VN: { PSD:25.28, AUR:20.47, PNL:17.19, USR: 7.13, SOS: 6.30, POT: 5.34, UDMR: 0.20 },
 };
 
-// ── D'Hondt with 5% threshold ──────────────────────────────────────────────────
-function calcSeats(
-  votePcts: Partial<Record<RoPartyId, number>>,
-  totalSeats = RO_CAMERA_SEATS,
-  threshold = RO_THRESHOLD,
-): Partial<Record<RoPartyId, number>> {
-  const qualifying: Partial<Record<RoPartyId, number>> = {};
-  let qualSum = 0;
-  for (const [id, v] of Object.entries(votePcts) as [RoPartyId, number][]) {
-    if ((v ?? 0) >= threshold) { qualifying[id] = v; qualSum += v; }
-  }
-  if (qualSum === 0) return {};
-  const quotients: { id: RoPartyId; q: number }[] = [];
-  for (const [id, v] of Object.entries(qualifying) as [RoPartyId, number][]) {
-    for (let d = 1; d <= totalSeats; d++) quotients.push({ id, q: v / d });
-  }
-  quotients.sort((a, b) => b.q - a.q);
-  const seats: Partial<Record<RoPartyId, number>> = {};
-  for (let i = 0; i < Math.min(totalSeats, quotients.length); i++) {
-    seats[quotients[i].id] = (seats[quotients[i].id] ?? 0) + 1;
-  }
-  return seats;
-}
-
 // Returns each party's estimated % of ALL valid votes in the county (sums to ≤100, not forced to 100).
 // Parties absent from real county data get a small estimated baseline drawn from the
 // "other votes" remainder, split proportionally to their national share — so the
@@ -383,6 +359,27 @@ function calcSeatsTwoStage(
 
 type PartialSeatsResult = { camera: Partial<Record<RoPartyId, number>>; senate: Partial<Record<RoPartyId, number>> };
 
+// ── Alt-threshold qualifier check (reused by analysis panel + sim panel) ─────
+// Returns the set of parties that clear the ≥20% in ≥4 counties bar, regardless
+// of whether they also clear the 5% national bar.
+function getAltThresholdQualifiers(
+  natPcts: Record<RoPartyId, number>,
+  overrides?: Record<string, Record<RoPartyId, number>>,
+): Set<RoPartyId> {
+  const countyOver20: Partial<Record<RoPartyId, number>> = {};
+  for (const countyId of Object.keys(RO_COUNTY_CAMERA_SEATS) as RoCountyId[]) {
+    const cv = overrides?.[countyId] ?? calcCountyVotes(natPcts, countyId);
+    for (const p of RO_PARTIES) {
+      if ((cv[p.id] ?? 0) >= 20) countyOver20[p.id] = (countyOver20[p.id] ?? 0) + 1;
+    }
+  }
+  const result = new Set<RoPartyId>();
+  for (const [id, cnt] of Object.entries(countyOver20) as [RoPartyId, number][]) {
+    if (cnt >= 4) result.add(id as RoPartyId);
+  }
+  return result;
+}
+
 function calcPartialSeats(
   natPcts: Record<RoPartyId, number>,
   declaredCounties: Set<RoCountyId>,
@@ -397,9 +394,10 @@ function calcPartialSeats(
     totalPop += c.pop;
   }
   if (totalPop === 0) return { camera: {}, senate: {} };
-  const norm: Partial<Record<RoPartyId, number>> = {};
+  const norm: Record<RoPartyId, number> = {} as Record<RoPartyId, number>;
   for (const p of RO_PARTIES) norm[p.id] = (weighted[p.id] ?? 0) / totalPop;
-  return { camera: calcSeats(norm, RO_CAMERA_SEATS), senate: {} };
+  // Use two-stage system so alt-threshold parties (UDMR) are included correctly
+  return { camera: calcSeatsTwoStage(norm), senate: {} };
 }
 
 function redistributePcts(
@@ -974,7 +972,7 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override, i
               <div className="flex items-center gap-1 mb-0.5">
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background:p.color }} />
                 <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{p.fullName}</span>
-                {pct < RO_THRESHOLD && pct > 0 && <span className="text-[7px] font-mono text-red-400 shrink-0">&lt;5%</span>}
+                {pct < RO_THRESHOLD && pct > 0 && p.thresholdType !== 'regional' && <span className="text-[7px] font-mono text-red-400 shrink-0">&lt;5%</span>}
                 {editId === p.id
                   ? <input type="number" min={0} max={100} step={0.1} value={editVal} autoFocus
                       className="w-14 text-[11px] font-mono text-right border border-default rounded px-1 bg-canvas text-ink"
@@ -1097,7 +1095,7 @@ function RoParliamentPanel({ cameraSeats, onClose, exiting, dark }: {
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Chamber of Deputies</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{RO_CAMERA_SEATS} seats · majority {RO_CAMERA_MAJORITY} · 5% threshold</div>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{RO_CAMERA_SEATS} seats · majority {RO_CAMERA_MAJORITY} · 5% or alt threshold</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
@@ -1236,13 +1234,19 @@ function RoAnalysisPanel({ natPcts, cameraSeats, onClose, exiting, dark }: {
   onClose: () => void; exiting?: boolean; dark?: boolean;
 }) {
   // ── Core stats computation ──────────────────────────────────────────────────
+  // A party qualifies if it clears the 5% national bar OR the ≥20%/4-county alt-threshold
+  const altQualifiers = useMemo(() => getAltThresholdQualifiers(natPcts), [natPcts]);
   const qualifyingParties = useMemo(
-    () => RO_PARTIES.filter(p => (natPcts[p.id] ?? 0) >= RO_THRESHOLD),
-    [natPcts]
+    () => RO_PARTIES.filter(p => (natPcts[p.id] ?? 0) >= RO_THRESHOLD || altQualifiers.has(p.id)),
+    [natPcts, altQualifiers]
   );
   const belowThreshold = useMemo(
-    () => RO_PARTIES.filter(p => (natPcts[p.id] ?? 0) > 0 && (natPcts[p.id] ?? 0) < RO_THRESHOLD),
-    [natPcts]
+    () => RO_PARTIES.filter(p =>
+      (natPcts[p.id] ?? 0) > 0 &&
+      (natPcts[p.id] ?? 0) < RO_THRESHOLD &&
+      !altQualifiers.has(p.id)   // only truly eliminated parties
+    ),
+    [natPcts, altQualifiers]
   );
 
   // Effective Number of Parties — votes (Laakso-Taagepera)
@@ -1378,8 +1382,8 @@ function RoAnalysisPanel({ natPcts, cameraSeats, onClose, exiting, dark }: {
         <StatRow label="Effective parties (votes)" value={enpVotes.toFixed(2)} />
         <StatRow label="Effective parties (seats)" value={enpSeats.toFixed(2)} />
         <StatRow label="Gallagher disproportionality" value={gallagher.toFixed(2) + '%'} sub={gallagher < 5 ? '(fair)' : gallagher < 10 ? '(mild)' : '(high)'} />
-        <StatRow label="Parties above 5% threshold" value={String(qualifyingParties.length)} sub={`of ${RO_PARTIES.length}`} />
-        <StatRow label="Votes wasted (sub-threshold)" value={wastedVotePct.toFixed(1) + '%'} />
+        <StatRow label="Parties in parliament" value={String(qualifyingParties.length)} sub={`of ${RO_PARTIES.length} · 5% or alt`} />
+        <StatRow label="Votes wasted (truly eliminated)" value={wastedVotePct.toFixed(1) + '%'} />
 
         {/* ── County map ─── */}
         <Sec>County Wins (42 total)</Sec>
@@ -1571,14 +1575,15 @@ function RoTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
         <H2>Electoral System</H2>
-        <P>Romania uses <strong>D'Hondt proportional representation</strong> for both the Chamber of Deputies and the Senate. Seats are allocated at the national level using party list votes.</P>
-        <Note>This simulator uses a <strong>simplified national proportional</strong> model with a 5% threshold — parties below this get <strong>zero seats</strong>.</Note>
+        <P>Romania uses a <strong>two-stage proportional representation</strong> system (Law 208/2015). Seats are first allocated county-by-county via Hare quota, then remaining seats go to a national D'Hondt redistribution.</P>
+        <Note>This simulator models the <strong>real two-stage system</strong>: Hare quota per county (Stage 1) + national D'Hondt remainder redistribution (Stage 2), including both entry thresholds.</Note>
         <H2>Chamber of Deputies</H2>
-        <P>The lower house has <strong>331 seats</strong>. A majority requires <strong>166 seats</strong>. The Chamber is the primary chamber for confidence votes and forming a government.</P>
-        <H2>Senate</H2>
-        <P>The upper house has <strong>137 seats</strong>. A majority requires <strong>69 seats</strong>. Toggle between Chamber and Senate in the Parliament panel (left side).</P>
-        <H2>5% Threshold</H2>
-        <P>Individual parties need at least <strong>5%</strong> nationally to receive any seats. In the scoreboard, parties below this threshold appear faded with a "&lt;5%" badge.</P>
+        <P>The lower house has <strong>331 seats</strong> (327 mainland + 4 diaspora). A majority requires <strong>166 seats</strong>. The Chamber is the primary chamber for confidence votes and forming a government.</P>
+        <H2>5% National Threshold</H2>
+        <P>A party needs at least <strong>5% of all valid votes nationwide</strong> to enter parliament. Parties below this are fully eliminated. In the scoreboard they appear faded.</P>
+        <H2>Alternative Threshold (Law 208/2015)</H2>
+        <P>A party that scores below 5% nationally can <em>still</em> enter parliament if it wins <strong>≥ 20% of the valid votes in at least 4 individual counties</strong>. This protects ethnic-minority parties like <strong>UDMR</strong>, which dominates Harghita (HR), Covasna (CV), Mureș (MS), and Satu Mare (SM) even when its national share falls below 5%.</P>
+        <Note>In the Simulation panel, the <strong>"alt"</strong> badge on UDMR means it qualifies via the 4-county route even if the national bar shows &lt;5%.</Note>
         <H2>Romanian Parties</H2>
         <P><strong>PSD</strong> (Social Democrats) leads a coalition with <strong>PNL</strong> (Liberals) and <strong>UDMR</strong> (Hungarian minority). The far-right bloc of <strong>AUR</strong>, <strong>SOS</strong>, and <strong>POT</strong> surged in 2024. <strong>USR</strong> is the main reformist anti-corruption force.</P>
         <H2>Sliders</H2>
