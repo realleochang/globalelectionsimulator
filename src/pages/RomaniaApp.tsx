@@ -1020,8 +1020,14 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override, i
     setEditId(null); setEditVal('');
   }
 
-  const sorted = useMemo(() => RO_PARTIES.map(p => ({ ...p, pct: pcts[p.id] ?? 0 })).sort((a, b) => b.pct - a.pct), [pcts]);
-  const county = RO_COUNTY_MAP[countyId]; const winner = sorted[0];
+  // Fixed render order — never reshuffled while dragging
+  const partyRows = useMemo(() => RO_PARTIES.map(p => ({ ...p, pct: pcts[p.id] ?? 0 })), [pcts]);
+  // Winner derived separately so the top-badge stays accurate without affecting order
+  const winner = useMemo(
+    () => partyRows.reduce<typeof partyRows[0] | null>((best, p) => (!best || p.pct > best.pct) ? p : best, null),
+    [partyRows],
+  );
+  const county = RO_COUNTY_MAP[countyId];
   return (
     <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
       <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0">
@@ -1043,7 +1049,7 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override, i
         )}
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-2.5">
-        {sorted.filter(p => p.pct >= 0.1 || panelLocks.has(p.id)).map(p => {
+        {partyRows.filter(p => p.pct >= 0.1 || panelLocks.has(p.id)).map(p => {
           const pct = pcts[p.id] ?? 0; const isLocked = panelLocks.has(p.id);
           return (
             <div key={p.id}>
