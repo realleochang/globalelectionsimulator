@@ -490,7 +490,7 @@ function zoomScale(zoom: number): number { return Math.max(0.40, Math.min(1.0, (
 
 function RoBubbleLayer({
   geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredCounties,
-  overrides, overridesRef,
+  overrides, overridesRef, blankMode, projectedCounties,
 }: {
   geoData: any; natPcts: Record<RoPartyId, number>;
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -500,6 +500,8 @@ function RoBubbleLayer({
   declaredCounties?: Set<RoCountyId>;
   overrides?: Record<string, Record<RoPartyId, number>>;
   overridesRef: React.MutableRefObject<Record<string, Record<RoPartyId, number>> | undefined>;
+  blankMode?: boolean;
+  projectedCounties?: Set<RoCountyId>;
 }) {
   const map = useMap();
   const bubblesRef = useRef<BubbleEntry[]>([]);
@@ -522,6 +524,7 @@ function RoBubbleLayer({
       const countyId = RO_NAME_TO_ID[countyName];
       if (!countyId) return;
       if (declaredCounties && !declaredCounties.has(countyId)) return;
+      if (blankMode && !(projectedCounties?.has(countyId))) return;
       const bounds = (layer as any).getBounds?.();
       if (!bounds?.isValid()) return;
       const center = bounds.getCenter();
@@ -548,17 +551,19 @@ function RoBubbleLayer({
       bubblesRef.current.push({ marker, baseRadius });
     });
     return () => { for (const { marker } of bubblesRef.current) marker.remove(); bubblesRef.current = []; };
-  }, [map, geoData, natPcts, overrides]);
+  }, [map, geoData, natPcts, overrides, blankMode, projectedCounties]);
 
   return null;
 }
 
 // ── Map view ───────────────────────────────────────────────────────────────────
-function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declaredCounties, overrides }: {
+function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declaredCounties, overrides, blankMode, projectedCounties }: {
   natPcts: Record<RoPartyId, number>; selectedCounty: RoCountyId | null;
   onSelect: (id: RoCountyId) => void; dark: boolean; bubbleMap: boolean;
   declaredCounties?: Set<RoCountyId>;
   overrides?: Record<string, Record<RoPartyId, number>>;
+  blankMode?: boolean;
+  projectedCounties?: Set<RoCountyId>;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const layerRef     = useRef<L.GeoJSON | null>(null);
@@ -572,13 +577,17 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
   const onSelectRef  = useRef(onSelect);
   const declaredRef  = useRef(declaredCounties);
   const overridesRef = useRef(overrides);
+  const blankModeRef = useRef(blankMode ?? false);
+  const projectedRef = useRef(projectedCounties ?? new Set<RoCountyId>());
   useEffect(() => { natPctsRef.current  = natPcts;        }, [natPcts]);
   useEffect(() => { selectedRef.current = selectedCounty; }, [selectedCounty]);
   useEffect(() => { darkRef.current     = dark;           }, [dark]);
   useEffect(() => { bubbleRef.current   = bubbleMap;      }, [bubbleMap]);
   useEffect(() => { onSelectRef.current = onSelect;       }, [onSelect]);
-  useEffect(() => { declaredRef.current = declaredCounties; }, [declaredCounties]);
-  useEffect(() => { overridesRef.current = overrides;     }, [overrides]);
+  useEffect(() => { declaredRef.current  = declaredCounties;         }, [declaredCounties]);
+  useEffect(() => { overridesRef.current = overrides;                }, [overrides]);
+  useEffect(() => { blankModeRef.current = blankMode ?? false;       }, [blankMode]);
+  useEffect(() => { projectedRef.current = projectedCounties ?? new Set(); }, [projectedCounties]);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}romania-counties.geojson`)
@@ -592,13 +601,17 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
     const borderColor = darkRef.current ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
     if (bubbleRef.current) return { fillOpacity:0, weight:0.4, color: darkRef.current ? 'rgba(255,255,255,0.18)':'rgba(0,0,0,0.18)', opacity:0.6 };
     if (!countyId) return { fillColor: darkRef.current?'#374151':'#E5E7EB', fillOpacity:0.5, weight:0.4, color:borderColor, opacity:1 };
+    // Blank mode: only colour counties that have been explicitly projected
+    if (blankModeRef.current && !projectedRef.current.has(countyId)) {
+      return { fillColor: darkRef.current?'#1f2937':'#d1d5db', fillOpacity:0.7, weight:isSelected?2:0.4, color:isSelected?'#c8a020':borderColor, opacity:1 };
+    }
     const isDeclared = !declaredRef.current || declaredRef.current.has(countyId);
     if (!isDeclared) return { fillColor: darkRef.current?'#1f2937':'#d1d5db', fillOpacity:0.7, weight:0.4, color:borderColor, opacity:1 };
     const fill = getCountyFill(natPctsRef.current, countyId, darkRef.current, overridesRef.current);
     return { fillColor:fill, fillOpacity:0.80, weight: isSelected?2:0.5, color: isSelected?'#c8a020':borderColor, opacity:1 };
   }, []);
 
-  useEffect(() => { layerRef.current?.setStyle((f: any) => getStyle(f)); }, [natPcts, selectedCounty, dark, bubbleMap, declaredCounties, overrides, getStyle]);
+  useEffect(() => { layerRef.current?.setStyle((f: any) => getStyle(f)); }, [natPcts, selectedCounty, dark, bubbleMap, declaredCounties, overrides, blankMode, projectedCounties, getStyle]);
 
   const onEachFeature = useCallback((feature: any, layer: L.Layer) => {
     const countyName: string = feature?.properties?.name ?? '';
@@ -606,6 +619,7 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
     layer.on('click', () => { if (countyId) onSelectRef.current(countyId); });
     layer.on('mousemove', (e: L.LeafletMouseEvent) => {
       if (bubbleRef.current || !countyId) { setTooltip(null); return; }
+      if (blankModeRef.current && !projectedRef.current.has(countyId)) { setTooltip(null); return; }
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       // Use override if present — same source as the county panel slider values
@@ -632,7 +646,8 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
         {geoData && bubbleMap && (
           <RoBubbleLayer geoData={geoData} natPcts={natPcts} containerRef={containerRef}
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef} declaredCounties={declaredCounties}
-            overrides={overrides} overridesRef={overridesRef} />
+            overrides={overrides} overridesRef={overridesRef}
+            blankMode={blankMode} projectedCounties={projectedCounties} />
         )}
       </MapContainer>
       {tooltip && (() => {
@@ -707,11 +722,14 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
 }
 
 // ── County panel (editable) ────────────────────────────────────────────────────
-function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override }: {
+function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override, isBlankMode, isProjected, onProject }: {
   countyId: RoCountyId; natPcts: Record<RoPartyId, number>;
   onUpdate: (id: RoCountyId, pcts: Record<RoPartyId, number>) => void;
   onClose: () => void; dark?: boolean;
   override?: Record<RoPartyId, number>;
+  isBlankMode?: boolean;
+  isProjected?: boolean;
+  onProject?: () => void;
 }) {
   const initPcts = () => {
     if (override) return { ...override };
@@ -761,7 +779,9 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override }:
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
             <h2 className="text-[17px] font-bold text-ink leading-tight truncate">{county?.name ?? countyId}</h2>
-            <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">{override ? 'Custom result · click % to edit' : 'Estimated result · click % to edit'}</p>
+            <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">
+              {isBlankMode && !isProjected ? 'Not yet projected' : override ? 'Custom result · click % to edit' : 'Estimated result · click % to edit'}
+            </p>
           </div>
           <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
         </div>
@@ -812,6 +832,15 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override }:
             <div className="text-[8.5px] font-mono text-ink-3 uppercase tracking-wide mb-1">Population (approx.)</div>
             <div className="text-[11px] font-mono font-semibold text-ink">{county?.pop.toLocaleString()}</div>
           </div>
+          {isBlankMode && !isProjected && (
+            <button onClick={onProject}
+              className="w-full h-8 rounded-[4px] bg-gold text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-gold-deep transition-colors">
+              ▶ Project Results
+            </button>
+          )}
+          {isBlankMode && isProjected && (
+            <div className="text-[9px] font-mono text-emerald-500 text-center py-1">✓ Projected</div>
+          )}
           {override && (
             <button onClick={() => {
               const cv = calcCountyVotes(natPcts, countyId);
@@ -1006,6 +1035,332 @@ function RoCoalitionPanel({ cameraSeats, onClose, exiting, dark }: {
   );
 }
 
+// ── Analysis panel ─────────────────────────────────────────────────────────────
+function RoAnalysisPanel({ natPcts, cameraSeats, onClose, exiting, dark }: {
+  natPcts: Record<RoPartyId, number>;
+  cameraSeats: Partial<Record<RoPartyId, number>>;
+  onClose: () => void; exiting?: boolean; dark?: boolean;
+}) {
+  // ── Core stats computation ──────────────────────────────────────────────────
+  const qualifyingParties = useMemo(
+    () => RO_PARTIES.filter(p => (natPcts[p.id] ?? 0) >= RO_THRESHOLD),
+    [natPcts]
+  );
+  const belowThreshold = useMemo(
+    () => RO_PARTIES.filter(p => (natPcts[p.id] ?? 0) > 0 && (natPcts[p.id] ?? 0) < RO_THRESHOLD),
+    [natPcts]
+  );
+
+  // Effective Number of Parties — votes (Laakso-Taagepera)
+  const totalVotePct = useMemo(() => RO_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0), [natPcts]);
+  const enpVotes = useMemo(() => {
+    if (totalVotePct === 0) return 0;
+    const ss = RO_PARTIES.reduce((s, p) => { const v = (natPcts[p.id] ?? 0) / totalVotePct; return s + v * v; }, 0);
+    return ss > 0 ? 1 / ss : 0;
+  }, [natPcts, totalVotePct]);
+
+  // Effective Number of Parties — seats
+  const totalSeats = useMemo(() => RO_PARTIES.reduce((s, p) => s + (cameraSeats[p.id] ?? 0), 0), [cameraSeats]);
+  const enpSeats = useMemo(() => {
+    if (totalSeats === 0) return 0;
+    const ss = RO_PARTIES.reduce((s, p) => { const v = (cameraSeats[p.id] ?? 0) / totalSeats; return s + v * v; }, 0);
+    return ss > 0 ? 1 / ss : 0;
+  }, [cameraSeats, totalSeats]);
+
+  // Gallagher Disproportionality Index
+  const gallagher = useMemo(() => {
+    if (totalVotePct === 0 || totalSeats === 0) return 0;
+    const sumSq = RO_PARTIES.reduce((s, p) => {
+      const v = (natPcts[p.id] ?? 0) / totalVotePct * 100;
+      const seats = totalSeats > 0 ? (cameraSeats[p.id] ?? 0) / totalSeats * 100 : 0;
+      const diff = v - seats;
+      return s + diff * diff;
+    }, 0);
+    return Math.sqrt(sumSq / 2);
+  }, [natPcts, cameraSeats, totalVotePct, totalSeats]);
+
+  // County wins per party
+  const countyWins = useMemo(() => {
+    const wins: Partial<Record<RoPartyId, number>> = {};
+    for (const county of RO_COUNTIES) {
+      const cv = calcCountyVotes(natPcts, county.id);
+      const sorted = (Object.entries(cv) as [RoPartyId, number][]).sort(([, a], [, b]) => b - a);
+      if (sorted.length > 0) {
+        const winner = sorted[0][0] as RoPartyId;
+        wins[winner] = (wins[winner] ?? 0) + 1;
+      }
+    }
+    return wins;
+  }, [natPcts]);
+
+  // Strongest & weakest county per party
+  const partyExtremes = useMemo(() => {
+    const best: Partial<Record<RoPartyId, { county: RoCounty; pct: number }>> = {};
+    const worst: Partial<Record<RoPartyId, { county: RoCounty; pct: number }>> = {};
+    for (const county of RO_COUNTIES) {
+      const cv = calcCountyVotes(natPcts, county.id);
+      for (const p of RO_PARTIES) {
+        const pct = cv[p.id] ?? 0;
+        if (!best[p.id] || pct > best[p.id]!.pct) best[p.id] = { county, pct };
+        if (!worst[p.id] || pct < worst[p.id]!.pct) worst[p.id] = { county, pct };
+      }
+    }
+    return { best, worst };
+  }, [natPcts]);
+
+  // Most competitive / most dominant counties
+  const countyMargins = useMemo(() => {
+    return RO_COUNTIES.map(county => {
+      const cv = calcCountyVotes(natPcts, county.id);
+      const sorted = (Object.entries(cv) as [RoPartyId, number][]).sort(([, a], [, b]) => b - a);
+      const margin = sorted.length >= 2 ? sorted[0][1] - sorted[1][1] : (sorted[0]?.[1] ?? 0);
+      const winner = sorted[0]?.[0] as RoPartyId | undefined;
+      return { county, margin, winner };
+    });
+  }, [natPcts]);
+
+  const mostCompetitive = useMemo(
+    () => [...countyMargins].sort((a, b) => a.margin - b.margin).slice(0, 5),
+    [countyMargins]
+  );
+  const mostDominant = useMemo(
+    () => [...countyMargins].sort((a, b) => b.margin - a.margin).slice(0, 5),
+    [countyMargins]
+  );
+
+  // Seats-to-votes ratio
+  const seatsToVotes = useMemo(() => {
+    return RO_PARTIES
+      .filter(p => (natPcts[p.id] ?? 0) > 0)
+      .map(p => {
+        const vPct = totalVotePct > 0 ? (natPcts[p.id] ?? 0) / totalVotePct * 100 : 0;
+        const sPct = totalSeats > 0 ? (cameraSeats[p.id] ?? 0) / totalSeats * 100 : 0;
+        return { id: p.id, vPct, sPct, ratio: vPct > 0 ? sPct / vPct : 0 };
+      })
+      .filter(x => x.vPct > 0)
+      .sort((a, b) => b.ratio - a.ratio);
+  }, [natPcts, cameraSeats, totalVotePct, totalSeats]);
+
+  // Swing vs 2024
+  const swings = useMemo(() => {
+    return RO_PARTIES.map(p => ({
+      id: p.id,
+      cur: natPcts[p.id] ?? 0,
+      base: RO_VOTE_PCT_2024[p.id] ?? 0,
+      delta: (natPcts[p.id] ?? 0) - (RO_VOTE_PCT_2024[p.id] ?? 0),
+    })).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta));
+  }, [natPcts]);
+
+  // Votes "wasted" below threshold
+  const wastedVotePct = useMemo(
+    () => belowThreshold.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0),
+    [belowThreshold, natPcts]
+  );
+
+  const Sec = ({ children }: { children: React.ReactNode }) => (
+    <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.15em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>
+  );
+  const StatRow = ({ label, value, sub }: { label: string; value: string; sub?: string }) => (
+    <div className="flex items-baseline justify-between py-0.5">
+      <span className="text-[10px] text-ink-3 flex-1 pr-2">{label}</span>
+      <span className="text-[11px] font-mono font-bold text-ink tabular-nums">{value}</span>
+      {sub && <span className="text-[8.5px] font-mono text-ink-3 ml-1">{sub}</span>}
+    </div>
+  );
+
+  return (
+    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h2 className="text-[13px] font-bold text-ink leading-none">📊 Election Analysis</h2>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Nerdy stats · Romania 2024 base</div>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
+
+        {/* ── System health ─── */}
+        <Sec>System Health</Sec>
+        <StatRow label="Effective parties (votes)" value={enpVotes.toFixed(2)} />
+        <StatRow label="Effective parties (seats)" value={enpSeats.toFixed(2)} />
+        <StatRow label="Gallagher disproportionality" value={gallagher.toFixed(2) + '%'} sub={gallagher < 5 ? '(fair)' : gallagher < 10 ? '(mild)' : '(high)'} />
+        <StatRow label="Parties above 5% threshold" value={String(qualifyingParties.length)} sub={`of ${RO_PARTIES.length}`} />
+        <StatRow label="Votes wasted (sub-threshold)" value={wastedVotePct.toFixed(1) + '%'} />
+
+        {/* ── County map ─── */}
+        <Sec>County Wins (42 total)</Sec>
+        <div className="space-y-1">
+          {RO_PARTIES
+            .map(p => ({ p, wins: countyWins[p.id] ?? 0 }))
+            .sort((a, b) => b.wins - a.wins)
+            .filter(x => x.wins > 0)
+            .map(({ p, wins }) => (
+              <div key={p.id} className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+                <span className="text-[10px] font-medium text-ink flex-1">{p.name}</span>
+                <div className="flex items-center gap-1">
+                  <div className="w-20 h-1.5 rounded-full bg-black/8 overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${(wins/42)*100}%`, background: p.color }} />
+                  </div>
+                  <span className="text-[10px] font-mono font-bold text-ink w-5 text-right">{wins}</span>
+                </div>
+              </div>
+            ))}
+        </div>
+
+        {/* ── Seats-to-votes ─── */}
+        {seatsToVotes.length > 0 && (
+          <>
+            <Sec>Seats ÷ Votes (D'Hondt bonus/penalty)</Sec>
+            <div className="space-y-0.5">
+              {seatsToVotes.map(({ id, vPct, sPct, ratio }) => {
+                const p = RO_PARTY_MAP[id]; if (!p) return null;
+                const bonus = ratio > 1;
+                return (
+                  <div key={id} className="flex items-center gap-2 py-0.5">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+                    <span className="text-[10px] text-ink flex-1">{p.name}</span>
+                    <span className="text-[9px] font-mono text-ink-3">{vPct.toFixed(1)}% v</span>
+                    <span className="text-[9px] font-mono text-ink-3">{sPct.toFixed(1)}% s</span>
+                    <span className={`text-[9.5px] font-mono font-bold ${bonus?'text-emerald-500':'text-red-400'}`}>
+                      {bonus ? '▲' : '▼'}{Math.abs(sPct - vPct).toFixed(1)}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* ── Swing vs 2024 ─── */}
+        <Sec>Swing vs 2024 Actual</Sec>
+        <div className="space-y-0.5">
+          {swings.map(({ id, cur, base, delta }) => {
+            const p = RO_PARTY_MAP[id]; if (!p) return null;
+            const up = delta >= 0;
+            return (
+              <div key={id} className="flex items-center gap-2 py-0.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+                <span className="text-[10px] text-ink flex-1">{p.name}</span>
+                <span className="text-[9px] font-mono text-ink-3">{base.toFixed(1)}%→{cur.toFixed(1)}%</span>
+                <span className={`text-[10px] font-mono font-bold w-12 text-right ${up?'text-emerald-500':'text-red-400'}`}>
+                  {up?'+':''}{delta.toFixed(1)}pp
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Battleground counties ─── */}
+        <Sec>🔥 Most Competitive Counties</Sec>
+        <div className="space-y-1">
+          {mostCompetitive.map(({ county, margin, winner }) => (
+            <div key={county.id} className="flex items-center gap-2">
+              {winner && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: partyColor(winner) }} />}
+              <span className="text-[10px] text-ink flex-1">{county.name}</span>
+              <span className="text-[9.5px] font-mono font-bold text-amber-500">{margin.toFixed(1)}pp margin</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Strongholds ─── */}
+        <Sec>💪 Most Dominant Counties</Sec>
+        <div className="space-y-1">
+          {mostDominant.map(({ county, margin, winner }) => (
+            <div key={county.id} className="flex items-center gap-2">
+              {winner && <span className="w-2 h-2 rounded-full shrink-0" style={{ background: partyColor(winner) }} />}
+              <span className="text-[10px] text-ink flex-1">{county.name}</span>
+              <span className="text-[9.5px] font-mono font-bold text-ink-3">{margin.toFixed(1)}pp</span>
+            </div>
+          ))}
+        </div>
+
+        {/* ── Party heartlands ─── */}
+        <Sec>🏆 Party Heartlands (best county)</Sec>
+        <div className="space-y-1.5">
+          {qualifyingParties.map(p => {
+            const b = partyExtremes.best[p.id];
+            if (!b) return null;
+            return (
+              <div key={p.id} className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+                <span className="text-[10px] text-ink flex-1">{p.name}</span>
+                <span className="text-[9px] font-mono text-ink-3">{b.county.name}</span>
+                <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: p.color }}>{b.pct.toFixed(1)}%</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Worst areas ─── */}
+        <Sec>📉 Weakest County per Party</Sec>
+        <div className="space-y-1.5">
+          {qualifyingParties.map(p => {
+            const w = partyExtremes.worst[p.id];
+            if (!w) return null;
+            return (
+              <div key={p.id} className="flex items-center gap-2">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+                <span className="text-[10px] text-ink flex-1">{p.name}</span>
+                <span className="text-[9px] font-mono text-ink-3">{w.county.name}</span>
+                <span className="text-[10px] font-mono font-bold tabular-nums text-ink-3">{w.pct.toFixed(1)}%</span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── Majority math ─── */}
+        <Sec>🔢 Majority Math (Camera, {RO_CAMERA_MAJORITY} needed)</Sec>
+        {totalSeats > 0 ? (
+          <>
+            <StatRow label="Largest single party" value={
+              (() => {
+                const [top] = Object.entries(cameraSeats).sort(([,a],[,b]) => (b??0)-(a??0));
+                return top ? `${RO_PARTY_MAP[top[0] as RoPartyId]?.name} (${top[1]})` : '—';
+              })()
+            } />
+            <StatRow label="Seats from threshold parties"
+              value={qualifyingParties.reduce((s, p) => s + (cameraSeats[p.id] ?? 0), 0).toString()}
+              sub={`/ ${RO_CAMERA_SEATS}`} />
+            <StatRow label="Seats short if top 2 ally"
+              value={(() => {
+                const top2 = Object.entries(cameraSeats).sort(([,a],[,b]) => (b??0)-(a??0)).slice(0, 2);
+                const combined = top2.reduce((s, [,v]) => s + (v??0), 0);
+                const short = RO_CAMERA_MAJORITY - combined;
+                return short <= 0 ? '✓ Have majority' : `${short} short`;
+              })()}
+            />
+            <StatRow label="Smallest winning coalition"
+              value={(() => {
+                // Greedy: add parties by seat count until majority
+                const sorted = Object.entries(cameraSeats)
+                  .sort(([,a],[,b]) => (b??0)-(a??0));
+                let total = 0; let count = 0;
+                for (const [, v] of sorted) {
+                  total += v ?? 0; count++;
+                  if (total >= RO_CAMERA_MAJORITY) break;
+                }
+                return `${count} part${count === 1 ? 'y' : 'ies'}`;
+              })()}
+            />
+          </>
+        ) : (
+          <div className="text-[10px] text-ink-3 font-mono">Adjust sliders to compute seats</div>
+        )}
+
+        {/* ── Fun facts ─── */}
+        <Sec>💡 Fun Facts</Sec>
+        <div className="text-[10px] text-ink leading-relaxed space-y-2">
+          <p>Romania uses <strong>D'Hondt</strong> — mathematically the most seat-generous to large parties, explaining why ENP(seats) &lt; ENP(votes).</p>
+          <p>The Gallagher index above <strong>10%</strong> signals high disproportionality. Germany's PR usually scores ~1–3%; Romania's 5% threshold boosts it.</p>
+          <p>Covasna (CV) and Harghita (HR) are unique: <strong>UDMR dominates</strong> with 40–88% in counties with large Hungarian minorities.</p>
+          <p>București (B) is Romania's electoral heavyweight: <strong>{(RO_COUNTY_VALID_VOTES_2024['B']/RO_GRAND_TOTAL_VOTES*100).toFixed(1)}%</strong> of all valid votes in 2024.</p>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
 // ── Tutorial panel ─────────────────────────────────────────────────────────────
 function RoTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exiting?: boolean; dark?: boolean }) {
   const H2 = ({ children }: { children: React.ReactNode }) => <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>;
@@ -1057,12 +1412,15 @@ export default function RomaniaApp() {
 
   const [preset, setPreset]   = useState<'2024'|'polling2026'|'blank'|'custom'>('2024');
   const [natPcts, setNatPcts] = useState<Record<RoPartyId, number>>(() => ({ ...RO_VOTE_PCT_2024 }));
+  const [projectedCounties, setProjectedCounties] = useState<Set<RoCountyId>>(new Set());
 
-  function load2024()        { setNatPcts({ ...RO_VOTE_PCT_2024 }); setPreset('2024'); resetSim(); }
-  function loadPolling2026() { setNatPcts({ ...RO_VOTE_PCT_2026_POLLING }); setPreset('polling2026'); resetSim(); }
+  function load2024()        { setNatPcts({ ...RO_VOTE_PCT_2024 }); setPreset('2024'); setProjectedCounties(new Set()); resetSim(); }
+  function loadPolling2026() { setNatPcts({ ...RO_VOTE_PCT_2026_POLLING }); setPreset('polling2026'); setProjectedCounties(new Set()); resetSim(); }
   function loadBlank() {
-    setNatPcts(Object.fromEntries(RO_PARTIES.map(p => [p.id, 100 / RO_PARTIES.length])) as Record<RoPartyId, number>);
-    setPreset('blank'); resetSim();
+    setNatPcts({ ...RO_VOTE_PCT_2024 });   // keep 2024 as the swing base
+    setPreset('blank');
+    setProjectedCounties(new Set());
+    resetSim();
   }
 
   const [selectedCounty, setSelectedCounty]       = useState<RoCountyId | null>(null);
@@ -1073,6 +1431,7 @@ export default function RomaniaApp() {
   const [simOpen, setSimOpen]                     = useState(false);
   const [parliOpen, setParliOpen]                 = useState(false);
   const [coalitionOpen, setCoalitionOpen]         = useState(false);
+  const [analysisOpen, setAnalysisOpen]           = useState(false);
   const [tutorialOpen, setTutorialOpen]           = useState(false);
   const [exitPanel, setExitPanel]                 = useState<string | null>(null);
   const exitTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1112,6 +1471,7 @@ export default function RomaniaApp() {
   const showTutorial = tutorialOpen  || exitPanel === 'tutorial';
   const showParli    = parliOpen     || exitPanel === 'parli';
   const showCoal     = coalitionOpen || exitPanel === 'coal';
+  const showAnalysis = analysisOpen  || exitPanel === 'analysis';
 
   return (
     <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="ro">
@@ -1127,6 +1487,22 @@ export default function RomaniaApp() {
           <button onClick={load2024}        className={preset==='2024'        ? btnGold : btnMuted}>2024 Results</button>
           <button onClick={loadPolling2026} className={preset==='polling2026' ? btnGold : btnMuted}>2026 Polling</button>
           <button onClick={loadBlank}       className={preset==='blank'       ? btnGold : btnMuted}>Blank Map</button>
+          {preset === 'blank' && (
+            <>
+              <button
+                onClick={() => setProjectedCounties(new Set(RO_COUNTIES.map(c => c.id)))}
+                className={`${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700`}>
+                Project All
+              </button>
+              {projectedCounties.size > 0 && (
+                <button
+                  onClick={() => setProjectedCounties(new Set())}
+                  className={btnMuted}>
+                  Clear ({projectedCounties.size})
+                </button>
+              )}
+            </>
+          )}
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
           <button onClick={() => setSimOpen(v => !v)} className={simOpen ? btnActive : btnMuted}>▶ Simulation</button>
           <button onClick={() => setBubbleMap(v => !v)}
@@ -1143,8 +1519,12 @@ export default function RomaniaApp() {
             else { setCoalitionOpen(true); setParliOpen(false); }
           }} className={coalitionOpen ? btnActive : btnMuted}>Coalition</button>
           <button onClick={() => {
+            if (analysisOpen) { setAnalysisOpen(false); triggerExit('analysis'); }
+            else { setAnalysisOpen(true); setTutorialOpen(false); }
+          }} className={analysisOpen ? btnActive : btnMuted}>📊 Analysis</button>
+          <button onClick={() => {
             if (tutorialOpen) { setTutorialOpen(false); triggerExit('tutorial'); }
-            else setTutorialOpen(true);
+            else { setTutorialOpen(true); setAnalysisOpen(false); }
           }} className={tutorialOpen ? btnActive : btnMuted}>Tutorial</button>
         </div>
 
@@ -1178,6 +1558,7 @@ export default function RomaniaApp() {
           onSelect={id => setSelectedCounty(prev => prev === id ? null : id)}
           dark={dark} bubbleMap={bubbleMap} declaredCounties={declaredCounties}
           overrides={countyOverrides}
+          blankMode={preset === 'blank'} projectedCounties={projectedCounties}
         />
 
         {/* Simulation panel */}
@@ -1285,11 +1666,23 @@ export default function RomaniaApp() {
           <RoCountyPanel countyId={selectedCounty} natPcts={natPcts}
             onUpdate={(id, pcts) => setCountyOverrides(prev => ({ ...prev, [id]: pcts }))}
             onClose={() => setSelectedCounty(null)} dark={dark}
-            override={countyOverrides[selectedCounty]} />
+            override={countyOverrides[selectedCounty]}
+            isBlankMode={preset === 'blank'}
+            isProjected={projectedCounties.has(selectedCounty)}
+            onProject={() => setProjectedCounties(prev => new Set([...prev, selectedCounty]))}
+          />
+        )}
+
+        {/* Analysis — right */}
+        {showAnalysis && !simOpen && !showCoal && (
+          <RoAnalysisPanel
+            natPcts={natPcts} cameraSeats={cameraSeats}
+            onClose={() => { setAnalysisOpen(false); triggerExit('analysis'); }}
+            exiting={exitPanel==='analysis'} dark={dark} />
         )}
 
         {/* Tutorial — right */}
-        {showTutorial && !simOpen && !showCoal && (
+        {showTutorial && !simOpen && !showCoal && !showAnalysis && (
           <RoTutorialPanel
             onClose={() => { setTutorialOpen(false); triggerExit('tutorial'); }}
             exiting={exitPanel==='tutorial'} dark={dark} />
