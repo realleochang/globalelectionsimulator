@@ -1430,7 +1430,8 @@ function SaSimulationPanel({ onStart, onClose, simRunning, simProgress, stopSim,
 // ── National List Panel — like Germany's ZweitstimmenPanel ────────────────────
 function SaListPanel({ natListPcts, onListPctsChange, regSeatsMap, activeParties, onClose, onProject, exiting, dark }: {
   natListPcts: Record<SaPartyId, number>;
-  onListPctsChange: (pcts: Record<SaPartyId, number>) => void;
+  /** Live callback — only passed on polling/baseline; undefined on blank map (draft-only) */
+  onListPctsChange?: (pcts: Record<SaPartyId, number>) => void;
   regSeatsMap: Partial<Record<SaPartyId, number>>;
   activeParties: Set<SaPartyId>;
   onProject?: (pcts: Record<SaPartyId, number>) => void;
@@ -1459,7 +1460,10 @@ function SaListPanel({ natListPcts, onListPctsChange, regSeatsMap, activeParties
     // Lock out inactive parties so their 0% stays 0%
     const inactiveLocks = new Set(SA_PARTIES.map(p => p.id).filter(pid => !activeParties.has(pid)));
     const next = redistributePcts(pctsRef.current, id, val, inactiveLocks);
-    pctsRef.current = next; setPcts(next); onListPctsChange(next);
+    pctsRef.current = next; setPcts(next);
+    // On blank map onListPctsChange is undefined — sliders are draft-only until "Project Result".
+    // On polling/baseline it is defined — live-update the scoreboard.
+    onListPctsChange?.(next);
   }
   function commitEdit(id: SaPartyId, raw: string) {
     const n = parseFloat(raw);
@@ -2351,10 +2355,10 @@ export default function SouthAfricaApp() {
           {showList && !simOpen && (
             <SaListPanel
               natListPcts={natListPcts}
-              onListPctsChange={pcts => {
+              onListPctsChange={preset !== 'blank' ? (pcts => {
                 setNatListPcts(pcts);
-                if (preset !== 'blank') setPreset('custom');
-              }}
+                setPreset('custom');
+              }) : undefined}
               regSeatsMap={regSeatsMap}
               activeParties={activeParties}
               onProject={handleProjectListOnly}
