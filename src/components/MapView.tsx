@@ -156,8 +156,8 @@ export function MapView({ bubbleMapMode = false, dark = false }: { bubbleMapMode
   return (
     <div ref={containerRef} className="relative w-full h-full">
       <MapContainer
-        center={[54.5, -3.5]}
-        zoom={6}
+        center={[52.5, -1.5]}
+        zoom={7}
         style={{ width: '100%', height: '100%' }}
         zoomControl
       >

@@ -72,7 +72,10 @@
       "Bash(curl -L -o philippines-flag.png \"https://flagcdn.com/w640/ph.png\")",
       "Bash(curl -L -o japan-flag.png \"https://flagcdn.com/w640/jp.png\")",
       "Bash(sort -k5 -n)",
-      "Bash(xxd)"
+      "Bash(xxd)",
+      "Bash(git checkout *)",
+      "PowerShell(powershell -ExecutionPolicy Bypass -File \"C:/Users/leoc4/Downloads/do_store_edit.ps1\")",
+      "Bash(python3 -c ' *)"
     ]
   }
 }

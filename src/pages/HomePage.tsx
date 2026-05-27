@@ -98,14 +98,10 @@ export const COUNTRIES = [
     lat: 52, lng: 5,
     accent: 'linear-gradient(90deg,#AE1C28,white,#21468B)',
     parties: [
-      { color: '#BB0000', abbr: 'SP'   }, { color: '#CC0000', abbr: 'GL-P' },
-      { color: '#2E7D32', abbr: 'PvdD' }, { color: '#005B96', abbr: 'DENK' },
-      { color: '#009E60', abbr: 'D66'  }, { color: '#5C2D91', abbr: 'Volt' },
-      { color: '#3380B0', abbr: 'CU'   }, { color: '#007B5F', abbr: 'CDA'  },
-      { color: '#0065AB', abbr: 'VVD'  }, { color: '#6CA23B', abbr: 'BBB'  },
-      { color: '#8B0086', abbr: '50+'  }, { color: '#CC6600', abbr: 'SGP'  },
+      { color: '#CC0000', abbr: 'PvdA' }, { color: '#009E60', abbr: 'D66'  },
+      { color: '#007B5F', abbr: 'CDA'  }, { color: '#0065AB', abbr: 'VVD'  },
       { color: '#1B3C78', abbr: 'JA21' }, { color: '#821622', abbr: 'FvD'  },
-      { color: '#003082', abbr: 'PVV'  }, { color: '#8B5E3C', abbr: 'DNA'  },
+      { color: '#003082', abbr: 'PVV'  },
     ],
   },
   {

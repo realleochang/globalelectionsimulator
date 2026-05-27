@@ -16,19 +16,18 @@ type RoParty = {
   fullName: string;
   color: string;
   seats2024: number;
-  senateSeats2024: number;
   leader: string;
   wikiTitle?: string;
 };
 
 const RO_PARTIES: RoParty[] = [
-  { id: 'PSD',  name: 'PSD',  fullName: 'Partidul Social Democrat',               color: '#CC0000', seats2024: 88,  senateSeats2024: 37, leader: 'Marcel Ciolacu',  wikiTitle: 'Marcel_Ciolacu' },
-  { id: 'AUR',  name: 'AUR',  fullName: 'Alianța pentru Unirea Românilor',        color: '#C8960C', seats2024: 70,  senateSeats2024: 29, leader: 'George Simion',   wikiTitle: 'George_Simion' },
-  { id: 'PNL',  name: 'PNL',  fullName: 'Partidul Național Liberal',              color: '#F9A800', seats2024: 56,  senateSeats2024: 23, leader: 'Nicolae Ciucă',   wikiTitle: 'Nicolae_Ciucă' },
-  { id: 'USR',  name: 'USR',  fullName: 'Uniunea Salvați România',                color: '#003DA5', seats2024: 49,  senateSeats2024: 20, leader: 'Cătălin Drulă',   wikiTitle: 'Cătălin_Drulă' },
-  { id: 'UDMR', name: 'UDMR', fullName: 'Uniunea Democrată Maghiară din România', color: '#2E7D32', seats2024: 25,  senateSeats2024: 10, leader: 'Kelemen Hunor',   wikiTitle: 'Kelemen_Hunor' },
-  { id: 'SOS',  name: 'SOS',  fullName: 'SOS România',                            color: '#B71C1C', seats2024: 22,  senateSeats2024:  9, leader: 'Diana Șoșoacă',   wikiTitle: 'Diana_Șoșoacă' },
-  { id: 'POT',  name: 'POT',  fullName: 'Partidul Oamenilor Tineri',              color: '#E65100', seats2024: 21,  senateSeats2024:  9, leader: 'Călin Georgescu' },
+  { id: 'PSD',  name: 'PSD',  fullName: 'Social Democratic Party',                color: '#CC0000', seats2024: 86, leader: 'Marcel Ciolacu',  wikiTitle: 'Marcel_Ciolacu' },
+  { id: 'AUR',  name: 'AUR',  fullName: 'Alliance for the Union of Romanians',   color: '#C8960C', seats2024: 63, leader: 'George Simion',   wikiTitle: 'George_Simion' },
+  { id: 'PNL',  name: 'PNL',  fullName: 'National Liberal Party',                color: '#F9A800', seats2024: 49, leader: 'Nicolae Ciucă',   wikiTitle: 'Nicolae_Ciucă' },
+  { id: 'USR',  name: 'USR',  fullName: 'Save Romania Union',                    color: '#003DA5', seats2024: 40, leader: 'Cătălin Drulă',   wikiTitle: 'Cătălin_Drulă' },
+  { id: 'SOS',  name: 'SOS',  fullName: 'SOS Romania',                           color: '#B71C1C', seats2024: 28, leader: 'Diana Șoșoacă',   wikiTitle: 'Diana_Șoșoacă' },
+  { id: 'POT',  name: 'POT',  fullName: 'Party of Young People',                 color: '#E65100', seats2024: 24, leader: 'Călin Georgescu' },
+  { id: 'UDMR', name: 'UDMR', fullName: 'Dem. Union of Hungarians in Romania',   color: '#2E7D32', seats2024: 22, leader: 'Kelemen Hunor',   wikiTitle: 'Kelemen_Hunor' },
 ];
 
 const RO_PARTY_MAP = Object.fromEntries(RO_PARTIES.map(p => [p.id, p])) as Record<RoPartyId, RoParty>;
@@ -38,14 +37,18 @@ const RO_SENATE_SEATS   = 137;
 const RO_SENATE_MAJORITY = 69;
 const RO_THRESHOLD = 5.0;
 
+// ── Real 2024 national results (Camera Deputaților) ───────────────────────────
+// Source: Permanent Electoral Authority / Wikipedia official count
+// Percentages are % of ALL valid votes cast (sub-threshold parties account for the remaining ~14%)
 const RO_VOTE_PCT_2024: Record<RoPartyId, number> = {
-  PSD: 26.6, AUR: 21.3, PNL: 17.0, USR: 14.8, UDMR: 7.5, SOS: 6.4, POT: 6.4,
+  PSD: 21.96, AUR: 18.01, PNL: 13.20, USR: 12.40, SOS: 7.36, POT: 6.46, UDMR: 6.33,
 };
 const RO_VOTE_RAW_2024: Record<RoPartyId, number> = {
-  PSD: 2_480_000, AUR: 1_990_000, PNL: 1_590_000, USR: 1_380_000,
-  UDMR: 700_000, SOS: 600_000, POT: 600_000,
+  PSD: 2_030_144, AUR: 1_665_143, PNL: 1_219_810, USR: 1_146_357,
+  SOS: 679_967, POT: 596_745, UDMR: 585_397,
 };
-const RO_GRAND_TOTAL_VOTES = 9_340_000;
+// Total valid votes cast (including sub-threshold parties) — used for raw-vote scaling
+const RO_GRAND_TOTAL_VOTES = 9_243_641;
 
 // ── County types ───────────────────────────────────────────────────────────────
 type RoCountyId =
@@ -117,50 +120,66 @@ const RO_NAME_TO_ID: Record<string, RoCountyId> = {
   'Vaslui': 'VS',        'Vrancea': 'VN',
 };
 
-// ── 2024 county results (approx., each row sums to 100) ────────────────────────
+// ── Estimated valid votes cast per county (Camera 2024) ───────────────────────
+// Source: Romania_2024_Chamber_of_Deputies_Results.xlsx
+const RO_COUNTY_VALID_VOTES_2024: Record<RoCountyId, number> = {
+  B:  859_183, AB: 148_135, AR: 207_389, AG: 266_643, BC: 296_270,
+  BH: 266_643, BN: 148_135, BT: 177_762, BR: 148_135, BV: 266_643,
+  BZ: 207_389, CL: 118_508, CS: 148_135, CJ: 296_270, CT: 325_897,
+  CV: 118_508, DB: 207_389, DJ: 296_270, GL: 266_643, GR: 118_508,
+  GJ: 148_135, HR: 148_135, HD: 177_762, IL: 118_508, IS: 355_524,
+  IF: 148_135, MM: 207_389, MH: 118_508, MS: 237_016, NT: 237_016,
+  OT: 177_762, PH: 325_897, SJ: 118_508, SM: 148_135, SB: 177_762,
+  SV: 296_270, TR: 148_135, TM: 296_270, TL: 118_508, VL: 177_762,
+  VS: 207_389, VN: 148_135,
+};
+
+// ── 2024 county results — actual percentages of all valid votes cast ──────────
+// Source: Romania_2024_Chamber_of_Deputies_Results.xlsx
+// null entries → party did not cross county threshold (treated as 0 for swing model)
 const RO_COUNTY_RESULTS_2024: Record<RoCountyId, Record<RoPartyId, number>> = {
-  AB: { PSD:22, AUR:18, PNL:25, USR:17, UDMR: 5, SOS:7,  POT:6  },
-  AR: { PSD:20, AUR:19, PNL:26, USR:15, UDMR: 9, SOS:6,  POT:5  },
-  AG: { PSD:32, AUR:18, PNL:18, USR:14, UDMR: 2, SOS:8,  POT:8  },
-  BC: { PSD:30, AUR:20, PNL:16, USR:13, UDMR: 2, SOS:9,  POT:10 },
-  BH: { PSD:18, AUR:17, PNL:22, USR:13, UDMR:20, SOS:5,  POT:5  },
-  BN: { PSD:24, AUR:20, PNL:25, USR:14, UDMR: 5, SOS:6,  POT:6  },
-  BT: { PSD:33, AUR:22, PNL:15, USR:11, UDMR: 1, SOS:10, POT:8  },
-  BR: { PSD:31, AUR:20, PNL:17, USR:12, UDMR: 1, SOS:9,  POT:10 },
-  BV: { PSD:20, AUR:19, PNL:22, USR:20, UDMR: 8, SOS:6,  POT:5  },
-  B:  { PSD:19, AUR:15, PNL:20, USR:26, UDMR: 2, SOS:8,  POT:10 },
-  BZ: { PSD:32, AUR:21, PNL:17, USR:12, UDMR: 1, SOS:9,  POT:8  },
-  CL: { PSD:34, AUR:20, PNL:16, USR:10, UDMR: 1, SOS:10, POT:9  },
-  CS: { PSD:28, AUR:19, PNL:20, USR:14, UDMR: 3, SOS:8,  POT:8  },
-  CJ: { PSD:17, AUR:16, PNL:22, USR:27, UDMR: 6, SOS:6,  POT:6  },
-  CT: { PSD:28, AUR:20, PNL:19, USR:15, UDMR: 1, SOS:8,  POT:9  },
-  CV: { PSD:12, AUR:10, PNL:12, USR:10, UDMR:48, SOS:4,  POT:4  },
-  DB: { PSD:35, AUR:20, PNL:17, USR:11, UDMR: 1, SOS:8,  POT:8  },
-  DJ: { PSD:35, AUR:21, PNL:17, USR:10, UDMR: 1, SOS:8,  POT:8  },
-  GL: { PSD:32, AUR:21, PNL:16, USR:12, UDMR: 1, SOS:9,  POT:9  },
-  GR: { PSD:38, AUR:20, PNL:16, USR: 9, UDMR: 1, SOS:8,  POT:8  },
-  GJ: { PSD:37, AUR:21, PNL:16, USR: 9, UDMR: 1, SOS:8,  POT:8  },
-  HR: { PSD: 9, AUR: 9, PNL:10, USR: 8, UDMR:57, SOS:4,  POT:3  },
-  HD: { PSD:27, AUR:18, PNL:22, USR:14, UDMR: 6, SOS:7,  POT:6  },
-  IL: { PSD:35, AUR:21, PNL:16, USR:10, UDMR: 1, SOS:9,  POT:8  },
-  IS: { PSD:27, AUR:19, PNL:16, USR:18, UDMR: 1, SOS:9,  POT:10 },
-  IF: { PSD:21, AUR:17, PNL:21, USR:22, UDMR: 2, SOS:8,  POT:9  },
-  MM: { PSD:24, AUR:21, PNL:24, USR:14, UDMR: 7, SOS:6,  POT:4  },
-  MH: { PSD:36, AUR:21, PNL:17, USR: 9, UDMR: 1, SOS:8,  POT:8  },
-  MS: { PSD:24, AUR:17, PNL:18, USR:13, UDMR:20, SOS:4,  POT:4  },
-  NT: { PSD:30, AUR:22, PNL:17, USR:13, UDMR: 1, SOS:9,  POT:8  },
-  OT: { PSD:36, AUR:21, PNL:16, USR: 9, UDMR: 1, SOS:9,  POT:8  },
-  PH: { PSD:27, AUR:19, PNL:23, USR:14, UDMR: 1, SOS:8,  POT:8  },
-  SJ: { PSD:23, AUR:19, PNL:25, USR:13, UDMR:10, SOS:5,  POT:5  },
-  SM: { PSD:20, AUR:18, PNL:22, USR:12, UDMR:19, SOS:5,  POT:4  },
-  SB: { PSD:19, AUR:17, PNL:25, USR:21, UDMR: 5, SOS:7,  POT:6  },
-  SV: { PSD:28, AUR:21, PNL:22, USR:13, UDMR: 1, SOS:8,  POT:7  },
-  TR: { PSD:41, AUR:20, PNL:15, USR: 8, UDMR: 1, SOS:8,  POT:7  },
-  TM: { PSD:19, AUR:17, PNL:27, USR:21, UDMR: 5, SOS:5,  POT:6  },
-  TL: { PSD:31, AUR:20, PNL:18, USR:12, UDMR: 1, SOS:9,  POT:9  },
-  VL: { PSD:32, AUR:20, PNL:20, USR:12, UDMR: 1, SOS:8,  POT:7  },
-  VS: { PSD:38, AUR:22, PNL:14, USR:10, UDMR: 1, SOS:8,  POT:7  },
-  VN: { PSD:34, AUR:22, PNL:16, USR:11, UDMR: 1, SOS:8,  POT:8  },
+  B:  { PSD:21.81, AUR:12.61, PNL:13.50, USR:23.43, SOS: 6.13, POT: 5.16, UDMR: 0     },
+  AB: { PSD:17.23, AUR:19.17, PNL:23.40, USR: 8.64, SOS: 5.16, POT: 9.20, UDMR: 0     },
+  AR: { PSD:15.61, AUR:23.50, PNL:19.88, USR: 9.03, SOS: 7.27, POT: 7.05, UDMR: 7.12  },
+  AG: { PSD:27.50, AUR:20.76, PNL:10.75, USR:11.62, SOS: 6.42, POT: 8.12, UDMR: 0     },
+  BC: { PSD:23.91, AUR:17.26, PNL:11.23, USR:10.53, SOS:10.51, POT: 6.41, UDMR: 0     },
+  BH: { PSD:13.22, AUR:11.29, PNL:32.04, USR: 0,    SOS: 0,    POT: 0,    UDMR:22.55  },
+  BN: { PSD:31.29, AUR:16.97, PNL:15.64, USR: 6.78, SOS: 5.92, POT: 8.52, UDMR: 0     },
+  BT: { PSD:30.94, AUR:18.90, PNL:18.14, USR: 5.18, SOS: 7.89, POT: 6.37, UDMR: 0     },
+  BR: { PSD:30.56, AUR:18.49, PNL:14.62, USR: 7.51, SOS: 9.68, POT: 5.53, UDMR: 0     },
+  BV: { PSD:17.37, AUR:15.66, PNL:15.48, USR:19.22, SOS: 5.99, POT: 6.16, UDMR: 5.68  },
+  BZ: { PSD:43.43, AUR:15.12, PNL: 7.99, USR: 7.56, SOS: 6.25, POT: 5.97, UDMR: 0     },
+  CL: { PSD:30.16, AUR:21.32, PNL:17.27, USR: 6.35, SOS: 7.78, POT: 5.10, UDMR: 0     },
+  CS: { PSD:29.68, AUR:20.39, PNL:12.15, USR: 6.91, SOS: 6.17, POT: 6.69, UDMR: 0     },
+  CJ: { PSD:13.30, AUR:14.37, PNL:21.40, USR:15.27, SOS: 0,    POT: 5.47, UDMR:13.07  },
+  CT: { PSD:18.20, AUR:20.29, PNL:13.03, USR:13.12, SOS:10.41, POT: 6.77, UDMR: 0     },
+  CV: { PSD: 5.44, AUR: 0,    PNL: 0,    USR: 0,    SOS: 0,    POT: 0,    UDMR:76.95  },
+  DB: { PSD:35.24, AUR:17.84, PNL:11.95, USR: 8.57, SOS: 7.62, POT: 7.91, UDMR: 0     },
+  DJ: { PSD:41.26, AUR:17.67, PNL:11.60, USR: 9.17, SOS: 0,    POT: 5.99, UDMR: 0     },
+  GL: { PSD:29.82, AUR:21.13, PNL:10.58, USR:10.83, SOS: 8.86, POT: 0,    UDMR: 0     },
+  GR: { PSD:19.46, AUR:18.50, PNL:34.73, USR: 5.46, SOS: 6.74, POT: 0,    UDMR: 0     },
+  GJ: { PSD:33.92, AUR:25.99, PNL:10.15, USR: 9.55, SOS: 0,    POT: 6.50, UDMR: 0     },
+  HR: { PSD: 0,    AUR: 0,    PNL: 0,    USR: 0,    SOS: 0,    POT: 0,    UDMR:88.00  },
+  HD: { PSD:27.82, AUR:20.31, PNL:13.80, USR: 8.58, SOS: 6.86, POT: 8.79, UDMR: 0     },
+  IL: { PSD:34.49, AUR:23.69, PNL: 8.78, USR: 8.05, SOS:10.38, POT: 0,    UDMR: 0     },
+  IS: { PSD:21.39, AUR:16.64, PNL:14.59, USR:14.04, SOS: 7.66, POT: 6.00, UDMR: 0     },
+  IF: { PSD:14.50, AUR:17.84, PNL:20.51, USR:17.63, SOS: 6.71, POT: 7.95, UDMR: 0     },
+  MM: { PSD:21.55, AUR:17.84, PNL:13.94, USR: 9.62, SOS: 5.38, POT: 5.65, UDMR: 6.14  },
+  MH: { PSD:41.05, AUR:20.60, PNL:16.20, USR: 0,    SOS: 5.30, POT: 5.04, UDMR: 0     },
+  MS: { PSD:13.87, AUR:13.87, PNL:10.12, USR: 7.62, SOS: 5.07, POT: 0,    UDMR:39.12  },
+  NT: { PSD:23.99, AUR:21.45, PNL:12.60, USR: 9.89, SOS: 9.44, POT: 6.46, UDMR: 0     },
+  OT: { PSD:41.34, AUR:17.96, PNL:10.26, USR: 6.03, SOS: 6.05, POT: 5.94, UDMR: 0     },
+  PH: { PSD:23.48, AUR:17.00, PNL:13.22, USR:11.56, SOS: 8.16, POT: 9.22, UDMR: 0     },
+  SJ: { PSD:20.70, AUR:13.26, PNL:18.17, USR: 6.81, SOS: 0,    POT: 0,    UDMR:24.29  },
+  SM: { PSD:12.52, AUR: 9.88, PNL:13.33, USR: 5.98, SOS: 0,    POT: 0,    UDMR:41.55  },
+  SB: { PSD:14.22, AUR:16.99, PNL:18.98, USR:16.22, SOS: 7.73, POT: 7.47, UDMR: 0     },
+  SV: { PSD:21.02, AUR:25.26, PNL:12.48, USR: 6.96, SOS: 8.95, POT: 6.63, UDMR: 0     },
+  TR: { PSD:40.32, AUR:17.29, PNL:14.26, USR: 5.46, SOS: 5.34, POT: 0,    UDMR: 0     },
+  TM: { PSD:18.03, AUR:18.38, PNL:12.63, USR:19.59, SOS: 6.83, POT: 6.45, UDMR: 0     },
+  TL: { PSD:23.98, AUR:22.84, PNL:10.24, USR: 8.34, SOS:10.53, POT: 7.46, UDMR: 0     },
+  VL: { PSD:29.12, AUR:21.65, PNL:12.56, USR: 7.43, SOS: 5.77, POT: 6.34, UDMR: 0     },
+  VS: { PSD:30.53, AUR:18.21, PNL: 8.34, USR: 9.76, SOS: 7.98, POT: 5.98, UDMR: 0     },
+  VN: { PSD:25.28, AUR:20.47, PNL:17.19, USR: 7.13, SOS: 6.30, POT: 5.34, UDMR: 0     },
 };
 
 // ── D'Hondt with 5% threshold ──────────────────────────────────────────────────
@@ -187,19 +206,46 @@ function calcSeats(
   return seats;
 }
 
+// Returns each party's estimated % of ALL valid votes in the county (sums to ≤100, not forced to 100).
+// Parties absent from real county data get a small estimated baseline drawn from the
+// "other votes" remainder, split proportionally to their national share — so the
+// swing model always has something to scale from.
 function calcCountyVotes(natPcts: Record<RoPartyId, number>, countyId: RoCountyId): Record<RoPartyId, number> {
   const base = RO_COUNTY_RESULTS_2024[countyId];
+
+  // How much of the county vote our 7 parties explicitly captured in real data
+  const capturedSum = RO_PARTIES.reduce((s, p) => s + (base[p.id] ?? 0), 0);
+  // The remainder went to sub-threshold parties outside our 7
+  const remainderPct = Math.max(0, 100 - capturedSum);
+
+  // National share of the unlisted group — used to split the remainder
+  const unlistedNatSum = RO_PARTIES
+    .filter(p => !(base[p.id] > 0))
+    .reduce((s, p) => s + (RO_VOTE_PCT_2024[p.id] ?? 0), 0);
+
   const raw: Record<RoPartyId, number> = {} as Record<RoPartyId, number>;
-  let total = 0;
+  let newTotal = 0;
+
   for (const p of RO_PARTIES) {
     const oldNat = RO_VOTE_PCT_2024[p.id] ?? 0;
     const newNat = natPcts[p.id] ?? 0;
-    const basePct = base[p.id] ?? 0;
-    const v = newNat === 0 ? 0 : oldNat === 0 ? newNat : basePct * (newNat / oldNat);
-    raw[p.id] = Math.max(0, v); total += raw[p.id];
+    // Effective county baseline: real data if listed, otherwise proportional share of remainder
+    const countyBase = (base[p.id] ?? 0) > 0
+      ? base[p.id]
+      : unlistedNatSum > 0 ? (oldNat / unlistedNatSum) * remainderPct : 0;
+
+    const v = newNat === 0 ? 0 : oldNat === 0 ? newNat : countyBase * (newNat / oldNat);
+    raw[p.id] = Math.max(0, v);
+    newTotal += raw[p.id];
   }
-  if (total === 0) return raw;
-  for (const p of RO_PARTIES) raw[p.id] = (raw[p.id] / total) * 100;
+
+  // Soft cap only: if a large swing pushes totals past 100%, scale back proportionally.
+  // Never inflate — real-data counties where totals are naturally < 100 stay that way.
+  if (newTotal > 100) {
+    const scale = 100 / newTotal;
+    for (const p of RO_PARTIES) raw[p.id] *= scale;
+  }
+
   return raw;
 }
 
@@ -231,10 +277,13 @@ function redistributePcts(
   locks: Set<RoPartyId>,
 ): Record<RoPartyId, number> {
   const ids = Object.keys(current) as RoPartyId[];
+  // Preserve the existing total (not hardcoded 100) — works for both the national
+  // sliders (total ≈ 85.72% in 2024 mode) and the county panel (total = 100%).
+  const totalSum = ids.reduce((s, id) => s + (current[id] ?? 0), 0);
   const lockedSum = ids.filter(id => locks.has(id) && id !== changedId).reduce((s, id) => s + (current[id] ?? 0), 0);
-  const clamped = Math.min(Math.max(newRaw, 0), 100 - lockedSum);
+  const clamped = Math.min(Math.max(newRaw, 0), totalSum - lockedSum);
   const unlocked = ids.filter(id => !locks.has(id) && id !== changedId);
-  const remaining = 100 - lockedSum - clamped;
+  const remaining = totalSum - lockedSum - clamped;
   const unlockedSum = unlocked.reduce((s, id) => s + (current[id] ?? 0), 0);
   const next: Record<RoPartyId, number> = { ...current, [changedId]: clamped };
   if (unlockedSum > 0) for (const id of unlocked) next[id] = ((current[id] ?? 0) / unlockedSum) * remaining;
@@ -281,7 +330,8 @@ function hexToRgba(hex: string, alpha: number): string {
 // ── Tooltip type ───────────────────────────────────────────────────────────────
 type CountyTooltipState = {
   x: number; y: number; name: string;
-  parties: { id: RoPartyId; pct: number }[];
+  parties: { id: RoPartyId; pct: number; rawVotes: number }[];
+  totalVotes: number;
   leader: RoPartyId | null;
 } | null;
 
@@ -356,15 +406,13 @@ function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLea
 }
 
 // ── Scoreboard ─────────────────────────────────────────────────────────────────
-function RoScoreboard({ natPcts, simCameraSeats, simSenateSeats, isBaseline, dark: _dark }: {
+function RoScoreboard({ natPcts, simCameraSeats, isBaseline, dark: _dark }: {
   natPcts: Record<RoPartyId, number>;
   simCameraSeats?: Partial<Record<RoPartyId, number>>;
-  simSenateSeats?: Partial<Record<RoPartyId, number>>;
   isBaseline?: boolean;
   dark?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const [chamber, setChamber] = useState<'camera' | 'senate'>('camera');
 
   useEffect(() => {
     const el = scrollRef.current; if (!el) return;
@@ -376,12 +424,7 @@ function RoScoreboard({ natPcts, simCameraSeats, simSenateSeats, isBaseline, dar
     return () => el.removeEventListener('wheel', handler);
   }, []);
 
-  const cameraSeatsC = useMemo(() => simCameraSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simCameraSeats, natPcts]);
-  const senateSeatsC = useMemo(() => simSenateSeats ?? calcSeats(natPcts, RO_SENATE_SEATS), [simSenateSeats, natPcts]);
-  const seats = chamber === 'camera' ? cameraSeatsC : senateSeatsC;
-  const majorityConst = chamber === 'camera' ? RO_CAMERA_MAJORITY : RO_SENATE_MAJORITY;
-
-  const pctTotal = Object.values(natPcts).reduce((s, v) => s + (v ?? 0), 0);
+  const seats = useMemo(() => simCameraSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simCameraSeats, natPcts]);
 
   const sorted = useMemo(
     () => RO_PARTIES
@@ -391,30 +434,20 @@ function RoScoreboard({ natPcts, simCameraSeats, simSenateSeats, isBaseline, dar
   );
 
   const leader = sorted[0]?.id ?? null;
-  const winner = leader && (seats[leader] ?? 0) >= majorityConst ? leader : null;
+  const winner = leader && (seats[leader] ?? 0) >= RO_CAMERA_MAJORITY ? leader : null;
 
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
-      {/* Chamber toggle strip */}
-      <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-0">
-        {(['camera', 'senate'] as const).map(ch => (
-          <button key={ch} onClick={() => setChamber(ch)}
-            className={`h-5 px-2 text-[8.5px] font-mono font-semibold uppercase tracking-wide rounded-[3px] transition-colors ${
-              chamber === ch ? 'bg-gold text-white' : 'border border-default text-ink-3 hover:bg-hover'
-            }`}>
-            {ch === 'camera' ? `Camera · ${RO_CAMERA_SEATS} seats · maj ${RO_CAMERA_MAJORITY}` : `Senat · ${RO_SENATE_SEATS} seats · maj ${RO_SENATE_MAJORITY}`}
-          </button>
-        ))}
-      </div>
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
-        <div className="flex gap-1.5 px-3 pt-1.5 pb-2 mx-auto w-fit items-stretch">
+        <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
           {sorted.map(party => {
             const s = seats[party.id] ?? 0;
-            const pct = pctTotal > 0 ? (natPcts[party.id] ?? 0) / pctTotal * 100 : 0;
+            // Use the actual slider value directly — natPcts stores % of all valid votes
+            const pct = natPcts[party.id] ?? 0;
             const rawVotes = isBaseline
               ? RO_VOTE_RAW_2024[party.id]
-              : Math.round((natPcts[party.id] ?? 0) / 100 * RO_GRAND_TOTAL_VOTES);
-            const belowThreshold = (natPcts[party.id] ?? 0) < RO_THRESHOLD;
+              : Math.round(pct / 100 * RO_GRAND_TOTAL_VOTES);
+            const belowThreshold = pct < RO_THRESHOLD;
             return (
               <RoScoreboardTile key={party.id} partyId={party.id} seats={s} pct={pct}
                 rawVotes={rawVotes} belowThreshold={belowThreshold}
@@ -449,6 +482,7 @@ function zoomScale(zoom: number): number { return Math.max(0.40, Math.min(1.0, (
 
 function RoBubbleLayer({
   geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredCounties,
+  overrides, overridesRef,
 }: {
   geoData: any; natPcts: Record<RoPartyId, number>;
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -456,6 +490,8 @@ function RoBubbleLayer({
   onSelect: (id: RoCountyId) => void;
   natPctsRef: React.MutableRefObject<Record<RoPartyId, number>>;
   declaredCounties?: Set<RoCountyId>;
+  overrides?: Record<string, Record<RoPartyId, number>>;
+  overridesRef: React.MutableRefObject<Record<string, Record<RoPartyId, number>> | undefined>;
 }) {
   const map = useMap();
   const bubblesRef = useRef<BubbleEntry[]>([]);
@@ -481,7 +517,8 @@ function RoBubbleLayer({
       const bounds = (layer as any).getBounds?.();
       if (!bounds?.isValid()) return;
       const center = bounds.getCenter();
-      const cv = calcCountyVotes(natPcts, countyId);
+      // Bubble colour/size: honour county-level overrides if present
+      const cv = overrides?.[countyId] ?? calcCountyVotes(natPcts, countyId);
       const sorted = (Object.entries(cv) as [RoPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
       if (!sorted.length) return;
       const [winId, winPct] = sorted[0];
@@ -493,15 +530,17 @@ function RoBubbleLayer({
       marker.on('mousemove', (e: L.LeafletMouseEvent) => {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
-        const cur = calcCountyVotes(natPctsRef.current, countyId);
-        const parties = (Object.entries(cur) as [RoPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 5).map(([id, pct]) => ({ id: id as RoPartyId, pct }));
-        setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: countyName, parties, leader: parties[0]?.id ?? null });
+        // Use override if present, otherwise swing model — same source as the county panel
+        const cur = overridesRef.current?.[countyId] ?? calcCountyVotes(natPctsRef.current, countyId);
+        const totalVotes = RO_COUNTY_VALID_VOTES_2024[countyId] ?? 0;
+        const parties = (Object.entries(cur) as [RoPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 7).map(([id, pct]) => ({ id: id as RoPartyId, pct, rawVotes: Math.round(pct / 100 * totalVotes) }));
+        setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: countyName, parties, totalVotes, leader: parties[0]?.id ?? null });
       });
       marker.on('mouseout', () => setTooltip(null));
       bubblesRef.current.push({ marker, baseRadius });
     });
     return () => { for (const { marker } of bubblesRef.current) marker.remove(); bubblesRef.current = []; };
-  }, [map, geoData, natPcts]);
+  }, [map, geoData, natPcts, overrides]);
 
   return null;
 }
@@ -561,16 +600,18 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
       if (bubbleRef.current || !countyId) { setTooltip(null); return; }
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const cv = calcCountyVotes(natPctsRef.current, countyId);
-      const parties = (Object.entries(cv) as [RoPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 5).map(([id, pct]) => ({ id: id as RoPartyId, pct }));
-      setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: countyName, parties, leader: parties[0]?.id ?? null });
+      // Use override if present — same source as the county panel slider values
+      const cv = overridesRef.current?.[countyId] ?? calcCountyVotes(natPctsRef.current, countyId);
+      const totalVotes = RO_COUNTY_VALID_VOTES_2024[countyId] ?? 0;
+      const parties = (Object.entries(cv) as [RoPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 7).map(([id, pct]) => ({ id: id as RoPartyId, pct, rawVotes: Math.round(pct / 100 * totalVotes) }));
+      setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: countyName, parties, totalVotes, leader: parties[0]?.id ?? null });
     });
     layer.on('mouseout', () => setTooltip(null));
   }, []);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      <MapContainer center={[45.8, 25.0]} zoom={7} minZoom={6} maxZoom={13}
+      <MapContainer center={[45.8, 25.0]} zoom={7} minZoom={3} maxZoom={13}
         style={{ width:'100%', height:'100%' }} zoomControl worldCopyJump={false}>
         <TileLayer key={dark?'dark':'light'}
           url={dark
@@ -582,31 +623,71 @@ function RoMapView({ natPcts, selectedCounty, onSelect, dark, bubbleMap, declare
         {geoData && <GeoJSON ref={layerRef as any} data={geoData} style={(f:any)=>getStyle(f)} onEachFeature={onEachFeature} {...({smoothFactor:0} as any)} />}
         {geoData && bubbleMap && (
           <RoBubbleLayer geoData={geoData} natPcts={natPcts} containerRef={containerRef}
-            setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef} declaredCounties={declaredCounties} />
+            setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef} declaredCounties={declaredCounties}
+            overrides={overrides} overridesRef={overridesRef} />
         )}
       </MapContainer>
       {tooltip && (() => {
         const cw = containerRef.current?.clientWidth ?? 9999;
-        const TW = 220; const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
-        const tt = { bg: dark?'rgba(18,24,44,0.96)':'rgba(255,255,255,0.97)', border: dark?'rgba(255,255,255,0.09)':'rgba(0,0,0,0.08)',
-          shadow: dark?'0 6px 28px rgba(0,0,0,0.5)':'0 6px 28px rgba(0,0,0,0.12)',
-          title: dark?'rgba(255,255,255,0.92)':'rgba(0,0,0,0.85)', body: dark?'rgba(255,255,255,0.85)':'rgba(0,0,0,0.78)' };
+        const TW = 248;
+        const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
+        const tt = {
+          bg:     dark ? 'rgba(18,24,44,0.97)'       : 'rgba(255,255,255,0.97)',
+          border: dark ? 'rgba(255,255,255,0.09)'    : 'rgba(0,0,0,0.08)',
+          shadow: dark ? '0 6px 28px rgba(0,0,0,0.5)' : '0 6px 28px rgba(0,0,0,0.13)',
+          title:  dark ? 'rgba(255,255,255,0.92)'    : 'rgba(0,0,0,0.85)',
+          sub:    dark ? 'rgba(255,255,255,0.38)'    : 'rgba(0,0,0,0.40)',
+          body:   dark ? 'rgba(255,255,255,0.85)'    : 'rgba(0,0,0,0.78)',
+          divider:dark ? 'rgba(255,255,255,0.07)'    : 'rgba(0,0,0,0.07)',
+          track:  dark ? 'rgba(255,255,255,0.08)'    : 'rgba(0,0,0,0.07)',
+        };
+        const maxPct = tooltip.parties[0]?.pct ?? 1;
         return (
           <div className="absolute pointer-events-none z-[1000]" style={{ left, top: Math.max(6, tooltip.y - 20), width: TW }}>
-            <div style={{ background:tt.bg, borderRadius:10, border:`1px solid ${tt.border}`, boxShadow:tt.shadow, backdropFilter:'blur(10px)', padding:'12px 14px' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:tt.title }}>{tooltip.name}</div>
-              <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color: dark?'rgba(255,255,255,0.40)':'rgba(0,0,0,0.42)', marginTop:2 }}>Est. county result</div>
-              <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:6 }}>
-                {tooltip.parties.map(({ id, pct }, i) => {
+            <div style={{ background:tt.bg, borderRadius:10, border:`1px solid ${tt.border}`, boxShadow:tt.shadow, backdropFilter:'blur(10px)', overflow:'hidden' }}>
+              {/* Header */}
+              <div style={{ padding:'11px 14px 9px' }}>
+                <div style={{ fontSize:14, fontWeight:700, color:tt.title, lineHeight:1.2 }}>{tooltip.name}</div>
+                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'baseline', marginTop:3 }}>
+                  <span style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub }}>Est. county result</span>
+                  {tooltip.totalVotes > 0 && (
+                    <span style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub }}>{tooltip.totalVotes.toLocaleString()} votes</span>
+                  )}
+                </div>
+              </div>
+              {/* Party rows */}
+              <div style={{ padding:'2px 14px 12px' }}>
+                {tooltip.parties.map(({ id, pct, rawVotes }, i) => {
                   const pColor = partyColor(id);
+                  const barW = maxPct > 0 ? Math.round((pct / maxPct) * 100) : 0;
                   return (
-                    <div key={id} style={{ display:'flex', alignItems:'center', gap:7 }}>
-                      <span style={{ width:8, height:8, borderRadius:2, flexShrink:0, background:pColor }} />
-                      <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{RO_PARTY_MAP[id]?.name ?? id}</span>
-                      <span style={{ fontSize:12, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:pColor }}>{pct.toFixed(1)}%</span>
+                    <div key={id} style={{ marginBottom: i < tooltip.parties.length - 1 ? 9 : 0 }}>
+                      {/* Name + votes + % */}
+                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:3 }}>
+                        <span style={{ width:8, height:8, borderRadius:2, flexShrink:0, background:pColor }} />
+                        <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {RO_PARTY_MAP[id]?.name ?? id}
+                        </span>
+                        {rawVotes > 0 && (
+                          <span style={{ fontSize:9.5, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(pColor, 0.72), whiteSpace:'nowrap' }}>
+                            {rawVotes.toLocaleString()}
+                          </span>
+                        )}
+                        <span style={{ fontSize:12, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:pColor, minWidth:38, textAlign:'right' }}>
+                          {pct.toFixed(1)}%
+                        </span>
+                      </div>
+                      {/* Progress bar */}
+                      <div style={{ height:3, borderRadius:2, background:tt.track, marginLeft:14 }}>
+                        <div style={{ height:'100%', borderRadius:2, background:pColor, width:`${barW}%`, transition:'width 0.2s' }} />
+                      </div>
                     </div>
                   );
                 })}
+              </div>
+              {/* Footer divider */}
+              <div style={{ borderTop:`1px solid ${tt.divider}`, padding:'6px 14px', display:'flex', justifyContent:'flex-end' }}>
+                <span style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:tt.sub }}>Chamber of Deputies · 2024</span>
               </div>
             </div>
           </div>
@@ -636,15 +717,23 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override }:
   const pctsRef = useRef(pcts);
   useEffect(() => { pctsRef.current = pcts; }, [pcts]);
 
+  // Reset UI state when the selected county changes
   useEffect(() => {
-    if (override) setPcts({ ...override });
-    else {
+    setPanelLocks(new Set()); setEditId(null);
+  }, [countyId]);
+
+  // Keep displayed pcts in sync with natPcts changes AND county changes.
+  // If the user has made manual edits (override exists) honour those; otherwise
+  // recompute from the current national slider values so the panel always agrees
+  // with the tooltip.
+  useEffect(() => {
+    if (override) {
+      setPcts({ ...override });
+    } else {
       const cv = calcCountyVotes(natPcts, countyId);
       setPcts(Object.fromEntries(RO_PARTIES.map(p => [p.id, cv[p.id] ?? 0])) as Record<RoPartyId, number>);
     }
-    setPanelLocks(new Set()); setEditId(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [countyId]);
+  }, [countyId, natPcts, override]);
 
   function applyChange(id: RoPartyId, val: number) {
     const next = redistributePcts(pctsRef.current, id, val, panelLocks);
@@ -703,10 +792,10 @@ function RoCountyPanel({ countyId, natPcts, onUpdate, onClose, dark, override }:
                   }
                 </button>
               </div>
-              <input type="range" min={0} max={55} step={0.1} value={pct} disabled={isLocked}
+              <input type="range" min={0} max={100} step={0.1} value={pct} disabled={isLocked}
                 onChange={e => applyChange(p.id, parseFloat(e.target.value))}
                 className="br-party-slider w-full"
-                style={{ '--party-color': p.color, '--pct': `${(pct/55)*100}%` } as React.CSSProperties} />
+                style={{ '--party-color': p.color, '--pct': `${pct}%` } as React.CSSProperties} />
             </div>
           );
         })}
@@ -775,7 +864,7 @@ function RoParliamentPanel({ cameraSeats, senateSeats, onClose, exiting, dark }:
     <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting?'panel-exit-left':'panel-slide-left'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">Parlamentul României</h2>
+          <h2 className="text-[13px] font-bold text-ink leading-none">Parliament of Romania</h2>
           <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeatsConst} seats · majority {majorityConst} · 5% threshold</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -785,7 +874,7 @@ function RoParliamentPanel({ cameraSeats, senateSeats, onClose, exiting, dark }:
         {(['camera','senate'] as const).map(ch => (
           <button key={ch} onClick={() => setChamber(ch)}
             className={`flex-1 h-7 rounded-[4px] text-[10px] font-mono font-semibold uppercase tracking-wide transition-colors ${chamber===ch ? 'bg-gold text-white' : 'border border-default text-ink-3 hover:bg-hover'}`}>
-            {ch === 'camera' ? `Camera (${RO_CAMERA_SEATS})` : `Senat (${RO_SENATE_SEATS})`}
+            {ch === 'camera' ? `Chamber (${RO_CAMERA_SEATS})` : `Senate (${RO_SENATE_SEATS})`}
           </button>
         ))}
       </div>
@@ -844,37 +933,23 @@ const RO_PRESET_COALITIONS: { name: string; emoji: string; parties: RoPartyId[] 
   { name: 'Marea Coaliție',   emoji: '🇷🇴', parties: ['PSD','PNL','USR','UDMR'] },
 ];
 
-function RoCoalitionPanel({ cameraSeats, senateSeats, onClose, exiting, dark }: {
+function RoCoalitionPanel({ cameraSeats, onClose, exiting, dark }: {
   cameraSeats: Partial<Record<RoPartyId, number>>;
-  senateSeats: Partial<Record<RoPartyId, number>>;
   onClose: () => void; exiting?: boolean; dark?: boolean;
 }) {
   const [selected, setSelected] = useState<Set<RoPartyId>>(new Set(['PSD','PNL','UDMR']));
-  const [chamber, setChamber] = useState<'camera' | 'senate'>('camera');
   const toggle = (id: RoPartyId) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const seats = chamber === 'camera' ? cameraSeats : senateSeats;
-  const majorityConst = chamber === 'camera' ? RO_CAMERA_MAJORITY : RO_SENATE_MAJORITY;
-  const totalSeatsConst = chamber === 'camera' ? RO_CAMERA_SEATS : RO_SENATE_SEATS;
-  const totalCoalSeats = [...selected].reduce((s, id) => s + (seats[id] ?? 0), 0);
-  const hasMajority = totalCoalSeats >= majorityConst;
+  const totalCoalSeats = [...selected].reduce((s, id) => s + (cameraSeats[id] ?? 0), 0);
+  const hasMajority = totalCoalSeats >= RO_CAMERA_MAJORITY;
 
   return (
     <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Coalition Builder</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Majority: {majorityConst} · {totalSeatsConst} total</div>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Chamber majority: {RO_CAMERA_MAJORITY} · {RO_CAMERA_SEATS} total</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
-      </div>
-      {/* Chamber toggle */}
-      <div className="flex px-3.5 pt-2.5 pb-0 gap-2 shrink-0">
-        {(['camera','senate'] as const).map(ch => (
-          <button key={ch} onClick={() => setChamber(ch)}
-            className={`flex-1 h-6 rounded-[4px] text-[9px] font-mono font-semibold uppercase tracking-wide transition-colors ${chamber===ch ? 'bg-gold text-white' : 'border border-default text-ink-3 hover:bg-hover'}`}>
-            {ch === 'camera' ? `Camera (${RO_CAMERA_SEATS})` : `Senat (${RO_SENATE_SEATS})`}
-          </button>
-        ))}
       </div>
       <div className="px-3.5 pt-3 pb-2 border-b border-default shrink-0">
         <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-2">Presets</div>
@@ -892,7 +967,7 @@ function RoCoalitionPanel({ cameraSeats, senateSeats, onClose, exiting, dark }: 
         <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-2">Toggle Parties</div>
         <div className="space-y-1.5">
           {RO_LR_ORDER.map(id => {
-            const party = RO_PARTY_MAP[id]; const s = seats[id] ?? 0;
+            const party = RO_PARTY_MAP[id];
             const isIn = selected.has(id); const color = partyColor(id);
             return (
               <button key={id} onClick={() => toggle(id)}
@@ -900,7 +975,7 @@ function RoCoalitionPanel({ cameraSeats, senateSeats, onClose, exiting, dark }: 
                 style={isIn ? { background: hexToRgba(color, 0.12), borderColor: hexToRgba(color, 0.40) } : {}}>
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
                 <span className="flex-1 text-[10px] font-medium text-ink truncate text-left">{party.fullName}</span>
-                <span className="text-[9px] font-mono font-bold" style={{ color }}>{s}</span>
+                <span className="text-[9px] font-mono font-bold" style={{ color }}>{cameraSeats[id] ?? 0}</span>
                 {isIn && <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M2 4.5l1.8 1.8L7 2.5" stroke={color} strokeWidth="1.4" strokeLinecap="round"/></svg>}
               </button>
             );
@@ -913,10 +988,10 @@ function RoCoalitionPanel({ cameraSeats, senateSeats, onClose, exiting, dark }: 
           <span className="text-[20px] font-black font-mono" style={{ color: hasMajority ? '#16a34a' : '#ef4444' }}>{totalCoalSeats}</span>
         </div>
         <div className="mt-1 h-2 rounded-full bg-black/8 overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-300" style={{ width:`${Math.min(totalCoalSeats/totalSeatsConst*100,100)}%`, background: hasMajority ? '#16a34a' : '#ef4444' }} />
+          <div className="h-full rounded-full transition-all duration-300" style={{ width:`${Math.min(totalCoalSeats/RO_CAMERA_SEATS*100,100)}%`, background: hasMajority ? '#16a34a' : '#ef4444' }} />
         </div>
         <div className={`mt-1.5 text-[9px] font-mono text-center font-bold ${hasMajority ? 'text-emerald-600' : 'text-red-500'}`}>
-          {hasMajority ? `✓ MAJORITY (need ${majorityConst})` : `✗ ${majorityConst - totalCoalSeats} seats short of majority`}
+          {hasMajority ? `✓ MAJORITY (need ${RO_CAMERA_MAJORITY})` : `✗ ${RO_CAMERA_MAJORITY - totalCoalSeats} seats short of majority`}
         </div>
       </div>
     </aside>
@@ -938,13 +1013,13 @@ function RoTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
-        <H2>Sistemul Electoral</H2>
-        <P>Romania uses <strong>D'Hondt proportional representation</strong> for both the Camera Deputaților and Senat. Seats are allocated at the national level using party list votes.</P>
+        <H2>Electoral System</H2>
+        <P>Romania uses <strong>D'Hondt proportional representation</strong> for both the Chamber of Deputies and the Senate. Seats are allocated at the national level using party list votes.</P>
         <Note>This simulator uses a <strong>simplified national proportional</strong> model with a 5% threshold — parties below this get <strong>zero seats</strong>.</Note>
-        <H2>Camera Deputaților</H2>
-        <P>The lower house has <strong>331 seats</strong>. A majority requires <strong>166 seats</strong>. The Camera is the primary chamber for confidence votes and forming a government.</P>
-        <H2>Senat</H2>
-        <P>The upper house has <strong>137 seats</strong>. A majority requires <strong>69 seats</strong>. Toggle between Camera and Senat in the Parliament panel (left side).</P>
+        <H2>Chamber of Deputies</H2>
+        <P>The lower house has <strong>331 seats</strong>. A majority requires <strong>166 seats</strong>. The Chamber is the primary chamber for confidence votes and forming a government.</P>
+        <H2>Senate</H2>
+        <P>The upper house has <strong>137 seats</strong>. A majority requires <strong>69 seats</strong>. Toggle between Chamber and Senate in the Parliament panel (left side).</P>
         <H2>5% Threshold</H2>
         <P>Individual parties need at least <strong>5%</strong> nationally to receive any seats. In the scoreboard, parties below this threshold appear faded with a "&lt;5%" badge.</P>
         <H2>Romanian Parties</H2>
@@ -952,9 +1027,9 @@ function RoTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <H2>Sliders</H2>
         <P>Open <strong>▶ Simulation</strong> to adjust party vote shares. Lock a party (🔒) to keep it fixed while others adjust proportionally.</P>
         <H2>Simulation</H2>
-        <P>Click <strong>▶ Rulează Simularea</strong> to watch Romania's 42 counties report results one by one, with live seat updates.</P>
+        <P>Click <strong>▶ Run Simulation</strong> to watch Romania's 42 counties report results one by one, with live seat updates.</P>
         <H2>Coalition Builder</H2>
-        <P>Click <strong>Coalition</strong> to toggle parties and check if a combination can reach the 166-seat Camera majority.</P>
+        <P>Click <strong>Coalition</strong> to toggle parties and check if a combination can reach the 166-seat Chamber majority.</P>
         <H2>Map Modes</H2>
         <P>Toggle <strong>Bubble Map</strong> for circles sized by winning margin, or leave off for choropleth coloring. Click any county to see its full breakdown.</P>
       </div>
@@ -1001,7 +1076,6 @@ export default function RomaniaApp() {
   }, []);
 
   const [simCameraSeats, setSimCameraSeats]   = useState<Partial<Record<RoPartyId, number>> | undefined>();
-  const [simSenateSeats, setSimSenateSeats]   = useState<Partial<Record<RoPartyId, number>> | undefined>();
   const [simProgress, setSimProgress]         = useState(0);
   const [simRunning, setSimRunning]           = useState(false);
   const [declaredCounties, setDeclaredCounties] = useState<Set<RoCountyId> | undefined>();
@@ -1009,7 +1083,7 @@ export default function RomaniaApp() {
   const natPctsAtSimStart = useRef<Record<RoPartyId, number>>(natPcts);
 
   function stopSim() { simTimersRef.current.forEach(clearTimeout); simTimersRef.current = []; setSimRunning(false); }
-  function resetSim() { stopSim(); setSimCameraSeats(undefined); setSimSenateSeats(undefined); setDeclaredCounties(undefined); setSimProgress(0); }
+  function resetSim() { stopSim(); setSimCameraSeats(undefined); setDeclaredCounties(undefined); setSimProgress(0); }
 
   useEffect(() => {
     const el = headerScrollRef.current; if (!el) return;
@@ -1018,7 +1092,7 @@ export default function RomaniaApp() {
   }, []);
 
   const cameraSeats = useMemo(() => simCameraSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simCameraSeats, natPcts]);
-  const senateSeats = useMemo(() => simSenateSeats ?? calcSeats(natPcts, RO_SENATE_SEATS), [simSenateSeats, natPcts]);
+  const senateSeats = useMemo(() => calcSeats(natPcts, RO_SENATE_SEATS), [natPcts]);
 
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
@@ -1073,7 +1147,7 @@ export default function RomaniaApp() {
 
       {/* ── Scoreboard ───────────────────────────────────────────────────── */}
       {scoreboardVisible && (
-        <RoScoreboard natPcts={natPcts} simCameraSeats={simCameraSeats} simSenateSeats={simSenateSeats} isBaseline={preset==='2024'} dark={dark} />
+        <RoScoreboard natPcts={natPcts} simCameraSeats={simCameraSeats} isBaseline={preset==='2024'} dark={dark} />
       )}
 
       {/* ── Body ─────────────────────────────────────────────────────────── */}
@@ -1155,7 +1229,7 @@ export default function RomaniaApp() {
                   const chunkTimes = roBellCurveTimes(NCHUNKS, 30_000);
                   const chunks: RoCounty[][] = Array.from({ length: NCHUNKS }, () => []);
                   allCounties.forEach((c, i) => chunks[i % NCHUNKS].push(c));
-                  setSimRunning(true); setSimProgress(0); setSimCameraSeats(undefined); setSimSenateSeats(undefined); setDeclaredCounties(new Set());
+                  setSimRunning(true); setSimProgress(0); setSimCameraSeats(undefined); setDeclaredCounties(new Set());
                   let declared = new Set<RoCountyId>();
                   const timers: ReturnType<typeof setTimeout>[] = [];
                   for (let ci = 0; ci < NCHUNKS; ci++) {
@@ -1167,10 +1241,8 @@ export default function RomaniaApp() {
                       setSimProgress(snap.size);
                       const partial = calcPartialSeats(natPctsAtSimStart.current, snap);
                       setSimCameraSeats(partial.camera);
-                      setSimSenateSeats(partial.senate);
                       if (snap.size >= RO_COUNTIES.length) {
                         setSimCameraSeats(calcSeats(natPctsAtSimStart.current, RO_CAMERA_SEATS));
-                        setSimSenateSeats(calcSeats(natPctsAtSimStart.current, RO_SENATE_SEATS));
                         setSimRunning(false);
                       }
                     }, t));
@@ -1179,8 +1251,8 @@ export default function RomaniaApp() {
                 }}
                 className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 transition-colors">
                 {simRunning
-                  ? `${simProgress}/${RO_COUNTIES.length} județe raportează…`
-                  : '▶ Rulează Simularea'}
+                  ? `${simProgress}/${RO_COUNTIES.length} counties reporting…`
+                  : '▶ Run Simulation'}
               </button>
               {(simCameraSeats || declaredCounties) && (
                 <button onClick={resetSim} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
@@ -1193,7 +1265,7 @@ export default function RomaniaApp() {
 
         {/* Coalition — right */}
         {showCoal && !simOpen && (
-          <RoCoalitionPanel cameraSeats={cameraSeats} senateSeats={senateSeats}
+          <RoCoalitionPanel cameraSeats={cameraSeats}
             onClose={() => { setCoalitionOpen(false); triggerExit('coal'); }}
             exiting={exitPanel==='coal'} dark={dark} />
         )}

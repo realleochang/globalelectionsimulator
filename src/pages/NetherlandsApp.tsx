@@ -26,21 +26,21 @@ type NlParty = {
 };
 
 const NL_PARTIES: NlParty[] = [
-  { id: 'D66',    name: 'D66',     fullName: 'Democraten 66',                           color: '#009E60', seats2025: 26, leader: 'Rob Jetten',            wikiTitle: 'Rob_Jetten' },
-  { id: 'PVV',    name: 'PVV',     fullName: 'Partij voor de Vrijheid',                 color: '#003082', seats2025: 26, leader: 'Geert Wilders',          wikiTitle: 'Geert_Wilders' },
-  { id: 'VVD',    name: 'VVD',     fullName: 'Volkspartij voor Vrijheid en Democratie', color: '#0065AB', seats2025: 22, leader: 'Dilan Yeşilgöz',         wikiTitle: 'Dilan_Yeşilgöz-Zegerius' },
-  { id: 'GLPVDA', name: 'GL-PvdA', fullName: 'GroenLinks–Partij van de Arbeid',         color: '#CC0000', seats2025: 20, leader: 'Frans Timmermans',       wikiTitle: 'Frans_Timmermans',       leader2026: 'Jesse Klaver',         wikiTitle2026: 'Jesse_Klaver' },
-  { id: 'CDA',    name: 'CDA',     fullName: 'Christen-Democratisch Appèl',             color: '#007B5F', seats2025: 18, leader: 'Henri Bontenbal',         wikiTitle: 'Henri_Bontenbal' },
-  { id: 'JA21',   name: 'JA21',    fullName: 'Juiste Antwoord 2021',                    color: '#1B3C78', seats2025:  9, leader: 'Joost Eerdmans',          wikiTitle: 'Joost_Eerdmans' },
-  { id: 'FVD',    name: 'FvD',     fullName: 'Forum voor Democratie',                   color: '#821622', seats2025:  7, leader: 'Lidewij de Vos',          wikiTitle: 'Lidewij_de_Vos' },
-  { id: 'BBB',    name: 'BBB',     fullName: 'BoerBurgerBeweging',                      color: '#6CA23B', seats2025:  4, leader: 'Caroline van der Plas',   wikiTitle: 'Caroline_van_der_Plas',  leader2026: 'Henk Vermeer',         wikiTitle2026: 'Henk_Vermeer' },
+  { id: 'D66',    name: 'D66',     fullName: 'Democrats 66',                            color: '#009E60', seats2025: 26, leader: 'Rob Jetten',            wikiTitle: 'Rob_Jetten' },
+  { id: 'PVV',    name: 'PVV',     fullName: 'Party for Freedom',                       color: '#003082', seats2025: 26, leader: 'Geert Wilders',          wikiTitle: 'Geert_Wilders' },
+  { id: 'VVD',    name: 'VVD',     fullName: "People's Party for Freedom & Democracy",  color: '#0065AB', seats2025: 22, leader: 'Dilan Yeşilgöz',         wikiTitle: 'Dilan_Yeşilgöz-Zegerius' },
+  { id: 'GLPVDA', name: 'GL-PvdA', fullName: 'GreenLeft–Labour Party',                  color: '#CC0000', seats2025: 20, leader: 'Frans Timmermans',       wikiTitle: 'Frans_Timmermans',       leader2026: 'Jesse Klaver',         wikiTitle2026: 'Jesse_Klaver' },
+  { id: 'CDA',    name: 'CDA',     fullName: 'Christian Democratic Appeal',             color: '#007B5F', seats2025: 18, leader: 'Henri Bontenbal',         wikiTitle: 'Henri_Bontenbal' },
+  { id: 'JA21',   name: 'JA21',    fullName: 'Right Answer 2021',                       color: '#1B3C78', seats2025:  9, leader: 'Joost Eerdmans',          wikiTitle: 'Joost_Eerdmans' },
+  { id: 'FVD',    name: 'FvD',     fullName: 'Forum for Democracy',                     color: '#821622', seats2025:  7, leader: 'Lidewij de Vos',          wikiTitle: 'Lidewij_de_Vos' },
+  { id: 'BBB',    name: 'BBB',     fullName: 'Farmer Citizen Movement',                 color: '#6CA23B', seats2025:  4, leader: 'Caroline van der Plas',   wikiTitle: 'Caroline_van_der_Plas',  leader2026: 'Henk Vermeer',         wikiTitle2026: 'Henk_Vermeer' },
   { id: 'DENK',   name: 'DENK',    fullName: 'DENK',                                    color: '#005B96', seats2025:  3, leader: 'Stephan van Baarle',      wikiTitle: 'Stephan_van_Baarle' },
-  { id: 'SGP',    name: 'SGP',     fullName: 'Staatkundig Gereformeerde Partij',        color: '#CC6600', seats2025:  3, leader: 'Chris Stoffer',            wikiTitle: 'Chris_Stoffer' },
-  { id: 'PVDD',   name: 'PvdD',    fullName: 'Partij voor de Dieren',                   color: '#2E7D32', seats2025:  3, leader: 'Esther Ouwehand',          wikiTitle: 'Esther_Ouwehand' },
-  { id: 'CU',     name: 'CU',      fullName: 'ChristenUnie',                            color: '#3380B0', seats2025:  3, leader: 'Mirjam Bikker',            wikiTitle: 'Mirjam_Bikker' },
-  { id: 'SP',     name: 'SP',      fullName: 'Socialistische Partij',                   color: '#BB0000', seats2025:  3, leader: 'Jimmy Dijk',               wikiTitle: 'Jimmy_Dijk' },
+  { id: 'SGP',    name: 'SGP',     fullName: 'Reformed Political Party',                color: '#CC6600', seats2025:  3, leader: 'Chris Stoffer',            wikiTitle: 'Chris_Stoffer' },
+  { id: 'PVDD',   name: 'PvdD',    fullName: 'Party for the Animals',                   color: '#2E7D32', seats2025:  3, leader: 'Esther Ouwehand',          wikiTitle: 'Esther_Ouwehand' },
+  { id: 'CU',     name: 'CU',      fullName: 'ChristianUnion',                          color: '#3380B0', seats2025:  3, leader: 'Mirjam Bikker',            wikiTitle: 'Mirjam_Bikker' },
+  { id: 'SP',     name: 'SP',      fullName: 'Socialist Party',                         color: '#BB0000', seats2025:  3, leader: 'Jimmy Dijk',               wikiTitle: 'Jimmy_Dijk' },
   { id: 'PLUS50', name: '50Plus',  fullName: '50Plus',                                  color: '#8B0086', seats2025:  2, leader: 'Jan Struijs',              wikiTitle: 'Jan_Struijs' },
-  { id: 'VOLT',   name: 'Volt',    fullName: 'Volt Nederland',                          color: '#5C2D91', seats2025:  1, leader: 'Laurens Dassen',           wikiTitle: 'Laurens_Dassen' },
+  { id: 'VOLT',   name: 'Volt',    fullName: 'Volt Netherlands',                        color: '#5C2D91', seats2025:  1, leader: 'Laurens Dassen',           wikiTitle: 'Laurens_Dassen' },
   { id: 'DNA',    name: 'DNA',     fullName: 'Dutch Nationalist Party',                 color: '#8B5E3C', seats2025:  0, leader: 'DNA Leader',               wikiTitle: undefined },
 ];
 
@@ -551,7 +551,7 @@ function NlBubbleLayer({
 
 // ── Caribbean Netherlands dot ─────────────────────────────────────────────────
 const NL_OVERSEAS_MARKERS = [
-  { id: 'BES' as NlProvId, name: 'Caribisch Nederland', lat: 12.18, lng: -68.27 },
+  { id: 'BES' as NlProvId, name: 'Caribbean Netherlands', lat: 12.18, lng: -68.27 },
 ];
 
 function NlOverseasLayer({
@@ -810,10 +810,10 @@ const NL_LR_ORDER: NlPartyId[] = [
 
 // ── Coalition builder presets ──────────────────────────────────────────────────
 const NL_PRESET_COALITIONS: { name: string; emoji: string; parties: NlPartyId[] }[] = [
-  { name: 'Kabinet Schoof',   emoji: '🇳🇱', parties: ['PVV','VVD','CDA','JA21'] },
-  { name: 'Progressief Blok', emoji: '🌹',  parties: ['D66','GLPVDA','SP','PVDD','CU','VOLT'] },
-  { name: 'Brede Coalitie',   emoji: '🤝',  parties: ['D66','VVD','GLPVDA','CDA'] },
-  { name: 'Rechts Blok',      emoji: '⚡',  parties: ['PVV','VVD','JA21','FVD','BBB'] },
+  { name: 'Schoof Cabinet',   emoji: '🇳🇱', parties: ['PVV','VVD','CDA','JA21'] },
+  { name: 'Progressive Bloc', emoji: '🌹',  parties: ['D66','GLPVDA','SP','PVDD','CU','VOLT'] },
+  { name: 'Broad Coalition',  emoji: '🤝',  parties: ['D66','VVD','GLPVDA','CDA'] },
+  { name: 'Right Bloc',       emoji: '⚡',  parties: ['PVV','VVD','JA21','FVD','BBB'] },
 ];
 
 // ── Parties visibility panel ───────────────────────────────────────────────────
@@ -1070,7 +1070,7 @@ function NlParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
     <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit-left' : 'panel-slide-left'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">Tweede Kamer Hemicycle</h2>
+          <h2 className="text-[13px] font-bold text-ink leading-none">House of Representatives Hemicycle</h2>
           <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeats} seats · majority {NL_MAJORITY}</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -1192,14 +1192,14 @@ function NlTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
-          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Tweede Kamer Guide</p>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">House of Representatives Guide</p>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
         <H2>The Dutch Electoral System</H2>
         <P>The Netherlands uses <strong>Party-List Proportional Representation</strong>. The entire country is one constituency — voters cast a single vote for a party list.</P>
-        <Note>All 150 seats in the Tweede Kamer (lower house) are allocated using the <strong>D'Hondt method</strong>.</Note>
+        <Note>All 150 seats in the House of Representatives (lower house) are allocated using the <strong>D'Hondt method</strong>.</Note>
 
         <H2>D'Hondt Explained</H2>
         <P>The D'Hondt method divides each party's votes by 1, 2, 3, … The 150 highest quotients each win a seat.</P>

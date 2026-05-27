@@ -293,17 +293,7 @@ export default function App() {
           <circle cx="16" cy="16" r="13.4" fill="none" stroke="rgba(255,255,255,0.28)" strokeWidth="0.5" />
         </svg>
 
-        {/* Title — hidden on small screens */}
-        <div className="hidden sm:flex flex-col justify-center mr-2 leading-none">
-          <span className="font-display font-black uppercase tracking-[0.04em] text-[14px] text-ink leading-none">
-            Global Election Simulator
-          </span>
-          <span className="text-[7.5px] font-mono uppercase tracking-[0.13em] text-ink-3 leading-none mt-[3px]">
-            Westminster Edition
-          </span>
-        </div>
-
-        </button>
+</button>
 
         {/* Scrollable button strip — wheel down scrolls right */}
         <div ref={headerScrollRef} className="flex-1 min-w-0 header-scroll-strip flex items-center gap-2 px-2">
