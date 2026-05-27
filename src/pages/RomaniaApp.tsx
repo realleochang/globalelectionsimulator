@@ -16,18 +16,19 @@ type RoParty = {
   fullName: string;
   color: string;
   seats2024: number;
+  senateSeats2024: number;
   leader: string;
   wikiTitle?: string;
 };
 
 const RO_PARTIES: RoParty[] = [
-  { id: 'PSD',  name: 'PSD',  fullName: 'Partidul Social Democrat',               color: '#CC0000', seats2024: 88, leader: 'Marcel Ciolacu',  wikiTitle: 'Marcel_Ciolacu' },
-  { id: 'AUR',  name: 'AUR',  fullName: 'Alianța pentru Unirea Românilor',        color: '#C8960C', seats2024: 70, leader: 'George Simion',   wikiTitle: 'George_Simion' },
-  { id: 'PNL',  name: 'PNL',  fullName: 'Partidul Național Liberal',              color: '#F9A800', seats2024: 56, leader: 'Nicolae Ciucă',   wikiTitle: 'Nicolae_Ciucă' },
-  { id: 'USR',  name: 'USR',  fullName: 'Uniunea Salvați România',                color: '#003DA5', seats2024: 49, leader: 'Cătălin Drulă',   wikiTitle: 'Cătălin_Drulă' },
-  { id: 'UDMR', name: 'UDMR', fullName: 'Uniunea Democrată Maghiară din România', color: '#2E7D32', seats2024: 25, leader: 'Kelemen Hunor',   wikiTitle: 'Kelemen_Hunor' },
-  { id: 'SOS',  name: 'SOS',  fullName: 'SOS România',                            color: '#B71C1C', seats2024: 22, leader: 'Diana Șoșoacă',   wikiTitle: 'Diana_Șoșoacă' },
-  { id: 'POT',  name: 'POT',  fullName: 'Partidul Oamenilor Tineri',              color: '#E65100', seats2024: 21, leader: 'Călin Georgescu' },
+  { id: 'PSD',  name: 'PSD',  fullName: 'Partidul Social Democrat',               color: '#CC0000', seats2024: 88,  senateSeats2024: 37, leader: 'Marcel Ciolacu',  wikiTitle: 'Marcel_Ciolacu' },
+  { id: 'AUR',  name: 'AUR',  fullName: 'Alianța pentru Unirea Românilor',        color: '#C8960C', seats2024: 70,  senateSeats2024: 29, leader: 'George Simion',   wikiTitle: 'George_Simion' },
+  { id: 'PNL',  name: 'PNL',  fullName: 'Partidul Național Liberal',              color: '#F9A800', seats2024: 56,  senateSeats2024: 23, leader: 'Nicolae Ciucă',   wikiTitle: 'Nicolae_Ciucă' },
+  { id: 'USR',  name: 'USR',  fullName: 'Uniunea Salvați România',                color: '#003DA5', seats2024: 49,  senateSeats2024: 20, leader: 'Cătălin Drulă',   wikiTitle: 'Cătălin_Drulă' },
+  { id: 'UDMR', name: 'UDMR', fullName: 'Uniunea Democrată Maghiară din România', color: '#2E7D32', seats2024: 25,  senateSeats2024: 10, leader: 'Kelemen Hunor',   wikiTitle: 'Kelemen_Hunor' },
+  { id: 'SOS',  name: 'SOS',  fullName: 'SOS România',                            color: '#B71C1C', seats2024: 22,  senateSeats2024:  9, leader: 'Diana Șoșoacă',   wikiTitle: 'Diana_Șoșoacă' },
+  { id: 'POT',  name: 'POT',  fullName: 'Partidul Oamenilor Tineri',              color: '#E65100', seats2024: 21,  senateSeats2024:  9, leader: 'Călin Georgescu' },
 ];
 
 const RO_PARTY_MAP = Object.fromEntries(RO_PARTIES.map(p => [p.id, p])) as Record<RoPartyId, RoParty>;
@@ -191,20 +192,24 @@ function calcCountyVotes(natPcts: Record<RoPartyId, number>, countyId: RoCountyI
   const raw: Record<RoPartyId, number> = {} as Record<RoPartyId, number>;
   let total = 0;
   for (const p of RO_PARTIES) {
-    const swing = (natPcts[p.id] ?? 0) - (RO_VOTE_PCT_2024[p.id] ?? 0);
-    const v = Math.max(0, (base[p.id] ?? 0) + swing);
-    raw[p.id] = v; total += v;
+    const oldNat = RO_VOTE_PCT_2024[p.id] ?? 0;
+    const newNat = natPcts[p.id] ?? 0;
+    const basePct = base[p.id] ?? 0;
+    const v = newNat === 0 ? 0 : oldNat === 0 ? newNat : basePct * (newNat / oldNat);
+    raw[p.id] = Math.max(0, v); total += raw[p.id];
   }
   if (total === 0) return raw;
   for (const p of RO_PARTIES) raw[p.id] = (raw[p.id] / total) * 100;
   return raw;
 }
 
+type PartialSeatsResult = { camera: Partial<Record<RoPartyId, number>>; senate: Partial<Record<RoPartyId, number>> };
+
 function calcPartialSeats(
   natPcts: Record<RoPartyId, number>,
   declaredCounties: Set<RoCountyId>,
-): Partial<Record<RoPartyId, number>> {
-  if (declaredCounties.size === 0) return {};
+): PartialSeatsResult {
+  if (declaredCounties.size === 0) return { camera: {}, senate: {} };
   const weighted: Partial<Record<RoPartyId, number>> = {};
   let totalPop = 0;
   for (const cId of declaredCounties) {
@@ -213,10 +218,10 @@ function calcPartialSeats(
     for (const p of RO_PARTIES) weighted[p.id] = (weighted[p.id] ?? 0) + (cv[p.id] ?? 0) * c.pop;
     totalPop += c.pop;
   }
-  if (totalPop === 0) return {};
+  if (totalPop === 0) return { camera: {}, senate: {} };
   const norm: Partial<Record<RoPartyId, number>> = {};
   for (const p of RO_PARTIES) norm[p.id] = (weighted[p.id] ?? 0) / totalPop;
-  return calcSeats(norm);
+  return { camera: calcSeats(norm, RO_CAMERA_SEATS), senate: calcSeats(norm, RO_SENATE_SEATS) };
 }
 
 function redistributePcts(
@@ -351,13 +356,16 @@ function RoScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLea
 }
 
 // ── Scoreboard ─────────────────────────────────────────────────────────────────
-function RoScoreboard({ natPcts, simSeats, isBaseline, dark: _dark }: {
+function RoScoreboard({ natPcts, simCameraSeats, simSenateSeats, isBaseline, dark: _dark }: {
   natPcts: Record<RoPartyId, number>;
-  simSeats?: Partial<Record<RoPartyId, number>>;
+  simCameraSeats?: Partial<Record<RoPartyId, number>>;
+  simSenateSeats?: Partial<Record<RoPartyId, number>>;
   isBaseline?: boolean;
   dark?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const [chamber, setChamber] = useState<'camera' | 'senate'>('camera');
+
   useEffect(() => {
     const el = scrollRef.current; if (!el) return;
     const handler = (e: WheelEvent) => {
@@ -368,7 +376,11 @@ function RoScoreboard({ natPcts, simSeats, isBaseline, dark: _dark }: {
     return () => el.removeEventListener('wheel', handler);
   }, []);
 
-  const seats = useMemo(() => simSeats ?? calcSeats(natPcts), [simSeats, natPcts]);
+  const cameraSeatsC = useMemo(() => simCameraSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simCameraSeats, natPcts]);
+  const senateSeatsC = useMemo(() => simSenateSeats ?? calcSeats(natPcts, RO_SENATE_SEATS), [simSenateSeats, natPcts]);
+  const seats = chamber === 'camera' ? cameraSeatsC : senateSeatsC;
+  const majorityConst = chamber === 'camera' ? RO_CAMERA_MAJORITY : RO_SENATE_MAJORITY;
+
   const pctTotal = Object.values(natPcts).reduce((s, v) => s + (v ?? 0), 0);
 
   const sorted = useMemo(
@@ -379,12 +391,23 @@ function RoScoreboard({ natPcts, simSeats, isBaseline, dark: _dark }: {
   );
 
   const leader = sorted[0]?.id ?? null;
-  const winner = leader && (seats[leader] ?? 0) >= RO_CAMERA_MAJORITY ? leader : null;
+  const winner = leader && (seats[leader] ?? 0) >= majorityConst ? leader : null;
 
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
+      {/* Chamber toggle strip */}
+      <div className="flex items-center gap-1.5 px-3 pt-1.5 pb-0">
+        {(['camera', 'senate'] as const).map(ch => (
+          <button key={ch} onClick={() => setChamber(ch)}
+            className={`h-5 px-2 text-[8.5px] font-mono font-semibold uppercase tracking-wide rounded-[3px] transition-colors ${
+              chamber === ch ? 'bg-gold text-white' : 'border border-default text-ink-3 hover:bg-hover'
+            }`}>
+            {ch === 'camera' ? `Camera · ${RO_CAMERA_SEATS} seats · maj ${RO_CAMERA_MAJORITY}` : `Senat · ${RO_SENATE_SEATS} seats · maj ${RO_SENATE_MAJORITY}`}
+          </button>
+        ))}
+      </div>
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
-        <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
+        <div className="flex gap-1.5 px-3 pt-1.5 pb-2 mx-auto w-fit items-stretch">
           {sorted.map(party => {
             const s = seats[party.id] ?? 0;
             const pct = pctTotal > 0 ? (natPcts[party.id] ?? 0) / pctTotal * 100 : 0;
@@ -821,22 +844,37 @@ const RO_PRESET_COALITIONS: { name: string; emoji: string; parties: RoPartyId[] 
   { name: 'Marea Coaliție',   emoji: '🇷🇴', parties: ['PSD','PNL','USR','UDMR'] },
 ];
 
-function RoCoalitionPanel({ seats, onClose, exiting, dark }: {
-  seats: Partial<Record<RoPartyId, number>>; onClose: () => void; exiting?: boolean; dark?: boolean;
+function RoCoalitionPanel({ cameraSeats, senateSeats, onClose, exiting, dark }: {
+  cameraSeats: Partial<Record<RoPartyId, number>>;
+  senateSeats: Partial<Record<RoPartyId, number>>;
+  onClose: () => void; exiting?: boolean; dark?: boolean;
 }) {
   const [selected, setSelected] = useState<Set<RoPartyId>>(new Set(['PSD','PNL','UDMR']));
+  const [chamber, setChamber] = useState<'camera' | 'senate'>('camera');
   const toggle = (id: RoPartyId) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const seats = chamber === 'camera' ? cameraSeats : senateSeats;
+  const majorityConst = chamber === 'camera' ? RO_CAMERA_MAJORITY : RO_SENATE_MAJORITY;
+  const totalSeatsConst = chamber === 'camera' ? RO_CAMERA_SEATS : RO_SENATE_SEATS;
   const totalCoalSeats = [...selected].reduce((s, id) => s + (seats[id] ?? 0), 0);
-  const hasMajority = totalCoalSeats >= RO_CAMERA_MAJORITY;
+  const hasMajority = totalCoalSeats >= majorityConst;
 
   return (
     <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Coalition Builder</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Camera majority: {RO_CAMERA_MAJORITY} · {RO_CAMERA_SEATS} total</div>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Majority: {majorityConst} · {totalSeatsConst} total</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+      {/* Chamber toggle */}
+      <div className="flex px-3.5 pt-2.5 pb-0 gap-2 shrink-0">
+        {(['camera','senate'] as const).map(ch => (
+          <button key={ch} onClick={() => setChamber(ch)}
+            className={`flex-1 h-6 rounded-[4px] text-[9px] font-mono font-semibold uppercase tracking-wide transition-colors ${chamber===ch ? 'bg-gold text-white' : 'border border-default text-ink-3 hover:bg-hover'}`}>
+            {ch === 'camera' ? `Camera (${RO_CAMERA_SEATS})` : `Senat (${RO_SENATE_SEATS})`}
+          </button>
+        ))}
       </div>
       <div className="px-3.5 pt-3 pb-2 border-b border-default shrink-0">
         <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-2">Presets</div>
@@ -862,7 +900,7 @@ function RoCoalitionPanel({ seats, onClose, exiting, dark }: {
                 style={isIn ? { background: hexToRgba(color, 0.12), borderColor: hexToRgba(color, 0.40) } : {}}>
                 <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
                 <span className="flex-1 text-[10px] font-medium text-ink truncate text-left">{party.fullName}</span>
-                <span className="text-[9px] font-mono font-bold" style={{ color }}>{s}s</span>
+                <span className="text-[9px] font-mono font-bold" style={{ color }}>{s}</span>
                 {isIn && <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M2 4.5l1.8 1.8L7 2.5" stroke={color} strokeWidth="1.4" strokeLinecap="round"/></svg>}
               </button>
             );
@@ -875,10 +913,10 @@ function RoCoalitionPanel({ seats, onClose, exiting, dark }: {
           <span className="text-[20px] font-black font-mono" style={{ color: hasMajority ? '#16a34a' : '#ef4444' }}>{totalCoalSeats}</span>
         </div>
         <div className="mt-1 h-2 rounded-full bg-black/8 overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-300" style={{ width:`${Math.min(totalCoalSeats/RO_CAMERA_SEATS*100,100)}%`, background: hasMajority ? '#16a34a' : '#ef4444' }} />
+          <div className="h-full rounded-full transition-all duration-300" style={{ width:`${Math.min(totalCoalSeats/totalSeatsConst*100,100)}%`, background: hasMajority ? '#16a34a' : '#ef4444' }} />
         </div>
         <div className={`mt-1.5 text-[9px] font-mono text-center font-bold ${hasMajority ? 'text-emerald-600' : 'text-red-500'}`}>
-          {hasMajority ? `✓ MAJORITY (need ${RO_CAMERA_MAJORITY})` : `✗ ${RO_CAMERA_MAJORITY - totalCoalSeats} seats short of majority`}
+          {hasMajority ? `✓ MAJORITY (need ${majorityConst})` : `✗ ${majorityConst - totalCoalSeats} seats short of majority`}
         </div>
       </div>
     </aside>
@@ -962,7 +1000,8 @@ export default function RomaniaApp() {
     exitTimerRef.current = setTimeout(() => setExitPanel(null), 280);
   }, []);
 
-  const [simSeats, setSimSeats]               = useState<Partial<Record<RoPartyId, number>> | undefined>();
+  const [simCameraSeats, setSimCameraSeats]   = useState<Partial<Record<RoPartyId, number>> | undefined>();
+  const [simSenateSeats, setSimSenateSeats]   = useState<Partial<Record<RoPartyId, number>> | undefined>();
   const [simProgress, setSimProgress]         = useState(0);
   const [simRunning, setSimRunning]           = useState(false);
   const [declaredCounties, setDeclaredCounties] = useState<Set<RoCountyId> | undefined>();
@@ -970,7 +1009,7 @@ export default function RomaniaApp() {
   const natPctsAtSimStart = useRef<Record<RoPartyId, number>>(natPcts);
 
   function stopSim() { simTimersRef.current.forEach(clearTimeout); simTimersRef.current = []; setSimRunning(false); }
-  function resetSim() { stopSim(); setSimSeats(undefined); setDeclaredCounties(undefined); setSimProgress(0); }
+  function resetSim() { stopSim(); setSimCameraSeats(undefined); setSimSenateSeats(undefined); setDeclaredCounties(undefined); setSimProgress(0); }
 
   useEffect(() => {
     const el = headerScrollRef.current; if (!el) return;
@@ -978,8 +1017,8 @@ export default function RomaniaApp() {
     el.addEventListener('wheel', h, { passive: false }); return () => el.removeEventListener('wheel', h);
   }, []);
 
-  const cameraSeats = useMemo(() => simSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simSeats, natPcts]);
-  const senateSeats = useMemo(() => calcSeats(natPcts, RO_SENATE_SEATS), [natPcts]);
+  const cameraSeats = useMemo(() => simCameraSeats ?? calcSeats(natPcts, RO_CAMERA_SEATS), [simCameraSeats, natPcts]);
+  const senateSeats = useMemo(() => simSenateSeats ?? calcSeats(natPcts, RO_SENATE_SEATS), [simSenateSeats, natPcts]);
 
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
@@ -1034,7 +1073,7 @@ export default function RomaniaApp() {
 
       {/* ── Scoreboard ───────────────────────────────────────────────────── */}
       {scoreboardVisible && (
-        <RoScoreboard natPcts={natPcts} simSeats={simSeats} isBaseline={preset==='2024'} dark={dark} />
+        <RoScoreboard natPcts={natPcts} simCameraSeats={simCameraSeats} simSenateSeats={simSenateSeats} isBaseline={preset==='2024'} dark={dark} />
       )}
 
       {/* ── Body ─────────────────────────────────────────────────────────── */}
@@ -1116,7 +1155,7 @@ export default function RomaniaApp() {
                   const chunkTimes = roBellCurveTimes(NCHUNKS, 30_000);
                   const chunks: RoCounty[][] = Array.from({ length: NCHUNKS }, () => []);
                   allCounties.forEach((c, i) => chunks[i % NCHUNKS].push(c));
-                  setSimRunning(true); setSimProgress(0); setSimSeats(undefined); setDeclaredCounties(new Set());
+                  setSimRunning(true); setSimProgress(0); setSimCameraSeats(undefined); setSimSenateSeats(undefined); setDeclaredCounties(new Set());
                   let declared = new Set<RoCountyId>();
                   const timers: ReturnType<typeof setTimeout>[] = [];
                   for (let ci = 0; ci < NCHUNKS; ci++) {
@@ -1126,9 +1165,12 @@ export default function RomaniaApp() {
                       const snap = new Set(declared);
                       setDeclaredCounties(snap);
                       setSimProgress(snap.size);
-                      setSimSeats(calcPartialSeats(natPctsAtSimStart.current, snap));
+                      const partial = calcPartialSeats(natPctsAtSimStart.current, snap);
+                      setSimCameraSeats(partial.camera);
+                      setSimSenateSeats(partial.senate);
                       if (snap.size >= RO_COUNTIES.length) {
-                        setSimSeats(calcSeats(natPctsAtSimStart.current));
+                        setSimCameraSeats(calcSeats(natPctsAtSimStart.current, RO_CAMERA_SEATS));
+                        setSimSenateSeats(calcSeats(natPctsAtSimStart.current, RO_SENATE_SEATS));
                         setSimRunning(false);
                       }
                     }, t));
@@ -1140,7 +1182,7 @@ export default function RomaniaApp() {
                   ? `${simProgress}/${RO_COUNTIES.length} județe raportează…`
                   : '▶ Rulează Simularea'}
               </button>
-              {(simSeats || declaredCounties) && (
+              {(simCameraSeats || declaredCounties) && (
                 <button onClick={resetSim} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
                   Reset
                 </button>
@@ -1151,7 +1193,7 @@ export default function RomaniaApp() {
 
         {/* Coalition — right */}
         {showCoal && !simOpen && (
-          <RoCoalitionPanel seats={cameraSeats}
+          <RoCoalitionPanel cameraSeats={cameraSeats} senateSeats={senateSeats}
             onClose={() => { setCoalitionOpen(false); triggerExit('coal'); }}
             exiting={exitPanel==='coal'} dark={dark} />
         )}
