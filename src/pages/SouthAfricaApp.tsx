@@ -141,11 +141,15 @@ function calcProvVotes(natPcts: Record<SaPartyId, number>, provId: SaProvId): Re
   const raw: Record<SaPartyId, number> = {} as Record<SaPartyId, number>;
   let total = 0;
   for (const p of SA_PARTIES) {
+    // If a party has 0% nationally (excluded or set to 0 in sim), zero it at province
+    // level too — don't let the 2024 base "carry" votes for absent parties.
+    if ((natPcts[p.id] ?? 0) <= 0) { raw[p.id] = 0; continue; }
     const swing = (natPcts[p.id] ?? 0) - (SA_VOTE_PCT_2024[p.id] ?? 0);
     const v = Math.max(0, (base[p.id] ?? 0) + swing);
     raw[p.id] = v; total += v;
   }
   if (total === 0) return raw;
+  // Renormalise so province shares still sum to 100%
   for (const p of SA_PARTIES) raw[p.id] = (raw[p.id] / total) * 100;
   return raw;
 }
