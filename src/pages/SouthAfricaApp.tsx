@@ -437,7 +437,7 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
                       <span style={{ width:8, height:8, borderRadius:2, flexShrink:0, background:c }} />
                       <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{SA_PARTY_MAP[id]?.name ?? id}</span>
                       <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:c }}>{pct.toFixed(1)}%</span>
-                      <span style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub, minWidth:42, textAlign:'right' }}>{fmtN(raw)}</span>
+                      <span style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub, minWidth:60, textAlign:'right' }}>{raw.toLocaleString()}</span>
                     </div>
                   );
                 })}
@@ -625,9 +625,12 @@ const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts,
 }); // React.memo
 
 // ── Province panel — WahlkreisPanel style (sliders + lock + edit + delta + ref) ─
-function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
+function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, activeParties, dark, override }: {
   provId: SaProvId; natPcts: Record<SaPartyId, number>;
   onUpdate: (id: SaProvId, pcts: Record<SaPartyId, number>) => void;
+  /** Called when "Project Result" is clicked — declares this province on the map */
+  onDeclare?: (pcts: Record<SaPartyId, number>) => void;
+  activeParties: Set<SaPartyId>;
   onClose: () => void; dark?: boolean;
   override?: Record<SaPartyId, number>;
 }) {
@@ -637,29 +640,32 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
     return Object.fromEntries(SA_PARTIES.map(p => [p.id, rv[p.id] ?? 0])) as Record<SaPartyId, number>;
   }, [override, natPcts, provId]);
 
-  const [pcts, setPcts]           = useState<Record<SaPartyId, number>>(initFromNat);
-  const [locks, setLocks]         = useState<Set<SaPartyId>>(new Set());
-  const [editId, setEditId]       = useState<SaPartyId | null>(null);
-  const [editVal, setEditVal]     = useState('');
-  const [showRef, setShowRef]     = useState(false);
+  const [pcts, setPcts]               = useState<Record<SaPartyId, number>>(initFromNat);
+  const [locks, setLocks]             = useState<Set<SaPartyId>>(new Set());
+  const [editId, setEditId]           = useState<SaPartyId | null>(null);
+  const [editVal, setEditVal]         = useState('');
+  const [showRef, setShowRef]         = useState(false);
+  const [reportingPct, setReportingPct] = useState(100);
   const pctsRef = useRef(pcts);
   useEffect(() => { pctsRef.current = pcts; }, [pcts]);
 
   // Re-init when province changes
   useEffect(() => {
-    setPcts(initFromNat()); setLocks(new Set()); setEditId(null);
+    setPcts(initFromNat()); setLocks(new Set()); setEditId(null); setReportingPct(100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provId]);
 
   function applyChange(id: SaPartyId, val: number) {
-    const next = redistributePcts(pctsRef.current, id, val, locks);
+    // Lock inactive parties at 0 so redistribution never spills into them
+    const effectiveLocks = new Set([...locks, ...SA_PARTIES.map(p => p.id).filter(pid => !activeParties.has(pid))]);
+    const next = redistributePcts(pctsRef.current, id, val, effectiveLocks);
     pctsRef.current = next; setPcts(next); onUpdate(provId, next);
   }
   function toggleLock(id: SaPartyId) {
     setLocks(prev => {
       const next = new Set(prev);
-      // can't lock if only one unlocked left
-      if (!next.has(id) && sorted.filter(p => !next.has(p.id) && p.id !== id).length < 1) return prev;
+      const activeUnlocked = sorted.filter(p => !next.has(p.id) && p.id !== id);
+      if (!next.has(id) && activeUnlocked.length < 1) return prev;
       next.has(id) ? next.delete(id) : next.add(id); return next;
     });
   }
@@ -669,10 +675,18 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
     setEditId(null); setEditVal('');
   }
 
-  const sorted = useMemo(() => SA_PARTIES.map(p => ({ ...p, pct: pcts[p.id] ?? 0 })).sort((a, b) => b.pct - a.pct), [pcts]);
+  // Show all active parties sorted by current %, even if at 0 (important for blank map)
+  const sorted = useMemo(
+    () => SA_PARTIES.filter(p => activeParties.has(p.id))
+      .map(p => ({ ...p, pct: pcts[p.id] ?? 0 }))
+      .sort((a, b) => b.pct - a.pct),
+    [pcts, activeParties],
+  );
   const prov = SA_PROV_MAP[provId];
-  const winner = sorted[0];
+  const winner = sorted.find(p => p.pct > 0);
   const baseline2024 = SA_PROV_RESULTS_2024[provId];
+  const pctSum = sorted.reduce((s, p) => s + p.pct, 0);
+  const totalVotes = prov?.votes2024 ?? 0;
 
   return (
     <aside className={`w-72 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
@@ -694,16 +708,37 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
             <span className="text-[9px] font-mono text-ink-3">{winner.pct.toFixed(1)}%</span>
           </div>
         )}
+
+        {/* % Reporting slider */}
+        <div className="mt-2.5">
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[8.5px] font-mono font-bold uppercase tracking-[0.12em] text-ink-3">% Reporting</span>
+            <span className="text-[9px] font-mono font-bold tabular-nums"
+              style={{ color: reportingPct === 100 ? '#16a34a' : '#f59e0b' }}>
+              {reportingPct}%
+            </span>
+          </div>
+          <input type="range" min={0} max={100} step={1} value={reportingPct}
+            onChange={e => setReportingPct(Number(e.target.value))}
+            className="party-slider w-full"
+            style={{ '--party-color': reportingPct === 100 ? '#16a34a' : '#f59e0b', '--pct': `${reportingPct}%` } as React.CSSProperties} />
+          <div className="flex justify-between mt-0.5">
+            <span className="text-[7.5px] font-mono text-ink-3">0%</span>
+            <span className="text-[7.5px] font-mono text-ink-3 tabular-nums">
+              {Math.round(reportingPct / 100 * totalVotes).toLocaleString()} votes counted
+            </span>
+          </div>
+        </div>
       </div>
 
-      {/* Sliders */}
+      {/* Sliders — all active parties always shown */}
       <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
-        {sorted.filter(p => p.pct >= 0.1 || locks.has(p.id)).map(p => {
+        {sorted.map(p => {
           const pct = pcts[p.id] ?? 0;
           const isLocked = locks.has(p.id);
-          const base2024 = baseline2024[p.id] ?? 0;
+          const base2024 = baseline2024?.[p.id] ?? 0;
           const delta = pct - base2024;
-          const rawVotes = Math.round(pct / 100 * (prov?.votes2024 ?? 0));
+          const rawVotes = Math.round(pct / 100 * reportingPct / 100 * totalVotes);
           return (
             <div key={p.id}>
               <div className="flex items-center gap-1 mb-0.5">
@@ -717,7 +752,7 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
                     : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
                   }
                 </button>
-                {/* Editable % — click to enter exact value */}
+                {/* Editable % */}
                 {editId === p.id ? (
                   <input type="number" min={0} max={100} step={0.1} value={editVal} autoFocus
                     className="w-12 h-5 text-[10px] font-mono font-semibold tabular-nums text-right px-1 rounded border border-default focus:outline-none focus:border-ink-3 bg-white text-ink-2"
@@ -732,14 +767,12 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
                   </span>
                 )}
               </div>
-              {/* party-slider (Germany design) */}
               <input type="range" min={0} max={75} step={0.1} value={pct} disabled={isLocked}
                 onChange={e => applyChange(p.id, parseFloat(e.target.value))}
                 className="party-slider w-full"
                 style={{ '--party-color': p.color, '--pct': `${(pct / 75) * 100}%` } as React.CSSProperties} />
-              {/* Delta vs 2024 + raw votes */}
               <div className="flex items-center justify-between mt-0.5">
-                <span className="text-[8px] font-mono tabular-nums text-ink-3">{fmtN(rawVotes)} votes</span>
+                <span className="text-[8px] font-mono tabular-nums text-ink-3">{rawVotes.toLocaleString()} votes</span>
                 {Math.abs(delta) > 0.05 && (
                   <span className={`text-[8px] font-mono tabular-nums ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                     {delta > 0 ? '+' : ''}{delta.toFixed(1)}pp
@@ -807,6 +840,33 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
           )}
         </div>
       </div>
+
+      {/* Project Result footer — declares this province on the map */}
+      {onDeclare && (() => {
+        const canDeclare = pctSum > 0.5;
+        return (
+          <div className="px-3.5 py-2.5 border-t border-default shrink-0">
+            <button
+              onClick={() => {
+                if (!canDeclare) return;
+                // Normalise to 100% if sliders don't yet sum to 100
+                let projected: Record<SaPartyId, number> = { ...pcts };
+                if (Math.abs(pctSum - 100) > 0.5) {
+                  for (const p of SA_PARTIES) projected[p.id] = (pcts[p.id] ?? 0) / pctSum * 100;
+                }
+                onDeclare(projected);
+              }}
+              disabled={!canDeclare}
+              className={`w-full py-2 text-[11px] font-mono font-bold rounded-[4px] border transition-colors ${
+                canDeclare
+                  ? 'border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white'
+                  : 'border-default text-ink-3 cursor-not-allowed opacity-50'
+              }`}>
+              ⊞ Project Result
+            </button>
+          </div>
+        );
+      })()}
     </aside>
   );
 }
@@ -1743,7 +1803,7 @@ export default function SouthAfricaApp() {
     simTimersRef.current = timers;
   }
 
-  /** Instantly project slider values as the national result (no animation) */
+  /** Instantly project List Seats sliders as the national result (no animation) */
   function handleProject(pcts: Record<SaPartyId, number>) {
     stopSim();
     setNatPcts(pcts);
@@ -1753,6 +1813,17 @@ export default function SouthAfricaApp() {
     setDeclaredProvs(undefined); // show all provinces coloured
     setSimSeats(undefined);
     setSimProgress(0);
+    setScoreboardVisible(true);
+  }
+
+  /** Declare a single province result — marks it as reported on the map */
+  function handleDeclareProvince(provId: SaProvId, pcts: Record<SaPartyId, number>) {
+    setProvOverrides(prev => ({ ...prev, [provId]: pcts }));
+    setDeclaredProvs(prev => {
+      const next = new Set(prev ?? []); // if undefined (non-blank mode), start fresh set
+      next.add(provId);
+      return next;
+    });
     setScoreboardVisible(true);
   }
 
@@ -2100,10 +2171,12 @@ export default function SouthAfricaApp() {
             <SaProvPanel
               provId={selectedProv}
               natPcts={natPcts}
+              activeParties={activeParties}
               onUpdate={(id, pcts) => {
                 setProvOverrides(prev => ({ ...prev, [id]: pcts }));
                 if (preset !== 'blank') setPreset('custom');
               }}
+              onDeclare={(pcts) => handleDeclareProvince(selectedProv, pcts)}
               onClose={() => setSelectedProv(null)}
               dark={dark}
               override={provOverrides[selectedProv]}
