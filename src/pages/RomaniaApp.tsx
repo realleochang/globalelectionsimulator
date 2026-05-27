@@ -43,6 +43,13 @@ const RO_THRESHOLD = 5.0;
 const RO_VOTE_PCT_2024: Record<RoPartyId, number> = {
   PSD: 21.96, AUR: 18.01, PNL: 13.20, USR: 12.40, SOS: 7.36, POT: 6.46, UDMR: 6.33,
 };
+
+// ── 2026 polling average ───────────────────────────────────────────────────────
+// Average of 8 polls (Mar–May 2026): INSCOP, CURS, Avangarde, Sociopol, ARP, IRES
+// AUR surges to ~35%; SOS and POT both fall below the 5% threshold
+const RO_VOTE_PCT_2026_POLLING: Record<RoPartyId, number> = {
+  AUR: 35.5, PSD: 20.2, PNL: 17.0, USR: 11.6, UDMR: 4.6, SOS: 3.2, POT: 2.1,
+};
 const RO_VOTE_RAW_2024: Record<RoPartyId, number> = {
   PSD: 2_030_144, AUR: 1_665_143, PNL: 1_219_810, USR: 1_146_357,
   SOS: 679_967, POT: 596_745, UDMR: 585_397,
@@ -1048,10 +1055,11 @@ export default function RomaniaApp() {
     localStorage.setItem('darkMode', String(dark));
   }, [dark]);
 
-  const [preset, setPreset]   = useState<'2024'|'blank'|'custom'>('2024');
+  const [preset, setPreset]   = useState<'2024'|'polling2026'|'blank'|'custom'>('2024');
   const [natPcts, setNatPcts] = useState<Record<RoPartyId, number>>(() => ({ ...RO_VOTE_PCT_2024 }));
 
-  function load2024()  { setNatPcts({ ...RO_VOTE_PCT_2024 }); setPreset('2024'); resetSim(); }
+  function load2024()        { setNatPcts({ ...RO_VOTE_PCT_2024 }); setPreset('2024'); resetSim(); }
+  function loadPolling2026() { setNatPcts({ ...RO_VOTE_PCT_2026_POLLING }); setPreset('polling2026'); resetSim(); }
   function loadBlank() {
     setNatPcts(Object.fromEntries(RO_PARTIES.map(p => [p.id, 100 / RO_PARTIES.length])) as Record<RoPartyId, number>);
     setPreset('blank'); resetSim();
@@ -1116,8 +1124,9 @@ export default function RomaniaApp() {
 
         <div ref={headerScrollRef} className="flex-1 min-w-0 flex items-center gap-2 px-2 overflow-x-auto scroll-none">
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={load2024}  className={preset==='2024'  ? btnGold : btnMuted}>2024 Results</button>
-          <button onClick={loadBlank} className={preset==='blank' ? btnGold : btnMuted}>Blank Map</button>
+          <button onClick={load2024}        className={preset==='2024'        ? btnGold : btnMuted}>2024 Results</button>
+          <button onClick={loadPolling2026} className={preset==='polling2026' ? btnGold : btnMuted}>2026 Polling</button>
+          <button onClick={loadBlank}       className={preset==='blank'       ? btnGold : btnMuted}>Blank Map</button>
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
           <button onClick={() => setSimOpen(v => !v)} className={simOpen ? btnActive : btnMuted}>▶ Simulation</button>
           <button onClick={() => setBubbleMap(v => !v)}
