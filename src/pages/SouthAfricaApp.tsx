@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, useMap } from 'react-leaflet';
 import L from 'leaflet';
@@ -10,31 +10,33 @@ type SaPartyId = 'ANC' | 'DA' | 'MK' | 'EFF' | 'IFP' | 'PA' | 'FFP' | 'ASA' | 'U
 type SaParty = { id: SaPartyId; name: string; fullName: string; color: string; seats2024: number; leader: string; wikiTitle?: string };
 
 const SA_PARTIES: SaParty[] = [
-  { id: 'ANC',  name: 'ANC',      fullName: 'African National Congress',          color: '#007A4D', seats2024: 159, leader: 'Cyril Ramaphosa',     wikiTitle: 'Cyril_Ramaphosa' },
-  { id: 'DA',   name: 'DA',       fullName: 'Democratic Alliance',                color: '#1565C0', seats2024:  87, leader: 'John Steenhuisen',    wikiTitle: 'John_Steenhuisen' },
-  { id: 'MK',   name: 'MK',       fullName: 'uMkhonto we Sizwe Party',            color: '#B71C1C', seats2024:  58, leader: 'Jacob Zuma',          wikiTitle: 'Jacob_Zuma' },
-  { id: 'EFF',  name: 'EFF',      fullName: 'Economic Freedom Fighters',          color: '#E53935', seats2024:  39, leader: 'Julius Malema',       wikiTitle: 'Julius_Malema' },
-  { id: 'IFP',  name: 'IFP',      fullName: 'Inkatha Freedom Party',              color: '#6A1B9A', seats2024:  17, leader: 'Velenkosini Hlabisa', wikiTitle: 'Velenkosini_Hlabisa' },
-  { id: 'PA',   name: 'PA',       fullName: 'Patriotic Alliance',                 color: '#E65100', seats2024:   9, leader: 'Gayton McKenzie',     wikiTitle: 'Gayton_McKenzie' },
-  { id: 'FFP',  name: 'FF+',      fullName: 'Freedom Front Plus',                 color: '#FF8F00', seats2024:   6, leader: 'Pieter Groenewald',   wikiTitle: 'Pieter_Groenewald' },
-  { id: 'ASA',  name: 'ActionSA', fullName: 'ActionSA',                           color: '#00ACC1', seats2024:   6, leader: 'Herman Mashaba',      wikiTitle: 'Herman_Mashaba' },
-  { id: 'UDM',  name: 'UDM',      fullName: 'United Democratic Movement',         color: '#558B2F', seats2024:   3, leader: 'Bantu Holomisa',      wikiTitle: 'Bantu_Holomisa' },
-  { id: 'ACDP', name: 'ACDP',     fullName: 'African Christian Democratic Party', color: '#1A237E', seats2024:   3, leader: 'Kenneth Meshoe',      wikiTitle: 'Kenneth_Meshoe' },
-  { id: 'RISE', name: 'Rise',     fullName: 'Rise Mzansi',                        color: '#00838F', seats2024:   2, leader: 'Songezo Zibi',        wikiTitle: 'Songezo_Zibi' },
-  { id: 'ATM',  name: 'ATM',      fullName: 'African Transformation Movement',    color: '#880E4F', seats2024:   2, leader: 'Vuyo Zungula',        wikiTitle: 'Vuyo_Zungula' },
-  { id: 'NCC',  name: 'NCC',      fullName: 'National Coloured Congress',         color: '#78909C', seats2024:   2, leader: 'Nic Koornhof',        wikiTitle: undefined },
-  { id: 'AJ',   name: 'Al Jama-ah', fullName: 'Al Jama-ah',                      color: '#2E7D32', seats2024:   2, leader: 'Ganief Hendricks',    wikiTitle: 'Ganief_Hendricks' },
-  { id: 'BOSA', name: 'BOSA',     fullName: 'Build One South Africa',             color: '#0288D1', seats2024:   2, leader: 'Mmusi Maimane',       wikiTitle: 'Mmusi_Maimane' },
-  { id: 'GOOD', name: 'GOOD',     fullName: 'Good Party',                         color: '#43A047', seats2024:   1, leader: 'Patricia de Lille',   wikiTitle: 'Patricia_de_Lille' },
-  { id: 'PAC',  name: 'PAC',      fullName: 'Pan Africanist Congress',            color: '#9C27B0', seats2024:   1, leader: 'Narius Moloto',       wikiTitle: undefined },
-  { id: 'UAT',  name: 'UAT',      fullName: 'United Africans Transformation',     color: '#795548', seats2024:   1, leader: 'Mzwandile Maphanga',  wikiTitle: undefined },
+  // Leaders current as of May 2026
+  { id: 'ANC',  name: 'ANC',       fullName: 'African National Congress',          color: '#007A4D', seats2024: 159, leader: 'Cyril Ramaphosa',     wikiTitle: 'Cyril_Ramaphosa' },
+  { id: 'DA',   name: 'DA',        fullName: 'Democratic Alliance',                color: '#1565C0', seats2024:  87, leader: 'John Steenhuisen',    wikiTitle: 'John_Steenhuisen' },
+  { id: 'MK',   name: 'MK',        fullName: 'uMkhonto we Sizwe Party',            color: '#B71C1C', seats2024:  58, leader: 'Jacob Zuma',          wikiTitle: 'Jacob_Zuma' },
+  { id: 'EFF',  name: 'EFF',       fullName: 'Economic Freedom Fighters',          color: '#E53935', seats2024:  39, leader: 'Julius Malema',       wikiTitle: 'Julius_Malema' },
+  { id: 'IFP',  name: 'IFP',       fullName: 'Inkatha Freedom Party',              color: '#6A1B9A', seats2024:  17, leader: 'Velenkosini Hlabisa', wikiTitle: 'Velenkosini_Hlabisa' },
+  { id: 'PA',   name: 'PA',        fullName: 'Patriotic Alliance',                 color: '#E65100', seats2024:   9, leader: 'Gayton McKenzie',     wikiTitle: 'Gayton_McKenzie' },
+  // FF+: Pieter Groenewald became NA Speaker (Jun 2024) → Willy Lubbe is now federal chair
+  { id: 'FFP',  name: 'FF+',       fullName: 'Freedom Front Plus',                 color: '#FF8F00', seats2024:   6, leader: 'Willy Lubbe',         wikiTitle: undefined },
+  { id: 'ASA',  name: 'ActionSA',  fullName: 'ActionSA',                           color: '#00ACC1', seats2024:   6, leader: 'Herman Mashaba',      wikiTitle: 'Herman_Mashaba' },
+  { id: 'UDM',  name: 'UDM',       fullName: 'United Democratic Movement',         color: '#558B2F', seats2024:   3, leader: 'Bantu Holomisa',      wikiTitle: 'Bantu_Holomisa' },
+  { id: 'ACDP', name: 'ACDP',      fullName: 'African Christian Democratic Party', color: '#1A237E', seats2024:   3, leader: 'Kenneth Meshoe',      wikiTitle: 'Kenneth_Meshoe' },
+  { id: 'RISE', name: 'Rise',      fullName: 'Rise Mzansi',                        color: '#00838F', seats2024:   2, leader: 'Songezo Zibi',        wikiTitle: 'Songezo_Zibi' },
+  { id: 'ATM',  name: 'ATM',       fullName: 'African Transformation Movement',    color: '#880E4F', seats2024:   2, leader: 'Vuyo Zungula',        wikiTitle: 'Vuyo_Zungula' },
+  { id: 'NCC',  name: 'NCC',       fullName: 'National Coloured Congress',         color: '#78909C', seats2024:   2, leader: 'Nic Koornhof',        wikiTitle: undefined },
+  { id: 'AJ',   name: 'Al Jama-ah',fullName: 'Al Jama-ah',                         color: '#2E7D32', seats2024:   2, leader: 'Ganief Hendricks',    wikiTitle: 'Ganief_Hendricks' },
+  { id: 'BOSA', name: 'BOSA',      fullName: 'Build One South Africa',             color: '#0288D1', seats2024:   2, leader: 'Mmusi Maimane',       wikiTitle: 'Mmusi_Maimane' },
+  { id: 'GOOD', name: 'GOOD',      fullName: 'Good Party',                         color: '#43A047', seats2024:   1, leader: 'Patricia de Lille',   wikiTitle: 'Patricia_de_Lille' },
+  { id: 'PAC',  name: 'PAC',       fullName: 'Pan Africanist Congress',            color: '#9C27B0', seats2024:   1, leader: 'Narius Moloto',       wikiTitle: undefined },
+  { id: 'UAT',  name: 'UAT',       fullName: 'United Africans Transformation',     color: '#795548', seats2024:   1, leader: 'Mzwandile Maphanga',  wikiTitle: undefined },
 ];
 
 const SA_PARTY_MAP = Object.fromEntries(SA_PARTIES.map(p => [p.id, p])) as Record<SaPartyId, SaParty>;
 const SA_TOTAL_SEATS = 400;
 const SA_MAJORITY = 201;
 
-// Official 2024 IEC national results (national ballot)
+// Official 2024 IEC national results
 const SA_VOTE_PCT_2024: Record<SaPartyId, number> = {
   ANC: 40.18, DA: 21.81, MK: 14.58, EFF: 9.52, IFP: 3.85, PA: 2.06,
   FFP: 1.36, ASA: 1.20, UDM: 0.49, ACDP: 0.60, RISE: 0.42, ATM: 0.40,
@@ -49,28 +51,49 @@ const SA_VOTE_RAW_2024: Record<SaPartyId, number> = {
 };
 const SA_GRAND_TOTAL_VOTES = 16_076_719;
 
-// Official 2024 seat allocation (used for baseline display)
+// Official 2024 seat allocation (total = list + regional)
 const SA_SEATS_2024: Record<SaPartyId, number> = {
   ANC: 159, DA: 87, MK: 58, EFF: 39, IFP: 17, PA: 9,
   FFP: 6,   ASA: 6, UDM: 3, ACDP: 3, RISE: 2, ATM: 2,
   NCC: 2,   AJ: 2,  BOSA: 2, GOOD: 1, PAC: 1, UAT: 1,
 };
 
+// ── Two-ballot system ─────────────────────────────────────────────────────────
+// 200 seats from National Compensatory Ballot (national list, purely proportional)
+// 200 seats from Regional Ballot (9 provinces, each apportioned by population)
+const SA_LIST_SEATS_TOTAL = 200;
+// SA_REG_SEATS_TOTAL = 200 — encoded in SA_REGIONAL_SEAT_QUOTA (sum = 200)
+
+// Regional seat quotas: 200 seats split by province population (59,054,000 total)
+const SA_REGIONAL_SEAT_QUOTA: Record<SaProvId, number> = {
+  GP: 51, KZN: 39, WC: 24, EC: 22, LP: 20, MP: 16, NC: 4, NW: 14, FS: 10,
+};
+
+// 2026 Social Research Foundation polling (Feb–Mar 2026, n=2222)
+// ANC 39, DA 28, MK 10, EFF 6, IFP 5 — others scaled proportionally to fill 12%
+const POLL_2026_PCTS: Record<SaPartyId, number> = {
+  ANC: 39.0, DA: 28.0, MK: 10.0, EFF: 6.0,  IFP: 5.0,
+  PA:   3.1, FFP:  2.0, ASA: 1.8, ACDP: 0.9, UDM: 0.7,
+  RISE: 0.6, BOSA: 0.6, ATM: 0.6, AJ:   0.4, NCC: 0.3,
+  PAC:  0.3, UAT:  0.3, GOOD: 0.4,
+};
+
 type SaProvId = 'GP' | 'KZN' | 'WC' | 'EC' | 'LP' | 'MP' | 'NC' | 'NW' | 'FS';
 type SaProvince = { id: SaProvId; name: string; pop: number; lat: number; lng: number; votes2024: number };
 
 const SA_PROVINCES: SaProvince[] = [
-  { id: 'GP',  name: 'Gauteng',        pop: 15_176_000, lat: -26.2, lng: 28.0, votes2024: 4_850_000 },
-  { id: 'KZN', name: 'KwaZulu-Natal',  pop: 11_514_000, lat: -29.1, lng: 30.7, votes2024: 3_600_000 },
-  { id: 'WC',  name: 'Western Cape',   pop:  7_052_000, lat: -33.2, lng: 21.9, votes2024: 2_450_000 },
-  { id: 'EC',  name: 'Eastern Cape',   pop:  6_498_000, lat: -32.3, lng: 26.4, votes2024: 1_900_000 },
-  { id: 'LP',  name: 'Limpopo',        pop:  5_928_000, lat: -23.4, lng: 29.4, votes2024: 1_600_000 },
-  { id: 'MP',  name: 'Mpumalanga',     pop:  4_679_000, lat: -25.6, lng: 30.5, votes2024: 1_380_000 },
-  { id: 'NC',  name: 'Northern Cape',  pop:  1_293_000, lat: -29.0, lng: 21.9, votes2024:   400_000 },
-  { id: 'NW',  name: 'North West',     pop:  4_027_000, lat: -26.5, lng: 25.6, votes2024: 1_100_000 },
-  { id: 'FS',  name: 'Free State',     pop:  2_887_000, lat: -28.5, lng: 26.8, votes2024:   850_000 },
+  { id: 'GP',  name: 'Gauteng',       pop: 15_176_000, lat: -26.2, lng: 28.0, votes2024: 4_850_000 },
+  { id: 'KZN', name: 'KwaZulu-Natal', pop: 11_514_000, lat: -29.1, lng: 30.7, votes2024: 3_600_000 },
+  { id: 'WC',  name: 'Western Cape',  pop:  7_052_000, lat: -33.2, lng: 21.9, votes2024: 2_450_000 },
+  { id: 'EC',  name: 'Eastern Cape',  pop:  6_498_000, lat: -32.3, lng: 26.4, votes2024: 1_900_000 },
+  { id: 'LP',  name: 'Limpopo',       pop:  5_928_000, lat: -23.4, lng: 29.4, votes2024: 1_600_000 },
+  { id: 'MP',  name: 'Mpumalanga',    pop:  4_679_000, lat: -25.6, lng: 30.5, votes2024: 1_380_000 },
+  { id: 'NC',  name: 'Northern Cape', pop:  1_293_000, lat: -29.0, lng: 21.9, votes2024:   400_000 },
+  { id: 'NW',  name: 'North West',    pop:  4_027_000, lat: -26.5, lng: 25.6, votes2024: 1_100_000 },
+  { id: 'FS',  name: 'Free State',    pop:  2_887_000, lat: -28.5, lng: 26.8, votes2024:   850_000 },
 ];
 const SA_PROV_MAP = Object.fromEntries(SA_PROVINCES.map(p => [p.id, p])) as Record<SaProvId, SaProvince>;
+
 
 const SA_PROV_RESULTS_2024: Record<SaProvId, Record<SaPartyId, number>> = {
   //         ANC    DA    MK    EFF   IFP   PA    FFP   ASA   UDM  ACDP  RISE  ATM   NCC   AJ    BOSA  GOOD  PAC   UAT
@@ -85,7 +108,10 @@ const SA_PROV_RESULTS_2024: Record<SaProvId, Record<SaPartyId, number>> = {
   FS:  { ANC:55.0, DA:15.0, MK:11.0, EFF:13.0, IFP:0.5,  PA:2.0, FFP:1.0, ASA:0.8, UDM:0.3, ACDP:0.3, RISE:0.3, ATM:0.4, NCC:0.1, AJ:0.1, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
 };
 
+// Left-Right ordering for hemicycle
+const SA_LR_ORDER: SaPartyId[] = ['EFF','ATM','PAC','MK','ANC','UDM','GOOD','AJ','NCC','RISE','BOSA','ASA','IFP','PA','ACDP','FFP','DA','UAT'];
 
+// ── Seat calculation (D'Hondt) ─────────────────────────────────────────────────
 function calcSeats(votePcts: Partial<Record<SaPartyId, number>>, totalSeats = SA_TOTAL_SEATS): Partial<Record<SaPartyId, number>> {
   const qualifying: Partial<Record<SaPartyId, number>> = {};
   let qualSum = 0;
@@ -135,6 +161,35 @@ function calcPartialSeats(natPcts: Record<SaPartyId, number>, declaredProvs: Set
   return calcSeats(norm);
 }
 
+/** Regional ballot: allocate 200 seats across 9 provinces by population quota, D'Hondt within each */
+function calcRegSeats(
+  natPcts: Record<SaPartyId, number>,
+  overrides?: Record<string, Record<SaPartyId, number>>,
+): Partial<Record<SaPartyId, number>> {
+  const totals: Partial<Record<SaPartyId, number>> = {};
+  for (const prov of SA_PROVINCES) {
+    const provPcts = overrides?.[prov.id] ?? calcProvVotes(natPcts, prov.id);
+    const provSeats = calcSeats(provPcts, SA_REGIONAL_SEAT_QUOTA[prov.id]);
+    for (const [id, n] of Object.entries(provSeats) as [SaPartyId, number][]) {
+      totals[id] = (totals[id] ?? 0) + n;
+    }
+  }
+  return totals;
+}
+
+/** Merge two seat maps (list + regional → total) */
+function mergeSeats(
+  a: Partial<Record<SaPartyId, number>>,
+  b: Partial<Record<SaPartyId, number>>,
+): Partial<Record<SaPartyId, number>> {
+  const result: Partial<Record<SaPartyId, number>> = {};
+  for (const p of SA_PARTIES) {
+    const sum = (a[p.id] ?? 0) + (b[p.id] ?? 0);
+    if (sum > 0) result[p.id] = sum;
+  }
+  return result;
+}
+
 function redistributePcts(current: Record<SaPartyId, number>, changedId: SaPartyId, newRaw: number, locks: Set<SaPartyId>): Record<SaPartyId, number> {
   const ids = Object.keys(current) as SaPartyId[];
   const lockedSum = ids.filter(id => locks.has(id) && id !== changedId).reduce((s, id) => s + (current[id] ?? 0), 0);
@@ -152,12 +207,9 @@ function partyColor(id: SaPartyId): string { return SA_PARTY_MAP[id]?.color ?? '
 
 function saRandNormal(): number {
   let u = 0, v = 0;
-  while (u === 0) u = Math.random(); while (v === 0) v = Math.random();
+  while (u === 0) u = Math.random();
+  while (v === 0) v = Math.random();
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
-function saBellCurveTimes(n: number, totalMs: number): number[] {
-  return Array.from({ length: n }, () => Math.max(0.02, Math.min(0.98, 0.5 + saRandNormal() * 0.18)))
-    .sort((a, b) => a - b).map(t => Math.round(t * totalMs));
 }
 
 function fmtN(n: number): string {
@@ -165,6 +217,7 @@ function fmtN(n: number): string {
   if (n >= 1_000) return Math.round(n / 1_000) + 'K';
   return String(n);
 }
+
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h[0]+h[0]+h[1]+h[1]+h[2]+h[2] : h;
@@ -172,17 +225,236 @@ function hexToRgba(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+// ── HSL colour helpers (port of Germany's getWkFill logic) ────────────────────
+function hexToHsl(hex: string): [number, number, number] {
+  const h = hex.replace('#', '');
+  const r = parseInt(h.slice(0,2),16)/255, g = parseInt(h.slice(2,4),16)/255, b = parseInt(h.slice(4,6),16)/255;
+  const max = Math.max(r,g,b), min = Math.min(r,g,b);
+  const l = (max + min) / 2;
+  if (max === min) return [0, 0, l];
+  const d = max - min;
+  const s = d / (1 - Math.abs(2*l - 1));
+  let hue: number;
+  if (max === r) hue = ((g - b) / d + (g < b ? 6 : 0));
+  else if (max === g) hue = (b - r) / d + 2;
+  else hue = (r - g) / d + 4;
+  return [hue * 60, s, l];
+}
+function hslToHex(h: number, s: number, l: number): string {
+  s = Math.max(0, Math.min(1, s)); l = Math.max(0, Math.min(1, l));
+  const c = (1 - Math.abs(2*l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  let r = 0, g = 0, b = 0;
+  if (h < 60) { r=c; g=x; } else if (h < 120) { r=x; g=c; }
+  else if (h < 180) { g=c; b=x; } else if (h < 240) { g=x; b=c; }
+  else if (h < 300) { r=x; b=c; } else { r=c; b=x; }
+  const toH = (n: number) => Math.round((n+m)*255).toString(16).padStart(2,'0');
+  return `#${toH(r)}${toH(g)}${toH(b)}`;
+}
+/** Winner-colour fill scaled by margin — identical logic to Germany's getWkFill */
+function getProvFill(color: string, margin: number, dark: boolean): string {
+  const t = Math.min(Math.max(margin / 30, 0), 1);
+  const [h, s] = hexToHsl(color);
+  const newL = dark ? 0.55 - t * 0.29 : 0.82 - t * 0.46;
+  return hslToHex(h, s, newL);
+}
+
 type ProvTooltipState = {
   x: number; y: number; name: string;
-  parties: { id: SaPartyId; pct: number }[];
+  parties: { id: SaPartyId; pct: number; raw: number }[];
   leader: SaPartyId | null;
 } | null;
 
-const SA_LR_ORDER: SaPartyId[] = ['EFF', 'ATM', 'PAC', 'MK', 'ANC', 'UDM', 'GOOD', 'AJ', 'NCC', 'RISE', 'BOSA', 'ASA', 'IFP', 'PA', 'ACDP', 'FFP', 'DA', 'UAT'];
+// ── Map controller (enforces smoothFactor:0 on zoom, like Germany) ────────────
+function enforceNoSmooth(layer: L.GeoJSON) {
+  layer.eachLayer((l) => { if ((l as L.Path).options) (l as L.Path & { options: { smoothFactor?: number } }).options.smoothFactor = 0; });
+}
+function MapController({ layerRef }: { layerRef: React.MutableRefObject<L.GeoJSON | null> }) {
+  const map = useMap();
+  useEffect(() => {
+    const onZoom = () => { if (layerRef.current) enforceNoSmooth(layerRef.current); };
+    map.on('zoomend', onZoom);
+    const ro = new ResizeObserver(() => map.invalidateSize());
+    ro.observe(map.getContainer());
+    return () => { map.off('zoomend', onZoom); ro.disconnect(); };
+  }, [map, layerRef]);
+  return null;
+}
 
-// ── Scoreboard tile ────────────────────────────────────────────────────────────
-function SaScoreboardTile({ partyId, seats, pct, rawVotes, isLeader, isWinner }: {
-  partyId: SaPartyId; seats: number; pct: number; rawVotes: number; isLeader: boolean; isWinner: boolean;
+// ── Choropleth: province GeoJSON, thin visible borders, coloured by winner ────
+function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides, dark }: {
+  natPcts: Record<SaPartyId, number>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  setTooltip: (t: ProvTooltipState) => void;
+  onSelect: (id: SaProvId) => void;
+  natPctsRef: React.MutableRefObject<Record<SaPartyId, number>>;
+  overrides?: Record<string, Record<SaPartyId, number>>;
+  declaredProvs?: Set<SaProvId>;
+  dark?: boolean;
+}) {
+  const map = useMap();
+  const layerRef = useRef<L.GeoJSON | null>(null);
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+
+  // Mutable refs so the style function always reads the latest values without
+  // needing to recreate the Leaflet layer on every data change.
+  const declaredProvsRef = useRef(declaredProvs);
+  const overridesRef     = useRef(overrides);
+  const darkRef          = useRef(dark);
+
+  const [geoData, setGeoData] = useState<GeoJSON.FeatureCollection | null>(null);
+  useEffect(() => {
+    fetch('/south-africa-province-outlines.geojson').then(r => r.json()).then(setGeoData).catch(() => {});
+  }, []);
+
+  // Stable style function — reads from mutable refs, never recreated
+  const getFeatureStyle = useCallback((feature: GeoJSON.Feature | undefined): L.PathOptions => {
+    const dk = darkRef.current ?? false;
+    // Thin, visible dark line between provinces (not white/invisible)
+    const borderColor = dk ? 'rgba(255,255,255,0.28)' : 'rgba(20,20,20,0.22)';
+    const undeclaredFill = dk ? '#1e2a3a' : '#d1d5db';
+    const provId = feature?.properties?.province_id as SaProvId | undefined;
+    if (!provId) return { fillColor: undeclaredFill, fillOpacity: 0.55, weight: 0.5, color: borderColor, opacity: 1 };
+    if (declaredProvsRef.current && !declaredProvsRef.current.has(provId)) {
+      return { fillColor: undeclaredFill, fillOpacity: 0.55, weight: 0.5, color: borderColor, opacity: 1 };
+    }
+    const rv = overridesRef.current?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
+    const sorted = (Object.entries(rv) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+    const winnerId = sorted[0]?.[0] as SaPartyId | undefined;
+    const baseColor = winnerId ? partyColor(winnerId) : '#888';
+    const margin = (sorted[0]?.[1] ?? 0) - (sorted[1]?.[1] ?? 0);
+    return { fillColor: getProvFill(baseColor, margin, dk), fillOpacity: 0.88, weight: 0.5, color: borderColor, opacity: 1 };
+  }, [natPctsRef]); // stable: reads everything else from refs
+
+  // ① CREATE layer once — only when geoData changes (not on slider moves!)
+  useEffect(() => {
+    if (!geoData) return;
+    if (layerRef.current) { layerRef.current.remove(); layerRef.current = null; }
+
+    const layer = L.geoJSON(geoData as GeoJSON.GeoJsonObject, {
+      ...(({ smoothFactor: 0 }) as unknown as object),
+      style: (feature) => getFeatureStyle(feature as GeoJSON.Feature),
+      onEachFeature: (feature, lyr) => {
+        const provId   = (feature as GeoJSON.Feature)?.properties?.province_id as SaProvId | undefined;
+        const provName = (feature as GeoJSON.Feature)?.properties?.name as string ?? (provId ?? '');
+
+        lyr.on('click', () => { if (provId) { setTooltip(null); onSelectRef.current(provId); } });
+
+        const buildTooltip = (e: L.LeafletMouseEvent) => {
+          if (!provId) return;
+          const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+          const provVotes = SA_PROV_MAP[provId]?.votes2024 ?? 0;
+          const cur = overridesRef.current?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
+          const parties = (Object.entries(cur) as [SaPartyId, number][])
+            .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6)
+            .map(([id, pct]) => ({ id, pct, raw: Math.round(pct / 100 * provVotes) }));
+          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: provName, parties, leader: parties[0]?.id ?? null });
+        };
+
+        lyr.on('mouseover', (e: L.LeafletMouseEvent) => {
+          if (lyr instanceof L.Path) lyr.setStyle({ fillOpacity: 0.98, weight: 1.2 });
+          buildTooltip(e);
+        });
+        lyr.on('mousemove', buildTooltip);
+        lyr.on('mouseout', () => { if (lyr instanceof L.Path) layer.resetStyle(lyr); setTooltip(null); });
+      },
+    }).addTo(map);
+
+    layerRef.current = layer;
+    return () => { layer.remove(); layerRef.current = null; };
+  }, [map, geoData]); // ← no natPcts/declaredProvs/overrides/dark here!
+
+  // ② UPDATE styles only — cheap setStyle() call, no layer teardown/rebuild
+  useEffect(() => {
+    declaredProvsRef.current = declaredProvs;
+    overridesRef.current     = overrides;
+    darkRef.current          = dark;
+    if (layerRef.current) {
+      layerRef.current.setStyle((f) => getFeatureStyle(f as GeoJSON.Feature));
+    }
+  }, [natPcts, declaredProvs, overrides, dark, getFeatureStyle]);
+
+  return null;
+}
+
+
+// ── Map view ───────────────────────────────────────────────────────────────────
+function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
+  natPcts: Record<SaPartyId, number>; onSelect: (id: SaProvId) => void;
+  dark: boolean; declaredProvs?: Set<SaProvId>;
+  overrides?: Record<string, Record<SaPartyId, number>>;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [tooltip, setTooltip] = useState<ProvTooltipState>(null);
+  const natPctsRef = useRef(natPcts);
+  const layerRef = useRef<L.GeoJSON | null>(null);
+  useEffect(() => { natPctsRef.current = natPcts; }, [natPcts]);
+
+  return (
+    <div ref={containerRef} className="relative w-full h-full">
+      <MapContainer center={[-29, 25]} zoom={5} minZoom={4} maxZoom={13}
+        style={{ width:'100%', height:'100%' }} zoomControl worldCopyJump={false}>
+        <TileLayer key={dark ? 'dark' : 'light'}
+          url={dark
+            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'}
+          attribution='&copy; OpenStreetMap &copy; CARTO'
+          subdomains="abcd" updateWhenZooming={false} updateWhenIdle maxZoom={20} />
+        <MapController layerRef={layerRef} />
+        {/* Choropleth always rendered */}
+        <SaChoroplethLayer natPcts={natPcts} containerRef={containerRef}
+          setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
+          declaredProvs={declaredProvs} overrides={overrides} dark={dark} />
+      </MapContainer>
+      {tooltip && (() => {
+        const cw = containerRef.current?.clientWidth ?? 9999;
+        const TW = 248; const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
+        const tt = {
+          bg: dark ? 'rgba(18,24,44,0.96)' : 'rgba(255,255,255,0.97)',
+          border: dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
+          shadow: dark ? '0 6px 28px rgba(0,0,0,0.5)' : '0 6px 28px rgba(0,0,0,0.12)',
+          title: dark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)',
+          body: dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.78)',
+          sub: dark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.40)',
+        };
+        return (
+          <div className="absolute pointer-events-none z-[1000]" style={{ left, top: Math.max(6, tooltip.y - 20), width: TW }}>
+            <div style={{ background:tt.bg, borderRadius:10, border:`1px solid ${tt.border}`, boxShadow:tt.shadow, backdropFilter:'blur(10px)', padding:'12px 14px' }}>
+              <div style={{ fontSize:13, fontWeight:700, color:tt.title }}>{tooltip.name}</div>
+              <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub, marginTop:2 }}>Provincial result · click to expand</div>
+              <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:5 }}>
+                {tooltip.parties.map(({ id, pct, raw }, i) => {
+                  const c = partyColor(id);
+                  return (
+                    <div key={id} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <span style={{ width:8, height:8, borderRadius:2, flexShrink:0, background:c }} />
+                      <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{SA_PARTY_MAP[id]?.name ?? id}</span>
+                      <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:c }}>{pct.toFixed(1)}%</span>
+                      <span style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub, minWidth:42, textAlign:'right' }}>{fmtN(raw)}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+      <div className="absolute bottom-2 right-2 text-[9.5px] text-ink-3 select-none z-[1000] font-mono">
+        Scroll to zoom · Click province to open
+      </div>
+    </div>
+  );
+}
+
+// ── Scoreboard tile — Germany dual-row style (NAT LIST + REGIONAL) ────────────
+const SaScoreboardTile = React.memo(function SaScoreboardTile({ partyId, listSeats, regSeats, listPct, regPct, listRaw, regRaw, isLeader, isWinner }: {
+  partyId: SaPartyId;
+  listSeats: number; regSeats: number;
+  listPct: number;   regPct: number;
+  listRaw: number;   regRaw: number;
+  isLeader: boolean; isWinner: boolean;
 }) {
   const party = SA_PARTY_MAP[partyId];
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
@@ -220,27 +492,49 @@ function SaScoreboardTile({ partyId, seats, pct, rawVotes, isLeader, isWinner }:
       </div>
       <span className="cand-leader-name" title={party.leader}>{party.leader.split(' ').pop()}</span>
       <span className="cand-party-abbrev">{party.name}</span>
-      <span className="cand-seats">{seats}</span>
+      {/* Total seats — large number */}
+      <span className="cand-seats">{listSeats + regSeats}</span>
       <span className="cand-party-name" title={party.fullName}>{party.fullName}</span>
+
+      {/* NAT LIST row (top, prominent) — mirrors Germany's LIST/Zweitstimme row */}
       <div style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:1 }}>
-        <span style={{ fontSize:6.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:600, color:hexToRgba(color, 0.48), letterSpacing:'0.10em', textTransform:'uppercase' }}>VOTES</span>
-        <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color }}>{pct.toFixed(1)}%</span>
+        <span style={{ fontSize:6.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:600, color:hexToRgba(color,0.48), letterSpacing:'0.10em', textTransform:'uppercase' }}>NAT LIST</span>
+        <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color }}>{listPct.toFixed(1)}%</span>
       </div>
-      <div style={{ width:'100%', textAlign:'right', marginBottom:3 }}>
-        <span className="cand-votes-full" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(color,0.65) }}>{rawVotes.toLocaleString()}</span>
-        <span className="cand-votes-compact" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(color,0.65) }}>{fmtN(rawVotes)}</span>
+      <div style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:2 }}>
+        <span style={{ fontSize:8, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color, opacity:0.75 }}>{listSeats}L</span>
+        <span className="cand-votes-full" style={{ fontSize:8, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(color,0.55) }}>{listRaw.toLocaleString()}</span>
+        <span className="cand-votes-compact" style={{ fontSize:8, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(color,0.55) }}>{fmtN(listRaw)}</span>
       </div>
+
+      {/* Separator */}
+      <div style={{ width:'100%', height:1, background:'var(--border-default,rgba(0,0,0,0.08))', marginBottom:2, opacity:0.6 }} />
+
+      {/* REGIONAL row (dimmed) — mirrors Germany's ERST/Erststimme row */}
+      <div style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:1, opacity:0.55 }}>
+        <span style={{ fontSize:6.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:600, color:hexToRgba(color,0.48), letterSpacing:'0.10em', textTransform:'uppercase' }}>REGIONAL</span>
+        <span style={{ fontSize:10, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color }}>{regPct.toFixed(1)}%</span>
+      </div>
+      <div style={{ width:'100%', display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:3, opacity:0.55 }}>
+        <span style={{ fontSize:8, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color }}>{regSeats}R</span>
+        <span className="cand-votes-full" style={{ fontSize:8, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(color,0.55) }}>{regRaw.toLocaleString()}</span>
+        <span className="cand-votes-compact" style={{ fontSize:8, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(color,0.55) }}>{fmtN(regRaw)}</span>
+      </div>
+
+      {/* Colour bar */}
       <div className="cand-bar-track" style={{ width:'100%', height:3, borderRadius:2, background:'var(--bar-track)' }}>
-        <div style={{ height:'100%', borderRadius:2, background:color, width:`${Math.min(pct/45*100,100)}%`, transition:'width 0.3s ease' }} />
+        <div style={{ height:'100%', borderRadius:2, background:color, width:`${Math.min(listPct/45*100,100)}%`, transition:'width 0.3s ease' }} />
       </div>
     </div>
   );
-}
+}); // React.memo — prevents re-renders when seats/pcts haven't changed
 
 // ── Scoreboard ─────────────────────────────────────────────────────────────────
-function SaScoreboard({ natPcts, simSeats, isBaseline }: {
-  natPcts: Record<SaPartyId, number>;
-  simSeats?: Partial<Record<SaPartyId, number>>;
+const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts, provOverrides, simTotalSeats, isBaseline }: {
+  natListPcts: Record<SaPartyId, number>;
+  natRegPcts: Record<SaPartyId, number>;
+  provOverrides?: Record<string, Record<SaPartyId, number>>;
+  simTotalSeats?: Partial<Record<SaPartyId, number>>;
   isBaseline?: boolean;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -250,283 +544,113 @@ function SaScoreboard({ natPcts, simSeats, isBaseline }: {
     el.addEventListener('wheel', handler, { passive: false }); return () => el.removeEventListener('wheel', handler);
   }, []);
 
-  const seats = useMemo(() => {
-    if (simSeats) return simSeats;
+  // Compute list seats (200) and regional seats (200) separately
+  const listSeatsMap = useMemo(() => {
+    if (isBaseline) {
+      // Approximate from official total: half list, half regional (proportional split)
+      const computed = calcSeats(SA_VOTE_PCT_2024, SA_LIST_SEATS_TOTAL);
+      return computed;
+    }
+    return calcSeats(natListPcts, SA_LIST_SEATS_TOTAL);
+  }, [natListPcts, isBaseline]);
+
+  const regSeatsMap = useMemo(() => {
+    if (isBaseline) return calcRegSeats(SA_VOTE_PCT_2024);
+    return calcRegSeats(natRegPcts, provOverrides);
+  }, [natRegPcts, provOverrides, isBaseline]);
+
+  const totalSeatsMap = useMemo(() => {
+    if (simTotalSeats) return simTotalSeats;
     if (isBaseline) return SA_SEATS_2024 as Partial<Record<SaPartyId, number>>;
-    return calcSeats(natPcts);
-  }, [simSeats, natPcts, isBaseline]);
-  const pctTotal = Object.values(natPcts).reduce((s, v) => s + (v ?? 0), 0);
+    return mergeSeats(listSeatsMap, regSeatsMap);
+  }, [simTotalSeats, listSeatsMap, regSeatsMap, isBaseline]);
+
+  const listPctTotal = Object.values(natListPcts).reduce((s, v) => s + v, 0);
+  const regPctTotal  = Object.values(natRegPcts).reduce((s, v) => s + v, 0);
+
   const sorted = useMemo(
-    () => SA_PARTIES.filter(p => (seats[p.id] ?? 0) > 0 || (natPcts[p.id] ?? 0) > 0)
-      .sort((a, b) => (seats[b.id] ?? 0) - (seats[a.id] ?? 0) || (natPcts[b.id] ?? 0) - (natPcts[a.id] ?? 0)),
-    [seats, natPcts],
+    () => SA_PARTIES
+      .filter(p => (totalSeatsMap[p.id] ?? 0) > 0 || (natListPcts[p.id] ?? 0) > 0)
+      .sort((a, b) => (totalSeatsMap[b.id] ?? 0) - (totalSeatsMap[a.id] ?? 0)
+                   || (natListPcts[b.id] ?? 0) - (natListPcts[a.id] ?? 0)),
+    [totalSeatsMap, natListPcts],
   );
+
   const leader = sorted[0]?.id ?? null;
-  const winner = leader && (seats[leader] ?? 0) >= SA_MAJORITY ? leader : null;
+  const winner = leader && (totalSeatsMap[leader] ?? 0) >= SA_MAJORITY ? leader : null;
 
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
           {sorted.map(party => {
-            const s = seats[party.id] ?? 0;
-            const pct = pctTotal > 0 ? (natPcts[party.id] ?? 0) / pctTotal * 100 : 0;
-            const rawVotes = isBaseline ? (SA_VOTE_RAW_2024[party.id] ?? 0) : Math.round((natPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
+            const lSeats = isBaseline
+              ? Math.round((SA_SEATS_2024[party.id] ?? 0) * SA_LIST_SEATS_TOTAL / SA_TOTAL_SEATS)
+              : (listSeatsMap[party.id] ?? 0);
+            const rSeats = isBaseline
+              ? (SA_SEATS_2024[party.id] ?? 0) - lSeats
+              : (regSeatsMap[party.id] ?? 0);
+            const listPct = listPctTotal > 0 ? (natListPcts[party.id] ?? 0) / listPctTotal * 100 : 0;
+            const regPct  = regPctTotal  > 0 ? (natRegPcts[party.id]  ?? 0) / regPctTotal  * 100 : 0;
+            const listRaw = isBaseline
+              ? Math.round((SA_VOTE_RAW_2024[party.id] ?? 0))
+              : Math.round((natListPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
+            const regRaw = isBaseline
+              ? Math.round((SA_VOTE_RAW_2024[party.id] ?? 0))
+              : Math.round((natRegPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
             return (
-              <SaScoreboardTile key={party.id} partyId={party.id} seats={s} pct={pct}
-                rawVotes={rawVotes} isLeader={party.id === leader && !winner} isWinner={party.id === winner} />
+              <SaScoreboardTile key={party.id} partyId={party.id}
+                listSeats={lSeats} regSeats={rSeats}
+                listPct={listPct} regPct={regPct}
+                listRaw={listRaw} regRaw={regRaw}
+                isLeader={party.id === leader && !winner}
+                isWinner={party.id === winner} />
             );
           })}
         </div>
       </div>
     </div>
   );
-}
+}); // React.memo
 
-// ── Map controller ─────────────────────────────────────────────────────────────
-function MapController() {
-  const map = useMap();
-  useEffect(() => {
-    const ro = new ResizeObserver(() => map.invalidateSize());
-    ro.observe(map.getContainer());
-    return () => ro.disconnect();
-  }, [map]);
-  return null;
-}
-
-// ── Province choropleth layer (9 merged province polygons) ────────────────────
-function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides, dark }: {
-  natPcts: Record<SaPartyId, number>;
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  setTooltip: (t: ProvTooltipState) => void;
-  onSelect: (id: SaProvId) => void;
-  natPctsRef: React.MutableRefObject<Record<SaPartyId, number>>;
-  overrides?: Record<string, Record<SaPartyId, number>>;
-  declaredProvs?: Set<SaProvId>;
-  dark?: boolean;
-}) {
-  const map = useMap();
-  const layerRef = useRef<L.GeoJSON | null>(null);
-  const onSelectRef = useRef(onSelect);
-  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
-
-  const [geoData, setGeoData] = useState<GeoJSON.FeatureCollection | null>(null);
-  useEffect(() => {
-    fetch('/south-africa-province-outlines.geojson').then(r => r.json()).then(setGeoData).catch(() => {});
-  }, []);
-
-  useEffect(() => {
-    if (!geoData) return;
-    if (layerRef.current) { layerRef.current.remove(); layerRef.current = null; }
-
-    const borderColor = dark ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.85)';
-    const undeclaredFill = dark ? '#1e2a3a' : '#d1d5db';
-
-    const layer = L.geoJSON(geoData as GeoJSON.GeoJsonObject, {
-      style: (feature) => {
-        const provId = (feature as GeoJSON.Feature)?.properties?.province_id as SaProvId | undefined;
-        if (!provId) return { fillColor: undeclaredFill, fillOpacity: 0.5, weight: 1.8, color: borderColor, opacity: 1 };
-        if (declaredProvs && !declaredProvs.has(provId)) {
-          return { fillColor: undeclaredFill, fillOpacity: 0.5, weight: 1.8, color: borderColor, opacity: 1 };
-        }
-        const rv = overrides?.[provId] ?? calcProvVotes(natPcts, provId);
-        const sorted = (Object.entries(rv) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
-        const winnerId = sorted[0]?.[0] as SaPartyId | undefined;
-        const color = winnerId ? partyColor(winnerId) : '#888';
-        const margin = (sorted[0]?.[1] ?? 0) - (sorted[1]?.[1] ?? 0);
-        const opacity = 0.45 + Math.min(margin / 40, 1) * 0.32;
-        return { fillColor: color, fillOpacity: opacity, weight: 1.8, color: borderColor, opacity: 1 };
-      },
-      onEachFeature: (feature, lyr) => {
-        const provId = (feature as GeoJSON.Feature)?.properties?.province_id as SaProvId | undefined;
-        const provName = (feature as GeoJSON.Feature)?.properties?.name ?? '';
-        lyr.on('click', () => { if (provId) { setTooltip(null); onSelectRef.current(provId); } });
-        lyr.on('mouseover', (e: L.LeafletMouseEvent) => {
-          if (lyr instanceof L.Path) lyr.setStyle({ fillOpacity: Math.min(((lyr.options.fillOpacity ?? 0.55) as number) + 0.20, 0.92), weight: 2.5 });
-          if (!provId) return;
-          const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
-          const cur = overrides?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
-          const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6).map(([id, pct]) => ({ id, pct }));
-          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: provName, parties, leader: parties[0]?.id ?? null });
-        });
-        lyr.on('mousemove', (e: L.LeafletMouseEvent) => {
-          if (!provId) return;
-          const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
-          const cur = overrides?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
-          const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6).map(([id, pct]) => ({ id, pct }));
-          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: provName, parties, leader: parties[0]?.id ?? null });
-        });
-        lyr.on('mouseout', () => { if (lyr instanceof L.Path) layer.resetStyle(lyr); setTooltip(null); });
-      },
-    }).addTo(map);
-
-    layerRef.current = layer;
-    return () => { layer.remove(); layerRef.current = null; };
-  }, [map, geoData, natPcts, declaredProvs, overrides, dark]);
-
-  return null;
-}
-
-// ── Province bubble layer ──────────────────────────────────────────────────────
-type BubbleEntry = { marker: L.CircleMarker; baseRadius: number };
-function zoomScale(zoom: number): number { return Math.max(0.40, Math.min(1.0, (zoom - 4) / (9 - 4))); }
-
-function SaBubbleLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides }: {
-  natPcts: Record<SaPartyId, number>;
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  setTooltip: (t: ProvTooltipState) => void;
-  onSelect: (id: SaProvId) => void;
-  natPctsRef: React.MutableRefObject<Record<SaPartyId, number>>;
-  overrides?: Record<string, Record<SaPartyId, number>>;
-  declaredProvs?: Set<SaProvId>;
-}) {
-  const map = useMap();
-  const bubblesRef = useRef<BubbleEntry[]>([]);
-  const onSelectRef = useRef(onSelect);
-  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
-
-  useEffect(() => {
-    const onZoom = () => {
-      const scale = zoomScale(map.getZoom());
-      for (const { marker, baseRadius } of bubblesRef.current) marker.setRadius(baseRadius * scale);
-    };
-    map.on('zoomend', onZoom); return () => { map.off('zoomend', onZoom); };
-  }, [map]);
-
-  useEffect(() => {
-    for (const { marker } of bubblesRef.current) marker.remove();
-    bubblesRef.current = [];
-    const scale = zoomScale(map.getZoom());
-    for (const prov of SA_PROVINCES) {
-      if (declaredProvs && !declaredProvs.has(prov.id)) continue;
-      const rv = overrides?.[prov.id] ?? calcProvVotes(natPcts, prov.id);
-      const sorted = (Object.entries(rv) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
-      if (!sorted.length) continue;
-      const [winId, winPct] = sorted[0];
-      const margin = winPct - (sorted[1]?.[1] ?? 0);
-      const baseRadius = 7 + Math.min(margin / 20, 1) * 17;
-      const color = partyColor(winId);
-      const marker = L.circleMarker([prov.lat, prov.lng] as L.LatLngExpression, {
-        radius: baseRadius * scale, color, fillColor: color, fillOpacity: 0.72, weight: 1.5, opacity: 0.9,
-      }).addTo(map);
-      marker.on('click', () => { setTooltip(null); onSelectRef.current(prov.id); });
-      marker.on('mousemove', (e: L.LeafletMouseEvent) => {
-        const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
-        const cur = overrides?.[prov.id] ?? calcProvVotes(natPctsRef.current, prov.id);
-        const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6).map(([id, pct]) => ({ id, pct }));
-        setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: prov.name, parties, leader: parties[0]?.id ?? null });
-      });
-      marker.on('mouseout', () => setTooltip(null));
-      bubblesRef.current.push({ marker, baseRadius });
-    }
-    return () => { for (const { marker } of bubblesRef.current) marker.remove(); bubblesRef.current = []; };
-  }, [map, natPcts, declaredProvs, overrides]);
-
-  return null;
-}
-
-// ── Map view ───────────────────────────────────────────────────────────────────
-function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides, mapMode }: {
-  natPcts: Record<SaPartyId, number>; onSelect: (id: SaProvId) => void;
-  dark: boolean; declaredProvs?: Set<SaProvId>;
-  overrides?: Record<string, Record<SaPartyId, number>>;
-  mapMode: 'choropleth' | 'bubbles';
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [tooltip, setTooltip] = useState<ProvTooltipState>(null);
-  const natPctsRef = useRef(natPcts);
-  useEffect(() => { natPctsRef.current = natPcts; }, [natPcts]);
-
-  return (
-    <div ref={containerRef} className="relative w-full h-full">
-      <MapContainer center={[-29, 25]} zoom={5} minZoom={4} maxZoom={13}
-        style={{ width:'100%', height:'100%' }} zoomControl worldCopyJump={false}>
-        <TileLayer key={dark ? 'dark' : 'light'}
-          url={dark
-            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'}
-          attribution='&copy; OpenStreetMap &copy; CARTO'
-          subdomains="abcd" updateWhenZooming={false} updateWhenIdle maxZoom={20} />
-        <MapController />
-        {mapMode === 'choropleth'
-          ? <SaChoroplethLayer natPcts={natPcts} containerRef={containerRef}
-              setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
-              declaredProvs={declaredProvs} overrides={overrides} dark={dark} />
-          : <SaBubbleLayer natPcts={natPcts} containerRef={containerRef}
-              setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
-              declaredProvs={declaredProvs} overrides={overrides} />
-        }
-      </MapContainer>
-      {tooltip && (() => {
-        const cw = containerRef.current?.clientWidth ?? 9999;
-        const TW = 220; const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
-        const tt = {
-          bg: dark ? 'rgba(18,24,44,0.96)' : 'rgba(255,255,255,0.97)',
-          border: dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)',
-          shadow: dark ? '0 6px 28px rgba(0,0,0,0.5)' : '0 6px 28px rgba(0,0,0,0.12)',
-          title: dark ? 'rgba(255,255,255,0.92)' : 'rgba(0,0,0,0.85)',
-          body: dark ? 'rgba(255,255,255,0.85)' : 'rgba(0,0,0,0.78)',
-        };
-        return (
-          <div className="absolute pointer-events-none z-[1000]" style={{ left, top: Math.max(6, tooltip.y - 20), width: TW }}>
-            <div style={{ background:tt.bg, borderRadius:10, border:`1px solid ${tt.border}`, boxShadow:tt.shadow, backdropFilter:'blur(10px)', padding:'12px 14px' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:tt.title }}>{tooltip.name}</div>
-              <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:dark?'rgba(255,255,255,0.40)':'rgba(0,0,0,0.42)', marginTop:2 }}>Provincial result · click to expand</div>
-              <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:6 }}>
-                {tooltip.parties.map(({ id, pct }, i) => {
-                  const c = partyColor(id);
-                  return (
-                    <div key={id} style={{ display:'flex', alignItems:'center', gap:7 }}>
-                      <span style={{ width:8, height:8, borderRadius:2, flexShrink:0, background:c }} />
-                      <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{SA_PARTY_MAP[id]?.name ?? id}</span>
-                      <span style={{ fontSize:12, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:c }}>{pct.toFixed(1)}%</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
-        );
-      })()}
-      <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono">
-        {mapMode === 'choropleth' ? 'Scroll to zoom · Click province to open' : 'Scroll to zoom · Click bubble to open'}
-      </div>
-    </div>
-  );
-}
-
-// ── Province panel (editable) ──────────────────────────────────────────────────
+// ── Province panel — WahlkreisPanel style (sliders + lock + edit + delta + ref) ─
 function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
   provId: SaProvId; natPcts: Record<SaPartyId, number>;
   onUpdate: (id: SaProvId, pcts: Record<SaPartyId, number>) => void;
   onClose: () => void; dark?: boolean;
   override?: Record<SaPartyId, number>;
 }) {
-  const initPcts = () => {
+  const initFromNat = useCallback((): Record<SaPartyId, number> => {
     if (override) return { ...override };
     const rv = calcProvVotes(natPcts, provId);
     return Object.fromEntries(SA_PARTIES.map(p => [p.id, rv[p.id] ?? 0])) as Record<SaPartyId, number>;
-  };
-  const [pcts, setPcts] = useState<Record<SaPartyId, number>>(initPcts);
-  const [panelLocks, setPanelLocks] = useState<Set<SaPartyId>>(new Set());
-  const [editId, setEditId] = useState<SaPartyId | null>(null);
-  const [editVal, setEditVal] = useState('');
+  }, [override, natPcts, provId]);
+
+  const [pcts, setPcts]           = useState<Record<SaPartyId, number>>(initFromNat);
+  const [locks, setLocks]         = useState<Set<SaPartyId>>(new Set());
+  const [editId, setEditId]       = useState<SaPartyId | null>(null);
+  const [editVal, setEditVal]     = useState('');
+  const [showRef, setShowRef]     = useState(false);
   const pctsRef = useRef(pcts);
   useEffect(() => { pctsRef.current = pcts; }, [pcts]);
 
+  // Re-init when province changes
   useEffect(() => {
-    if (override) setPcts({ ...override });
-    else {
-      const rv = calcProvVotes(natPcts, provId);
-      setPcts(Object.fromEntries(SA_PARTIES.map(p => [p.id, rv[p.id] ?? 0])) as Record<SaPartyId, number>);
-    }
-    setPanelLocks(new Set()); setEditId(null);
+    setPcts(initFromNat()); setLocks(new Set()); setEditId(null);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provId]);
 
   function applyChange(id: SaPartyId, val: number) {
-    const next = redistributePcts(pctsRef.current, id, val, panelLocks);
+    const next = redistributePcts(pctsRef.current, id, val, locks);
     pctsRef.current = next; setPcts(next); onUpdate(provId, next);
+  }
+  function toggleLock(id: SaPartyId) {
+    setLocks(prev => {
+      const next = new Set(prev);
+      // can't lock if only one unlocked left
+      if (!next.has(id) && sorted.filter(p => !next.has(p.id) && p.id !== id).length < 1) return prev;
+      next.has(id) ? next.delete(id) : next.add(id); return next;
+    });
   }
   function commitEdit(id: SaPartyId, raw: string) {
     const n = parseFloat(raw);
@@ -535,72 +659,137 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
   }
 
   const sorted = useMemo(() => SA_PARTIES.map(p => ({ ...p, pct: pcts[p.id] ?? 0 })).sort((a, b) => b.pct - a.pct), [pcts]);
-  const prov = SA_PROV_MAP[provId]; const winner = sorted[0];
+  const prov = SA_PROV_MAP[provId];
+  const winner = sorted[0];
+  const baseline2024 = SA_PROV_RESULTS_2024[provId];
+
   return (
-    <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
+    <aside className={`w-72 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
+      {/* Header */}
       <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0">
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
             <h2 className="text-[17px] font-bold text-ink leading-tight truncate">{prov?.name ?? provId}</h2>
-            <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">{override ? 'Custom result · click % to edit' : 'Estimated result · click % to edit'}</p>
+            <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">
+              {override ? 'Custom result' : 'Estimated result'} · click % to edit
+            </p>
           </div>
           <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
         </div>
         {winner && (
           <div className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-[4px] border" style={{ borderColor:`${winner.color}33` }}>
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ background:winner.color }} />
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: winner.color }} />
             <span className="text-[11px] font-medium text-ink flex-1 truncate">{winner.fullName}</span>
             <span className="text-[9px] font-mono text-ink-3">{winner.pct.toFixed(1)}%</span>
           </div>
         )}
       </div>
-      <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-2.5">
-        {sorted.filter(p => p.pct >= 0.1 || panelLocks.has(p.id)).map(p => {
-          const pct = pcts[p.id] ?? 0; const isLocked = panelLocks.has(p.id);
+
+      {/* Sliders */}
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
+        {sorted.filter(p => p.pct >= 0.1 || locks.has(p.id)).map(p => {
+          const pct = pcts[p.id] ?? 0;
+          const isLocked = locks.has(p.id);
+          const base2024 = baseline2024[p.id] ?? 0;
+          const delta = pct - base2024;
+          const rawVotes = Math.round(pct / 100 * (prov?.votes2024 ?? 0));
           return (
             <div key={p.id}>
               <div className="flex items-center gap-1 mb-0.5">
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background:p.color }} />
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: p.color }} />
                 <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{p.fullName}</span>
-                {editId === p.id
-                  ? <input type="number" min={0} max={100} step={0.1} value={editVal} autoFocus
-                      className="w-14 text-[11px] font-mono text-right border border-default rounded px-1 bg-canvas text-ink"
-                      onChange={e => setEditVal(e.target.value)}
-                      onBlur={() => commitEdit(p.id, editVal)}
-                      onKeyDown={e => { if (e.key==='Enter') commitEdit(p.id, editVal); if (e.key==='Escape') { setEditId(null); setEditVal(''); } }} />
-                  : <button onClick={() => { if (!isLocked) { setEditId(p.id); setEditVal(pct.toFixed(1)); } }}
-                      className={`text-[10px] font-mono font-semibold tabular-nums ${isLocked?'cursor-default':'hover:underline cursor-text'}`}
-                      style={{ color:p.color }}>{pct.toFixed(1)}%</button>
-                }
-                <button onClick={() => setPanelLocks(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })}
-                  className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked?'text-gold':'text-ink-3 hover:text-ink'}`} title={isLocked?'Unlock':'Lock'}>
+                {/* Lock */}
+                <button onClick={() => toggleLock(p.id)} title={isLocked ? 'Unlock' : 'Lock'}
+                  className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked ? 'text-gold' : 'text-ink-3 hover:text-ink'}`}>
                   {isLocked
                     ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                    : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
+                    : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
                   }
                 </button>
+                {/* Editable % — click to enter exact value */}
+                {editId === p.id ? (
+                  <input type="number" min={0} max={100} step={0.1} value={editVal} autoFocus
+                    className="w-12 h-5 text-[10px] font-mono font-semibold tabular-nums text-right px-1 rounded border border-default focus:outline-none focus:border-ink-3 bg-white text-ink-2"
+                    onChange={e => setEditVal(e.target.value)}
+                    onBlur={() => commitEdit(p.id, editVal)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit(p.id, editVal); } if (e.key === 'Escape') { setEditId(null); setEditVal(''); } }} />
+                ) : (
+                  <span onClick={() => { if (!isLocked) { setEditId(p.id); setEditVal(pct.toFixed(1)); } }}
+                    className="text-[10px] font-mono font-semibold text-ink-2 tabular-nums min-w-[38px] text-right leading-none"
+                    style={{ cursor: isLocked ? 'default' : 'text', color: p.color }}>
+                    {pct.toFixed(1)}%
+                  </span>
+                )}
               </div>
+              {/* party-slider (Germany design) */}
               <input type="range" min={0} max={75} step={0.1} value={pct} disabled={isLocked}
                 onChange={e => applyChange(p.id, parseFloat(e.target.value))}
-                className="br-party-slider w-full"
-                style={{ '--party-color': p.color, '--pct': `${(pct/75)*100}%` } as React.CSSProperties} />
+                className="party-slider w-full"
+                style={{ '--party-color': p.color, '--pct': `${(pct / 75) * 100}%` } as React.CSSProperties} />
+              {/* Delta vs 2024 + raw votes */}
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[8px] font-mono tabular-nums text-ink-3">{fmtN(rawVotes)} votes</span>
+                {Math.abs(delta) > 0.05 && (
+                  <span className={`text-[8px] font-mono tabular-nums ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {delta > 0 ? '+' : ''}{delta.toFixed(1)}pp
+                  </span>
+                )}
+              </div>
             </div>
           );
         })}
+
+        {/* Reference section (2024 baseline) */}
+        <div className="pt-2 border-t border-default">
+          <button onClick={() => setShowRef(v => !v)}
+            className="flex items-center gap-1.5 w-full text-left text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 hover:text-ink transition-colors mb-1">
+            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+              <path d={showRef ? 'M1 6l3-4 3 4' : 'M1 2l3 4 3-4'} stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            2024 Reference
+          </button>
+          {showRef && (
+            <div className="space-y-1 mt-1.5">
+              {[...SA_PARTIES].sort((a, b) => (baseline2024[b.id] ?? 0) - (baseline2024[a.id] ?? 0))
+                .filter(p => (baseline2024[p.id] ?? 0) >= 0.1)
+                .map(p => {
+                  const refPct = baseline2024[p.id] ?? 0;
+                  const curPct = pcts[p.id] ?? 0;
+                  const d = curPct - refPct;
+                  return (
+                    <div key={p.id} className="flex items-center gap-1.5">
+                      <span style={{ width:6, height:6, borderRadius:1, background:p.color, flexShrink:0, display:'inline-block' }} />
+                      <span className="text-[9px] text-ink-3 flex-1 truncate">{p.name}</span>
+                      <span className="text-[9px] font-mono text-ink-3 tabular-nums">{refPct.toFixed(1)}%</span>
+                      {Math.abs(d) > 0.05 && (
+                        <span className={`text-[8px] font-mono tabular-nums ${d > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                          {d > 0 ? '+' : ''}{d.toFixed(1)}
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+            </div>
+          )}
+        </div>
+
+        {/* Province stats + reset */}
         <div className="pt-2 border-t border-default space-y-2">
-          <div>
-            <div className="text-[8.5px] font-mono text-ink-3 uppercase tracking-wide mb-0.5">Population</div>
-            <div className="text-[11px] font-mono font-semibold text-ink">{prov?.pop.toLocaleString()}</div>
-          </div>
-          <div>
-            <div className="text-[8.5px] font-mono text-ink-3 uppercase tracking-wide mb-0.5">2024 Votes Cast</div>
-            <div className="text-[11px] font-mono font-semibold text-ink">{prov?.votes2024.toLocaleString()}</div>
+          <div className="grid grid-cols-2 gap-2">
+            <div>
+              <div className="text-[8px] font-mono text-ink-3 uppercase tracking-wide mb-0.5">Population</div>
+              <div className="text-[10px] font-mono font-semibold text-ink">{prov?.pop.toLocaleString()}</div>
+            </div>
+            <div>
+              <div className="text-[8px] font-mono text-ink-3 uppercase tracking-wide mb-0.5">2024 Votes</div>
+              <div className="text-[10px] font-mono font-semibold text-ink">{prov?.votes2024.toLocaleString()}</div>
+            </div>
           </div>
           {override && (
             <button onClick={() => {
               const rv = calcProvVotes(natPcts, provId);
               const reset = Object.fromEntries(SA_PARTIES.map(p => [p.id, rv[p.id] ?? 0])) as Record<SaPartyId, number>;
-              setPcts(reset); setPanelLocks(new Set()); onUpdate(provId, reset);
+              setPcts(reset); setLocks(new Set()); onUpdate(provId, reset);
             }} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
               Reset to Estimate
             </button>
@@ -611,8 +800,10 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, dark, override }: {
   );
 }
 
-// ── Parliament hemicycle ───────────────────────────────────────────────────────
-function SaParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: { seats: Partial<Record<SaPartyId, number>>; onClose: () => void; exiting?: boolean; dark?: boolean }) {
+// ── Parliament hemicycle — fixed 12-row geometry matching Germany ──────────────
+function SaParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
+  seats: Partial<Record<SaPartyId, number>>; onClose: () => void; exiting?: boolean; dark?: boolean;
+}) {
   const seatColors: string[] = [];
   const legend: { id: SaPartyId; count: number; color: string }[] = [];
   for (const id of SA_LR_ORDER) {
@@ -622,21 +813,31 @@ function SaParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: { seats:
     for (let i = 0; i < n; i++) seatColors.push(color);
   }
   const totalSeats = seatColors.length;
-  const W = 310, H = 180, cx = W/2, cy = H - 4, innerR = 52, rowSpacing = 9, rows = 6;
+
+  // Geometry — 12 rows like Germany (innerR=58, rowSpacing=8, seatR=2.7)
+  const W = 310, H = 178, cx = W / 2, cy = H - 5;
+  const innerR = 58, rowSpacing = 8, rows = 12, seatR = 2.7;
   const arcLengths = Array.from({ length: rows }, (_, i) => Math.PI * (innerR + i * rowSpacing));
   const totalArc = arcLengths.reduce((s, v) => s + v, 0);
   const floors = arcLengths.map(a => Math.floor((a / totalArc) * SA_TOTAL_SEATS));
   const remainder = SA_TOTAL_SEATS - floors.reduce((s, v) => s + v, 0);
-  arcLengths.map((a, i) => ({ i, frac: (a/totalArc)*SA_TOTAL_SEATS - floors[i] }))
+  arcLengths.map((a, i) => ({ i, frac: (a / totalArc) * SA_TOTAL_SEATS - floors[i] }))
     .sort((a, b) => b.frac - a.frac).slice(0, remainder).forEach(({ i }) => floors[i]++);
+
   const rawPos: { x: number; y: number; θ: number; r: number }[] = [];
   for (let row = 0; row < rows; row++) {
-    const r = innerR + row * rowSpacing; const n = floors[row];
-    for (let j = 0; j < n; j++) { const θ = Math.PI * (n - j - 0.5) / n; rawPos.push({ x: cx + r*Math.cos(θ), y: cy - r*Math.sin(θ), θ, r }); }
+    const r = innerR + row * rowSpacing;
+    const n = floors[row];
+    for (let j = 0; j < n; j++) {
+      const θ = Math.PI * (n - j - 0.5) / n;
+      rawPos.push({ x: cx + r * Math.cos(θ), y: cy - r * Math.sin(θ), θ, r });
+    }
   }
+  // Sort: descending angle (left→right), then inner row first (like Germany)
   rawPos.sort((a, b) => b.θ - a.θ || a.r - b.r);
+
   return (
-    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting?'panel-exit-left':'panel-slide-left'}`}>
+    <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit-left' : 'panel-slide-left'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">National Assembly</h2>
@@ -649,10 +850,15 @@ function SaParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: { seats:
           ? <div className="flex items-center justify-center h-40 text-ink-3 text-[11px] font-mono px-4 text-center">Load results or run simulation first</div>
           : <>
             <div className="px-2.5 pt-5 pb-1">
-              <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display:'block' }}>
-                <line x1={cx} y1={cy-innerR+4} x2={cx} y2={cy-(innerR+(rows-1)*rowSpacing)-8} stroke="rgba(0,0,0,0.10)" strokeWidth="1" strokeDasharray="3,3" />
+              <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display: 'block' }}>
+                {/* Centre axis dashes */}
+                <line x1={cx} y1={cy - innerR + 4} x2={cx} y2={cy - (innerR + (rows-1)*rowSpacing) - 8}
+                  stroke="rgba(0,0,0,0.10)" strokeWidth="1" strokeDasharray="3,3" />
+                {/* Majority arc marker */}
+                <text x={cx + 2} y={cy - innerR - 4} fontSize="7" fontFamily="monospace" fill="rgba(0,0,0,0.28)" textAnchor="middle">201</text>
                 {rawPos.map(({ x, y }, i) => (
-                  <circle key={i} cx={x} cy={y} r={2.8} fill={i < seatColors.length ? seatColors[i] : (dark?'#374151':'#e5e7eb')} />
+                  <circle key={i} cx={x} cy={y} r={seatR}
+                    fill={i < seatColors.length ? seatColors[i] : (dark ? '#374151' : '#e5e7eb')} />
                 ))}
               </svg>
             </div>
@@ -676,19 +882,24 @@ function SaParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: { seats:
 
 // ── Coalition builder ──────────────────────────────────────────────────────────
 const SA_PRESET_COALITIONS: { name: string; emoji: string; parties: SaPartyId[] }[] = [
-  { name: 'GNU (Current)',     emoji: '🇿🇦', parties: ['ANC','DA','IFP','PA','FFP','ASA','UDM','RISE','ACDP','BOSA','GOOD','PAC'] },
-  { name: 'ANC + MK + EFF',   emoji: '✊',  parties: ['ANC','MK','EFF'] },
-  { name: 'DA-Led Opposition', emoji: '🔵', parties: ['DA','IFP','FFP','ASA','RISE','PA','BOSA'] },
-  { name: 'ANC + MK',         emoji: '🤝', parties: ['ANC','MK'] },
+  { name: 'GNU (Current)',      emoji: '🇿🇦', parties: ['ANC','DA','IFP','PA','FFP','ASA','UDM','RISE','ACDP','BOSA','GOOD','PAC'] },
+  { name: 'ANC + MK + EFF',    emoji: '✊',  parties: ['ANC','MK','EFF'] },
+  { name: 'DA-Led Opposition',  emoji: '🔵', parties: ['DA','IFP','FFP','ASA','RISE','PA','BOSA'] },
+  { name: 'ANC + MK',          emoji: '🤝', parties: ['ANC','MK'] },
 ];
 
-function SaCoalitionPanel({ seats, onClose, exiting, dark }: { seats: Partial<Record<SaPartyId, number>>; onClose: () => void; exiting?: boolean; dark?: boolean }) {
-  const [selected, setSelected] = useState<Set<SaPartyId>>(new Set(['ANC','DA','IFP','PA','FFP','ASA','UDM','RISE','ACDP','BOSA','GOOD','PAC']));
+function SaCoalitionPanel({ seats, onClose, exiting, dark }: {
+  seats: Partial<Record<SaPartyId, number>>; onClose: () => void; exiting?: boolean; dark?: boolean;
+}) {
+  const [selected, setSelected] = useState<Set<SaPartyId>>(
+    new Set(['ANC','DA','IFP','PA','FFP','ASA','UDM','RISE','ACDP','BOSA','GOOD','PAC'])
+  );
   const toggle = (id: SaPartyId) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const totalCoalSeats = [...selected].reduce((s, id) => s + (seats[id] ?? 0), 0);
   const hasMajority = totalCoalSeats >= SA_MAJORITY;
+
   return (
-    <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
+    <aside className={`w-72 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Coalition Builder</h2>
@@ -733,7 +944,8 @@ function SaCoalitionPanel({ seats, onClose, exiting, dark }: { seats: Partial<Re
           <span className="text-[20px] font-black font-mono" style={{ color: hasMajority ? '#16a34a' : '#ef4444' }}>{totalCoalSeats}</span>
         </div>
         <div className="mt-1 h-2 rounded-full bg-black/8 overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-300" style={{ width:`${Math.min(totalCoalSeats/SA_TOTAL_SEATS*100,100)}%`, background: hasMajority ? '#16a34a' : '#ef4444' }} />
+          <div className="h-full rounded-full transition-all duration-300"
+            style={{ width:`${Math.min(totalCoalSeats/SA_TOTAL_SEATS*100,100)}%`, background: hasMajority ? '#16a34a' : '#ef4444' }} />
         </div>
         <div className={`mt-1.5 text-[9px] font-mono text-center font-bold ${hasMajority ? 'text-emerald-600' : 'text-red-500'}`}>
           {hasMajority ? `✓ MAJORITY (need ${SA_MAJORITY})` : `✗ ${SA_MAJORITY - totalCoalSeats} seats short of majority`}
@@ -743,13 +955,606 @@ function SaCoalitionPanel({ seats, onClose, exiting, dark }: { seats: Partial<Re
   );
 }
 
+// ── Breakdown panel — per-province results table + national seat bar ───────────
+function SaBreakdownPanel({ natPcts, displaySeats, onClose, exiting, dark }: {
+  natPcts: Record<SaPartyId, number>;
+  displaySeats: Partial<Record<SaPartyId, number>>;
+  onClose: () => void; exiting?: boolean; dark?: boolean;
+}) {
+  const seatsSorted = SA_PARTIES
+    .filter(p => (displaySeats[p.id] ?? 0) > 0)
+    .sort((a, b) => (displaySeats[b.id] ?? 0) - (displaySeats[a.id] ?? 0));
+  const totalDisplayed = seatsSorted.reduce((s, p) => s + (displaySeats[p.id] ?? 0), 0);
+
+  // Majority line position
+  const majPct = (SA_MAJORITY / SA_TOTAL_SEATS) * 100;
+
+  return (
+    <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+      {/* Header */}
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h2 className="text-[13px] font-bold text-ink leading-none">Province Breakdown</h2>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{SA_TOTAL_SEATS} seats · majority {SA_MAJORITY}</div>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      {/* National seat bar */}
+      <div className="px-3.5 py-3 border-b border-default shrink-0">
+        <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-2">
+          National Assembly — {totalDisplayed} / {SA_TOTAL_SEATS} seats
+        </div>
+        {/* Stacked seat bar */}
+        <div className="relative h-5 rounded overflow-hidden flex gap-px">
+          {seatsSorted.map(p => (
+            <div key={p.id}
+              style={{ flex: displaySeats[p.id] ?? 0, background: p.color, minWidth: 0 }}
+              title={`${p.name}: ${displaySeats[p.id]}`} />
+          ))}
+          {/* Majority marker */}
+          <div className="absolute top-0 bottom-0 w-px bg-white/80 z-10"
+            style={{ left: `${majPct}%` }} />
+          <div className="absolute top-0 text-[7px] font-mono text-white/80 font-bold z-10"
+            style={{ left: `${majPct + 0.5}%` }}>201</div>
+        </div>
+        {/* Mini legend */}
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+          {seatsSorted.map(p => (
+            <div key={p.id} className="flex items-center gap-1">
+              <div style={{ width:6, height:6, borderRadius:1, background:p.color, flexShrink:0 }} />
+              <span className="text-[8px] font-mono text-ink-3">{p.name}</span>
+              <span className="text-[8px] font-mono font-bold text-ink">{displaySeats[p.id]}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Province rows */}
+      <div className="flex-1 overflow-y-auto thin-scroll divide-y divide-default">
+        {SA_PROVINCES.map(prov => {
+          const rv = calcProvVotes(natPcts, prov.id);
+          const sorted = (Object.entries(rv) as [SaPartyId, number][])
+            .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+          const winnerId  = sorted[0]?.[0] as SaPartyId;
+          const winPct    = sorted[0]?.[1] ?? 0;
+          const runner1Id = sorted[1]?.[0] as SaPartyId;
+          const runner1Pct= sorted[1]?.[1] ?? 0;
+          const runner2Id = sorted[2]?.[0] as SaPartyId;
+          const runner2Pct= sorted[2]?.[1] ?? 0;
+          const margin    = winPct - runner1Pct;
+          const winColor  = winnerId ? partyColor(winnerId) : '#888';
+
+          return (
+            <div key={prov.id} className="px-3.5 py-3">
+              {/* Province name + votes */}
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-[11px] font-semibold text-ink">{prov.name}</span>
+                <span className="text-[8px] font-mono text-ink-3">{(prov.votes2024 / 1_000_000).toFixed(2)}M votes</span>
+              </div>
+              {/* Winner row */}
+              <div className="flex items-center gap-2 mb-1">
+                <div style={{ width:10, height:10, borderRadius:2, background:winColor, flexShrink:0 }} />
+                <span className="text-[11px] font-bold" style={{ color: winColor }}>
+                  {SA_PARTY_MAP[winnerId]?.name ?? '—'}
+                </span>
+                <span className="text-[11px] font-mono font-bold" style={{ color: winColor }}>
+                  {winPct.toFixed(1)}%
+                </span>
+                <span className="text-[8.5px] font-mono text-ink-3 ml-auto">+{margin.toFixed(1)}pp</span>
+              </div>
+              {/* Runner-ups */}
+              <div className="flex items-center gap-4">
+                {[{ id: runner1Id, pct: runner1Pct }, { id: runner2Id, pct: runner2Pct }]
+                  .filter(x => x.id)
+                  .map(({ id, pct }) => (
+                  <div key={id} className="flex items-center gap-1">
+                    <span style={{ width:6, height:6, borderRadius:1, background:partyColor(id), flexShrink:0, display:'inline-block' }} />
+                    <span className="text-[8.5px] font-mono text-ink-3">{SA_PARTY_MAP[id]?.name}</span>
+                    <span className="text-[8.5px] font-mono text-ink-3">{pct.toFixed(1)}%</span>
+                  </div>
+                ))}
+              </div>
+              {/* Win margin bar */}
+              <div className="mt-1.5 h-1 rounded-full overflow-hidden"
+                style={{ background: dark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }}>
+                <div className="h-full rounded-full transition-all duration-300"
+                  style={{ width:`${Math.min(winPct / 70 * 100, 100)}%`, background: winColor }} />
+              </div>
+            </div>
+          );
+        })}
+        <div className="px-3.5 py-3">
+          <p className="text-[9px] font-mono text-ink-3 leading-relaxed">
+            Provincial results are estimated by applying the national swing to 2024 IEC baseline figures.
+            Click any province on the map to see the full breakdown and adjust sliders.
+          </p>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+// ── Simulation panel — Germany DeSimulationPanel style ────────────────────────
+function SaSimulationPanel({ onStart, onClose, simRunning, simProgress, stopSim, natPcts, activeParties, dark }: {
+  onStart: (pcts: Record<SaPartyId, number>, durationMs: number) => void;
+  onClose: () => void;
+  simRunning: boolean;
+  simProgress: number;
+  stopSim: () => void;
+  natPcts: Record<SaPartyId, number>;
+  activeParties: Set<SaPartyId>;
+  dark?: boolean;
+}) {
+  const [pcts, setPcts]       = useState<Record<SaPartyId, number>>(() => ({ ...natPcts }));
+  const [locks, setLocks]     = useState<Set<SaPartyId>>(new Set());
+  const [editId, setEditId]   = useState<SaPartyId | null>(null);
+  const [editVal, setEditVal] = useState('');
+  const [duration, setDuration] = useState(60_000); // 1 minute default
+
+  const pctsRef  = useRef(pcts);
+  const locksRef = useRef(locks);
+  useEffect(() => { pctsRef.current = pcts; }, [pcts]);
+  useEffect(() => { locksRef.current = locks; }, [locks]);
+
+  // Sync when parent's activeParties or natPcts changes (e.g. preset switch or party toggled)
+  useEffect(() => {
+    setPcts(prev => {
+      const next = { ...prev };
+      for (const p of SA_PARTIES) {
+        if (!activeParties.has(p.id)) next[p.id] = 0;
+        else if ((natPcts[p.id] ?? 0) !== (prev[p.id] ?? 0)) next[p.id] = natPcts[p.id] ?? 0;
+      }
+      return next;
+    });
+    setLocks(prev => { const n = new Set(prev); for (const id of [...n]) { if (!activeParties.has(id)) n.delete(id); } return n; });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeParties]);
+
+  // Only count active parties for sum check
+  const pctSum = useMemo(
+    () => SA_PARTIES.filter(p => activeParties.has(p.id)).reduce((s, p) => s + (pcts[p.id] ?? 0), 0),
+    [pcts, activeParties],
+  );
+  const sumOk  = Math.abs(pctSum - 100) < 0.5;
+  const canPlay = sumOk && !simRunning;
+
+  // Only show active parties in slider list
+  const sorted = useMemo(
+    () => SA_PARTIES.filter(p => activeParties.has(p.id)).sort((a, b) => (pcts[b.id] ?? 0) - (pcts[a.id] ?? 0)),
+    [pcts, activeParties],
+  );
+
+  function applyChange(id: SaPartyId, val: number) {
+    // Also lock out inactive parties so their 0% stays 0%
+    const effectiveLocks = new Set([...locksRef.current, ...SA_PARTIES.map(p => p.id).filter(pid => !activeParties.has(pid))]);
+    const next = redistributePcts(pctsRef.current, id, val, effectiveLocks);
+    pctsRef.current = next; setPcts(next);
+  }
+  function toggleLock(id: SaPartyId) {
+    setLocks(prev => {
+      const next = new Set(prev);
+      if (!next.has(id) && sorted.filter(p => !next.has(p.id) && p.id !== id).length < 1) return prev;
+      next.has(id) ? next.delete(id) : next.add(id); return next;
+    });
+  }
+  function commitEdit(id: SaPartyId, raw: string) {
+    const n = parseFloat(raw);
+    if (!isNaN(n)) applyChange(id, Math.max(0, Math.min(100, n)));
+    setEditId(null); setEditVal('');
+  }
+
+  const DURATIONS = [
+    { label: '30s', ms: 30_000 }, { label: '1m', ms: 60_000 },
+    { label: '2m', ms: 120_000 }, { label: '5m', ms: 300_000 },
+  ];
+
+  return (
+    <aside className={`w-72 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
+      {/* Header */}
+      <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0">
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[17px] font-bold text-ink leading-tight">Election Night</h1>
+            <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">South Africa Simulation</p>
+          </div>
+          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-4">
+        {/* Vote share sliders */}
+        <div>
+          <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-ink-3 mb-2">
+            Vote Shares
+          </div>
+          <div className="space-y-3">
+            {sorted.map(party => {
+              const pct = pcts[party.id] ?? 0;
+              const base = SA_VOTE_PCT_2024[party.id] ?? 0;
+              const delta = pct - base;
+              const isLocked = locks.has(party.id);
+              const color = partyColor(party.id);
+              const rawVotes = Math.round(pct / 100 * SA_GRAND_TOTAL_VOTES);
+              return (
+                <div key={party.id}>
+                  <div className="flex items-center gap-1 mb-0.5">
+                    <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                    <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{party.fullName}</span>
+                    {/* Lock */}
+                    <button onClick={() => toggleLock(party.id)} title={isLocked ? 'Unlock' : 'Lock'}
+                      className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked ? 'text-gold' : 'text-ink-3 hover:text-ink'}`}>
+                      {isLocked
+                        ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
+                        : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" stroke="currentColor" strokeWidth="1.2" fill="none"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
+                      }
+                    </button>
+                    {/* Editable % */}
+                    {editId === party.id ? (
+                      <input type="number" min={0} max={100} step={0.1} value={editVal} autoFocus
+                        className="w-12 h-5 text-[10px] font-mono font-semibold tabular-nums text-right px-1 rounded border border-default focus:outline-none focus:border-ink-3 bg-white text-ink-2"
+                        onChange={e => setEditVal(e.target.value)}
+                        onBlur={() => commitEdit(party.id, editVal)}
+                        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit(party.id, editVal); } if (e.key === 'Escape') { setEditId(null); setEditVal(''); } }} />
+                    ) : (
+                      <span onClick={() => { if (!isLocked) { setEditId(party.id); setEditVal(pct.toFixed(1)); } }}
+                        className="text-[10px] font-mono font-semibold tabular-nums min-w-[38px] text-right leading-none"
+                        style={{ color, cursor: isLocked ? 'default' : 'text' }}>
+                        {pct.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
+                  <input type="range" min={0} max={60} step={0.1} value={pct} disabled={isLocked}
+                    onChange={e => applyChange(party.id, parseFloat(e.target.value))}
+                    className="party-slider w-full"
+                    style={{ '--party-color': color, '--pct': `${(pct / 60) * 100}%` } as React.CSSProperties} />
+                  <div className="flex items-center justify-between mt-0.5">
+                    <span className="text-[8px] font-mono tabular-nums text-ink-3">{fmtN(rawVotes)} votes</span>
+                    {Math.abs(delta) > 0.05 && (
+                      <span className={`text-[8px] font-mono tabular-nums ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                        {delta > 0 ? '+' : ''}{delta.toFixed(1)}pp vs 2024
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {/* Sum check */}
+          <div className={`text-[8.5px] font-mono font-bold text-right pt-2 border-t border-default mt-2 ${sumOk ? 'text-emerald-600' : 'text-red-500'}`}>
+            Total: {pctSum.toFixed(1)}%
+          </div>
+        </div>
+
+        {/* Duration picker */}
+        <div>
+          <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-ink-3 mb-2">Duration</div>
+          <div className="flex gap-1.5">
+            {DURATIONS.map(d => (
+              <button key={d.label} onClick={() => setDuration(d.ms)} disabled={simRunning}
+                className={`flex-1 py-1.5 text-[9.5px] font-mono rounded-[4px] border transition-colors ${duration === d.ms ? 'bg-gold text-white border-gold' : 'border-default text-ink-3 hover:bg-hover disabled:opacity-40'}`}>
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        {simRunning && (
+          <div>
+            <div className="text-[9px] font-mono text-ink-3 mb-1">{simProgress} / {SA_PROVINCES.length} provinces declared</div>
+            <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.07)' }}>
+              <div className="h-full bg-emerald-500 transition-all duration-300"
+                style={{ width: `${(simProgress / SA_PROVINCES.length) * 100}%` }} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Run / Stop / Project */}
+      <div className="px-3.5 py-2.5 border-t border-default shrink-0 space-y-1.5">
+        {simRunning
+          ? <button onClick={stopSim}
+              className="w-full py-2 text-[11px] font-mono font-bold rounded-[4px] bg-red-600 text-white hover:bg-red-700 transition-colors">
+              ■ Stop Simulation
+            </button>
+          : <>
+              <button onClick={() => { if (canPlay) onStart(pcts, duration); }} disabled={!canPlay}
+                className={`w-full py-2 text-[11px] font-mono font-bold rounded-[4px] transition-colors ${canPlay ? 'bg-emerald-600 text-white hover:bg-emerald-700' : 'bg-ink/10 text-ink-3 cursor-not-allowed'}`}>
+                {!sumOk ? '⚠ Shares must sum to 100%' : '▶ Run Simulation'}
+              </button>
+            </>
+        }
+      </div>
+    </aside>
+  );
+}
+
+// ── National List Panel — like Germany's ZweitstimmenPanel ────────────────────
+function SaListPanel({ natListPcts, onListPctsChange, regSeatsMap, activeParties, onClose, onProject, exiting, dark }: {
+  natListPcts: Record<SaPartyId, number>;
+  onListPctsChange: (pcts: Record<SaPartyId, number>) => void;
+  regSeatsMap: Partial<Record<SaPartyId, number>>;
+  activeParties: Set<SaPartyId>;
+  onProject?: (pcts: Record<SaPartyId, number>) => void;
+  onClose: () => void; exiting?: boolean; dark?: boolean;
+}) {
+  const [pcts, setPcts]       = useState<Record<SaPartyId, number>>({ ...natListPcts });
+  const [editId, setEditId]   = useState<SaPartyId | null>(null);
+  const [editVal, setEditVal] = useState('');
+  const pctsRef = useRef(pcts);
+  useEffect(() => { pctsRef.current = pcts; }, [pcts]);
+
+  // Sync when parent changes (preset switch or activeParties change)
+  useEffect(() => { setPcts({ ...natListPcts }); }, [natListPcts]);
+
+  const listSeats = useMemo(() => calcSeats(pcts, SA_LIST_SEATS_TOTAL), [pcts]);
+
+  const pctTotal = Object.values(pcts).reduce((s, v) => s + v, 0);
+  // Only show active parties that have votes or are active
+  const sorted = useMemo(
+    () => SA_PARTIES.filter(p => activeParties.has(p.id))
+      .sort((a, b) => (pcts[b.id] ?? 0) - (pcts[a.id] ?? 0)),
+    [pcts, activeParties],
+  );
+
+  function applyChange(id: SaPartyId, val: number) {
+    // Lock out inactive parties so their 0% stays 0%
+    const inactiveLocks = new Set(SA_PARTIES.map(p => p.id).filter(pid => !activeParties.has(pid)));
+    const next = redistributePcts(pctsRef.current, id, val, inactiveLocks);
+    pctsRef.current = next; setPcts(next); onListPctsChange(next);
+  }
+  function commitEdit(id: SaPartyId, raw: string) {
+    const n = parseFloat(raw);
+    if (!isNaN(n)) applyChange(id, Math.max(0, Math.min(100, n)));
+    setEditId(null); setEditVal('');
+  }
+
+  // Grand totals for summary bar
+  const totalListSeats = Object.values(listSeats).reduce((s, v) => s + v, 0);
+  const totalRegSeats  = Object.values(regSeatsMap).reduce((s, v) => s + v, 0);
+
+  return (
+    <aside className={`w-72 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+      {/* Header */}
+      <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0">
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[15px] font-bold text-ink leading-tight">National List Seats</h2>
+            <p className="text-[9px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">200 seats · National Compensatory Ballot</p>
+          </div>
+          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
+        </div>
+        {/* Seat summary: L + R = T */}
+        <div className="mt-2.5 flex items-center justify-between px-2 py-1.5 rounded-[4px] bg-ink/4 border border-default">
+          <div className="text-center">
+            <div className="text-[16px] font-black font-mono text-ink">{totalListSeats}</div>
+            <div className="text-[7px] font-mono text-ink-3 uppercase tracking-wide">List</div>
+          </div>
+          <div className="text-ink-3 text-[12px] font-mono">+</div>
+          <div className="text-center">
+            <div className="text-[16px] font-black font-mono text-ink">{totalRegSeats}</div>
+            <div className="text-[7px] font-mono text-ink-3 uppercase tracking-wide">Regional</div>
+          </div>
+          <div className="text-ink-3 text-[12px] font-mono">=</div>
+          <div className="text-center">
+            <div className="text-[16px] font-black font-mono" style={{ color: (totalListSeats + totalRegSeats) >= SA_MAJORITY ? '#16a34a' : '#ef4444' }}>
+              {totalListSeats + totalRegSeats}
+            </div>
+            <div className="text-[7px] font-mono text-ink-3 uppercase tracking-wide">Total</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Party rows with slider + L+R=T breakdown */}
+      <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
+        {sorted.map(party => {
+          const pct = pcts[party.id] ?? 0;
+          const normPct = pctTotal > 0 ? pct / pctTotal * 100 : 0;
+          const l = listSeats[party.id] ?? 0;
+          const r = regSeatsMap[party.id] ?? 0;
+          const t = l + r;
+          const color = partyColor(party.id);
+          const base = SA_VOTE_PCT_2024[party.id] ?? 0;
+          const delta = pct - base;
+          const rawVotes = Math.round(normPct / 100 * SA_GRAND_TOTAL_VOTES);
+
+          return (
+            <div key={party.id}>
+              <div className="flex items-center gap-1 mb-0.5">
+                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
+                <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{party.fullName}</span>
+                {/* L+R=T seats */}
+                <span className="text-[8.5px] font-mono tabular-nums shrink-0" style={{ color }}>
+                  {l}+{r}={t}
+                </span>
+                {/* Editable % */}
+                {editId === party.id ? (
+                  <input type="number" min={0} max={100} step={0.1} value={editVal} autoFocus
+                    className="w-12 h-5 text-[10px] font-mono font-semibold tabular-nums text-right px-1 rounded border border-default focus:outline-none focus:border-ink-3 bg-white text-ink-2"
+                    onChange={e => setEditVal(e.target.value)}
+                    onBlur={() => commitEdit(party.id, editVal)}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); commitEdit(party.id, editVal); } if (e.key === 'Escape') { setEditId(null); setEditVal(''); } }} />
+                ) : (
+                  <span onClick={() => { setEditId(party.id); setEditVal(pct.toFixed(1)); }}
+                    className="text-[10px] font-mono font-semibold tabular-nums min-w-[38px] text-right leading-none cursor-text"
+                    style={{ color }}>
+                    {normPct.toFixed(1)}%
+                  </span>
+                )}
+              </div>
+              <input type="range" min={0} max={60} step={0.1} value={pct}
+                onChange={e => applyChange(party.id, parseFloat(e.target.value))}
+                className="party-slider w-full"
+                style={{ '--party-color': color, '--pct': `${(pct / 60) * 100}%` } as React.CSSProperties} />
+              <div className="flex items-center justify-between mt-0.5">
+                <span className="text-[8px] font-mono tabular-nums text-ink-3">{fmtN(rawVotes)} votes</span>
+                {Math.abs(delta) > 0.05 && (
+                  <span className={`text-[8px] font-mono tabular-nums ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
+                    {delta > 0 ? '+' : ''}{delta.toFixed(1)}pp
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="px-3.5 py-2.5 border-t border-default shrink-0 space-y-2">
+        {onProject && (() => {
+          const pctSum = Object.values(pcts).reduce((s, v) => s + v, 0);
+          const canProject = pctSum > 0.5;
+          return (
+            <button
+              onClick={() => {
+                if (!canProject) return;
+                // Normalize to 100% if needed (e.g. blank-map mode where sliders start at 0)
+                let projected: Record<SaPartyId, number> = { ...pcts };
+                if (Math.abs(pctSum - 100) > 0.5) {
+                  for (const p of SA_PARTIES) projected[p.id] = (pcts[p.id] ?? 0) / pctSum * 100;
+                }
+                onProject(projected);
+              }}
+              disabled={!canProject}
+              className={`w-full py-2 text-[11px] font-mono font-bold rounded-[4px] border transition-colors ${
+                canProject
+                  ? 'border-blue-500 text-blue-500 hover:bg-blue-500 hover:text-white'
+                  : 'border-default text-ink-3 cursor-not-allowed opacity-50'
+              }`}>
+              ⊞ Project Result
+            </button>
+          );
+        })()}
+        <p className="text-[8px] font-mono text-ink-3 text-center uppercase tracking-wide leading-relaxed">
+          National Compensatory Ballot · 200 seats · click % to edit exactly
+        </p>
+      </div>
+    </aside>
+  );
+}
+
 // ── Tutorial panel ─────────────────────────────────────────────────────────────
+// ── Parties panel — toggle which parties participate in the election ───────────
+function SaPartiesPanel({ activeParties, onToggle, onSetActive, natPcts, onClose, exiting, dark }: {
+  activeParties: Set<SaPartyId>;
+  onToggle: (id: SaPartyId) => void;
+  onSetActive: (ids: Set<SaPartyId>) => void;
+  natPcts: Record<SaPartyId, number>;
+  onClose: () => void; exiting?: boolean; dark?: boolean;
+}) {
+  const sorted = useMemo(
+    () => [...SA_PARTIES].sort((a, b) => (natPcts[b.id] ?? 0) - (natPcts[a.id] ?? 0)),
+    [natPcts],
+  );
+  const activeCount = activeParties.size;
+
+  return (
+    <aside className={`w-64 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
+      {/* Header */}
+      <div className="px-3.5 pt-3 pb-2.5 border-b border-default shrink-0">
+        <div className="flex items-start gap-2">
+          <div className="flex-1 min-w-0">
+            <h2 className="text-[14px] font-bold text-ink leading-tight">Parties</h2>
+            <p className="text-[9px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">
+              {activeCount} / {SA_PARTIES.length} active · click to toggle
+            </p>
+          </div>
+          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
+        </div>
+        {/* Quick-select buttons */}
+        <div className="flex gap-1.5 mt-2">
+          <button
+            onClick={() => onSetActive(new Set(SA_PARTIES.map(p => p.id)))}
+            className="flex-1 h-6 text-[9px] font-mono rounded-[3px] border border-default text-ink-3 hover:bg-hover hover:text-ink transition-colors">
+            All
+          </button>
+          <button
+            onClick={() => {
+              // keep parties currently polling ≥ 1% (or with seats)
+              const major = new Set(SA_PARTIES.filter(p => (natPcts[p.id] ?? 0) >= 1 || p.seats2024 >= 6).map(p => p.id));
+              if (major.size < 2) return;
+              onSetActive(major);
+            }}
+            className="flex-1 h-6 text-[9px] font-mono rounded-[3px] border border-default text-ink-3 hover:bg-hover hover:text-ink transition-colors">
+            Major
+          </button>
+          <button
+            onClick={() => {
+              // 3-party race: keep top 3 by current %
+              const top3 = new Set(sorted.slice(0, 3).map(p => p.id));
+              onSetActive(top3);
+            }}
+            className="flex-1 h-6 text-[9px] font-mono rounded-[3px] border border-default text-ink-3 hover:bg-hover hover:text-ink transition-colors">
+            Top 3
+          </button>
+        </div>
+      </div>
+
+      {/* Party list */}
+      <div className="flex-1 overflow-y-auto thin-scroll py-1">
+        {sorted.map(party => {
+          const isActive = activeParties.has(party.id);
+          const pct = natPcts[party.id] ?? 0;
+          const color = party.color;
+          return (
+            <button
+              key={party.id}
+              onClick={() => onToggle(party.id)}
+              disabled={isActive && activeCount <= 1}
+              className={`w-full flex items-center gap-2.5 px-3.5 py-1.5 text-left transition-all ${
+                isActive
+                  ? 'opacity-100'
+                  : 'opacity-40 hover:opacity-60'
+              } ${isActive && activeCount <= 1 ? 'cursor-not-allowed' : 'cursor-pointer hover:bg-hover'}`}
+            >
+              {/* Party color strip */}
+              <span className={`w-2.5 h-2.5 rounded-full shrink-0 transition-all ${isActive ? '' : 'grayscale'}`}
+                style={{ background: isActive ? color : '#9ca3af' }} />
+              {/* Name */}
+              <span className={`flex-1 text-[10.5px] font-medium truncate ${isActive ? 'text-ink' : 'text-ink-3 line-through'}`}>
+                {party.name}
+              </span>
+              {/* Vote % */}
+              {pct > 0 && (
+                <span className="text-[9px] font-mono tabular-nums shrink-0" style={{ color: isActive ? color : '#9ca3af' }}>
+                  {pct.toFixed(1)}%
+                </span>
+              )}
+              {/* Checkbox */}
+              <span className={`w-4 h-4 rounded-[3px] border flex items-center justify-center shrink-0 transition-colors ${
+                isActive
+                  ? 'border-transparent'
+                  : 'border-default bg-transparent'
+              }`}
+              style={isActive ? { background: color } : {}}>
+                {isActive && (
+                  <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                    <path d="M1.5 4l2 2 3-3" stroke="white" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                )}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Footer note */}
+      <div className="px-3.5 py-2 border-t border-default shrink-0">
+        <p className="text-[8px] font-mono text-ink-3 leading-relaxed">
+          Deselected parties are excluded from all seat calculations and slider panels. Votes redistribute proportionally.
+        </p>
+      </div>
+    </aside>
+  );
+}
+
 function SaTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exiting?: boolean; dark?: boolean }) {
-  const H2 = ({ children }: { children: React.ReactNode }) => <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>;
-  const P  = ({ children }: { children: React.ReactNode }) => <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>;
+  const H2   = ({ children }: { children: React.ReactNode }) => <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>;
+  const P    = ({ children }: { children: React.ReactNode }) => <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>;
   const Note = ({ children }: { children: React.ReactNode }) => <div className="tutorial-note rounded-[4px] px-2.5 py-2 text-[10px] leading-relaxed mb-2">{children}</div>;
   return (
-    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
+    <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
@@ -759,20 +1564,32 @@ function SaTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
         <H2>Electoral System</H2>
-        <P>South Africa uses <strong>closed-list proportional representation</strong>. Voters choose a party. The 400 National Assembly seats are divided proportionally among all parties that receive votes.</P>
-        <Note>This simulator uses <strong>D'Hondt</strong> to allocate seats. South Africa's actual system uses the Droop quota — results are nearly identical in practice.</Note>
-        <H2>No Threshold</H2>
-        <P>There is <strong>no formal threshold</strong>. Even very small parties win seats. Roughly 0.25% of the national vote earns a single seat.</P>
+        <P>South Africa uses <strong>closed-list proportional representation</strong>. Voters cast a ballot for a party; the 400 National Assembly seats are divided proportionally using the Droop quota (simulated here with D'Hondt — nearly identical results).</P>
+        <Note>There is <strong>no formal threshold</strong>. Even tiny parties win seats. Roughly 0.25% of the national vote earns a single seat.</Note>
+
         <H2>2024 Historic Election</H2>
-        <P>In 2024, the <strong>ANC fell below 50%</strong> for the first time since 1994. The outcome was a <strong>Government of National Unity (GNU)</strong> — ANC + DA + IFP + several smaller parties, together holding 275+ seats.</P>
-        <H2>18 Parties</H2>
-        <P>This simulator tracks all <strong>18 parties</strong> that won seats in 2024, from the ANC (159 seats) down to small parties like GOOD, PAC, and UAT (1 seat each). The baseline loads the official IEC result.</P>
-        <H2>9 Provinces on the Map</H2>
-        <P>Each coloured bubble represents one of South Africa's 9 provinces. Bubble colour shows the leading party; size reflects the margin of victory. Click any bubble to see the provincial breakdown.</P>
-        <H2>Sliders</H2>
-        <P>Open <strong>Simulation</strong> to drag vote-share sliders. Lock any party to keep it fixed while others redistribute proportionally.</P>
+        <P>In May 2024, the <strong>ANC fell below 50%</strong> for the first time since 1994, winning only 40.2%. The result was a <strong>Government of National Unity (GNU)</strong>: ANC + DA + IFP + 9 smaller parties holding 275+ seats.</P>
+
+        <H2>Presets</H2>
+        <P><strong>2024 Results</strong> loads the official IEC national ballot figures. <strong>2026 Polling</strong> loads the Social Research Foundation poll (Feb–Mar 2026, n=2222): ANC 39%, DA 28%, MK 10%, EFF 6%, IFP 5%. <strong>Blank Map</strong> resets everything to zero.</P>
+
+        <H2>Map Modes</H2>
+        <P>Toggle between <strong>Map</strong> (province choropleth with 52 district borders) and <strong>Bubbles</strong> (circle markers sized by margin). Colour intensity scales with the winner's margin of victory.</P>
+
+        <H2>Province Panel</H2>
+        <P>Click any province on the map to open its detail panel. Drag the <strong>party-coloured sliders</strong> to adjust provincial vote shares. Lock any party (🔒) to keep it fixed while others redistribute proportionally. Click any percentage to type an exact value. The <strong>delta</strong> (±pp) shows the change from the 2024 baseline; expand <em>2024 Reference</em> to see the full baseline column.</P>
+
+        <H2>Simulation</H2>
+        <P>Open <strong>▶ Simulation</strong> to set national vote shares and a <strong>duration</strong> (30s → 5m). Click <em>Run</em> and watch provinces declare one by one, updating the scoreboard and parliament in real time. The map auto-switches to Blank Map and reveals provinces as they come in.</P>
+
+        <H2>Parliament</H2>
+        <P>The <strong>Parliament</strong> button opens the National Assembly hemicycle — 400 seats across 12 arcs, coloured by party in left-to-right ideological order.</P>
+
+        <H2>Breakdown</H2>
+        <P>The <strong>Breakdown</strong> panel shows the national seat bar and a province-by-province results table: winner, margin, and the top challengers for each of the 9 provinces.</P>
+
         <H2>Coalition Builder</H2>
-        <P>Click <strong>Coalition</strong> to toggle parties and see whether a combination reaches the 201-seat majority threshold.</P>
+        <P>Toggle parties on and off to see whether a combination clears the <strong>201-seat majority</strong> threshold. Use the preset buttons for common coalition scenarios.</P>
       </div>
     </aside>
   );
@@ -788,21 +1605,167 @@ export default function SouthAfricaApp() {
     localStorage.setItem('darkMode', String(dark));
   }, [dark]);
 
-  const [preset, setPreset]   = useState<'baseline'|'blank'|'custom'>('baseline');
-  const [natPcts, setNatPcts] = useState<Record<SaPartyId, number>>(() => ({ ...SA_VOTE_PCT_2024 }));
+  // ── Election state ───────────────────────────────────────────────────────────
+  const [preset, setPreset]           = useState<'baseline' | 'polling2026' | 'blank' | 'custom'>('baseline');
+  // natRegPcts  = Regional ballot (9 provinces, drives map colouring + 200 regional seats)
+  const [natPcts, setNatPcts]         = useState<Record<SaPartyId, number>>(() => ({ ...SA_VOTE_PCT_2024 }));
+  // natListPcts = National Compensatory Ballot (200 list seats, edited via List Seats panel)
+  const [natListPcts, setNatListPcts] = useState<Record<SaPartyId, number>>(() => ({ ...SA_VOTE_PCT_2024 }));
+  // activeParties = which parties participate; inactive ones are forced to 0% and their votes redistribute
+  const [activeParties, setActiveParties] = useState<Set<SaPartyId>>(() => new Set(SA_PARTIES.map(p => p.id)));
 
-  function loadBaseline() { setNatPcts({ ...SA_VOTE_PCT_2024 }); setPreset('baseline'); resetSim(); }
-  function loadBlank()    { setNatPcts(Object.fromEntries(SA_PARTIES.map(p => [p.id, 100/SA_PARTIES.length])) as Record<SaPartyId, number>); setPreset('blank'); resetSim(); }
+  /** Toggle one party in/out — deactivating redistributes its votes proportionally */
+  function handlePartyToggle(id: SaPartyId) {
+    if (activeParties.has(id)) {
+      if (activeParties.size <= 1) return; // keep at least 1
+      // Build locks = all currently inactive parties (already 0%, should stay 0%)
+      const locks = new Set(SA_PARTIES.map(p => p.id).filter(pid => !activeParties.has(pid)));
+      setNatPcts(prev => redistributePcts(prev, id, 0, locks));
+      setNatListPcts(prev => redistributePcts(prev, id, 0, locks));
+      setActiveParties(prev => { const n = new Set(prev); n.delete(id); return n; });
+    } else {
+      // Reactivate at 0% — user adjusts via slider
+      setActiveParties(prev => new Set([...prev, id]));
+    }
+    if (preset !== 'baseline') setPreset('custom');
+  }
 
-  const [selectedProv, setSelectedProv]           = useState<SaProvId | null>(null);
-  const [provOverrides, setProvOverrides]         = useState<Record<string, Record<SaPartyId, number>>>({});
+  /** Batch-set the active party set (used by "Major", "Top 3", "All" quick buttons) */
+  function handleSetActiveParties(newActive: Set<SaPartyId>) {
+    // Deactivate each newly-excluded party one at a time so votes redistribute sequentially
+    const toDeactivate = [...activeParties].filter(id => !newActive.has(id));
+    const toActivate   = [...newActive].filter(id => !activeParties.has(id));
+    let pcts     = { ...natPcts };
+    let listPcts = { ...natListPcts };
+    let current  = new Set(activeParties);
+    for (const id of toDeactivate) {
+      if (current.size <= 1) break;
+      const locks = new Set(SA_PARTIES.map(p => p.id).filter(pid => !current.has(pid)));
+      pcts     = redistributePcts(pcts,     id, 0, locks);
+      listPcts = redistributePcts(listPcts, id, 0, locks);
+      current.delete(id);
+    }
+    for (const id of toActivate) current.add(id); // re-activated parties start at 0%
+    setNatPcts(pcts);
+    setNatListPcts(listPcts);
+    setActiveParties(current);
+    if (preset !== 'baseline') setPreset('custom');
+  }
+
+  function loadBaseline() {
+    setNatPcts({ ...SA_VOTE_PCT_2024 }); setNatListPcts({ ...SA_VOTE_PCT_2024 });
+    setPreset('baseline'); resetSim(); setProvOverrides({});
+  }
+  function loadPolling2026() {
+    setNatPcts({ ...POLL_2026_PCTS }); setNatListPcts({ ...POLL_2026_PCTS });
+    setPreset('polling2026'); resetSim(); setProvOverrides({});
+  }
+  function loadBlank() {
+    const zero = Object.fromEntries(SA_PARTIES.map(p => [p.id, 0])) as Record<SaPartyId, number>;
+    setNatPcts(zero); setNatListPcts(zero);
+    setPreset('blank'); resetSim();
+    setProvOverrides({}); setScoreboardVisible(false);
+    // Blank map: declare no provinces yet so map is fully grey
+    setDeclaredProvs(new Set());
+  }
+
+  // ── Province overrides ───────────────────────────────────────────────────────
+  const [provOverrides, setProvOverrides] = useState<Record<string, Record<SaPartyId, number>>>({});
+
+  // ── Simulation state ─────────────────────────────────────────────────────────
+  const [simSeats, setSimSeats]           = useState<Partial<Record<SaPartyId, number>> | undefined>();
+  const [simProgress, setSimProgress]     = useState(0);
+  const [simRunning, setSimRunning]       = useState(false);
+  const [declaredProvs, setDeclaredProvs] = useState<Set<SaProvId> | undefined>();
+  const simTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const natPctsAtSimStart = useRef<Record<SaPartyId, number>>(natPcts);
+
+  function stopSim() {
+    simTimersRef.current.forEach(clearTimeout);
+    simTimersRef.current = [];
+    setSimRunning(false);
+  }
+  function resetSim() {
+    stopSim();
+    setSimSeats(undefined);
+    setDeclaredProvs(preset === 'blank' ? new Set() : undefined);
+    setSimProgress(0);
+  }
+
+  function handleSimStart(pcts: Record<SaPartyId, number>, durationMs: number) {
+    stopSim();
+    natPctsAtSimStart.current = { ...pcts };
+    setNatPcts(pcts);
+    setNatListPcts(pcts); // keep list ballot in sync with regional when simulation runs
+    setPreset('blank');
+    setProvOverrides({});
+    setDeclaredProvs(new Set());
+    setSimSeats(undefined);
+    setSimProgress(0);
+    setSimRunning(true);
+    setScoreboardVisible(false);
+
+    const allProvs = [...SA_PROVINCES].sort(() => Math.random() - 0.5);
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    let declared = new Set<SaProvId>();
+
+    allProvs.forEach(prov => {
+      const raw = 0.5 + saRandNormal() * 0.16;
+      const t = Math.max(0.04, Math.min(0.97, raw)) * durationMs;
+
+      timers.push(setTimeout(() => {
+        declared = new Set(declared);
+        declared.add(prov.id);
+        setDeclaredProvs(new Set(declared));
+        setSimProgress(declared.size);
+        setSimSeats(calcPartialSeats(natPctsAtSimStart.current, declared));
+        if (declared.size >= SA_PROVINCES.length) {
+          setSimSeats(mergeSeats(
+            calcSeats(natPctsAtSimStart.current, SA_LIST_SEATS_TOTAL),
+            calcRegSeats(natPctsAtSimStart.current),
+          ));
+          setSimRunning(false);
+        }
+      }, t));
+    });
+
+    simTimersRef.current = timers;
+  }
+
+  /** Instantly project slider values as the national result (no animation) */
+  function handleProject(pcts: Record<SaPartyId, number>) {
+    stopSim();
+    setNatPcts(pcts);
+    setNatListPcts(pcts);
+    setPreset('custom');
+    setProvOverrides({});
+    setDeclaredProvs(undefined); // show all provinces coloured
+    setSimSeats(undefined);
+    setSimProgress(0);
+    setScoreboardVisible(true);
+  }
+
+  // Auto-show scoreboard when provinces start declaring
+  useEffect(() => {
+    if (preset === 'blank' && simProgress > 0) setScoreboardVisible(true);
+  }, [preset, simProgress]);
+
+  // ── UI state ─────────────────────────────────────────────────────────────────
+  const [selectedProv, setSelectedProv]       = useState<SaProvId | null>(null);
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
-  const [locks, setLocks]                         = useState<Set<SaPartyId>>(new Set());
-  const [simOpen, setSimOpen]                     = useState(false);
-  const [parliOpen, setParliOpen]                 = useState(false);
-  const [coalitionOpen, setCoalitionOpen]         = useState(false);
-  const [tutorialOpen, setTutorialOpen]           = useState(false);
-  const [exitPanel, setExitPanel]                 = useState<string | null>(null);
+  const [simOpen, setSimOpen]                 = useState(false);
+  const [simExiting, setSimExiting]           = useState(false);
+  const [listOpen, setListOpen]               = useState(false);
+  const [listExiting, setListExiting]         = useState(false);
+  const [parliOpen, setParliOpen]             = useState(false);
+  const [coalitionOpen, setCoalitionOpen]     = useState(false);
+  const [breakdownOpen, setBreakdownOpen]     = useState(false);
+  const [breakdownExiting, setBreakdownExiting] = useState(false);
+  const [tutorialOpen, setTutorialOpen]       = useState(false);
+  const [tutorialExiting, setTutorialExiting] = useState(false);
+  const [partiesOpen, setPartiesOpen]         = useState(false);
+  const [partiesExiting, setPartiesExiting]   = useState(false);
+  const [exitPanel, setExitPanel]             = useState<string | null>(null);
   const exitTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const headerScrollRef = useRef<HTMLDivElement>(null);
 
@@ -812,170 +1775,315 @@ export default function SouthAfricaApp() {
     exitTimerRef.current = setTimeout(() => setExitPanel(null), 280);
   }, []);
 
-  const [mapMode, setMapMode]             = useState<'choropleth' | 'bubbles'>('choropleth');
-  const [simSeats, setSimSeats]           = useState<Partial<Record<SaPartyId, number>> | undefined>();
-  const [simProgress, setSimProgress]     = useState(0);
-  const [simRunning, setSimRunning]       = useState(false);
-  const [declaredProvs, setDeclaredProvs] = useState<Set<SaProvId> | undefined>();
-  const simTimersRef        = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const natPctsAtSimStart   = useRef<Record<SaPartyId, number>>(natPcts);
-
-  function stopSim() { simTimersRef.current.forEach(clearTimeout); simTimersRef.current = []; setSimRunning(false); }
-  function resetSim() { stopSim(); setSimSeats(undefined); setDeclaredProvs(undefined); setSimProgress(0); }
-
+  // Horizontal scroll on header strip via vertical wheel (like Germany)
   useEffect(() => {
     const el = headerScrollRef.current; if (!el) return;
     const h = (e: WheelEvent) => { if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; e.preventDefault(); el.scrollLeft += e.deltaY; };
     el.addEventListener('wheel', h, { passive: false }); return () => el.removeEventListener('wheel', h);
   }, []);
 
+  // Derived seats — two-ballot
+  const listSeatsMap = useMemo(() => calcSeats(natListPcts, SA_LIST_SEATS_TOTAL), [natListPcts]);
+  const regSeatsMap  = useMemo(() => calcRegSeats(natPcts, provOverrides), [natPcts, provOverrides]);
   const displaySeats = useMemo(() => {
     if (simSeats) return simSeats;
     if (preset === 'baseline') return SA_SEATS_2024 as Partial<Record<SaPartyId, number>>;
-    return calcSeats(natPcts);
-  }, [simSeats, natPcts, preset]);
+    return mergeSeats(listSeatsMap, regSeatsMap);
+  }, [simSeats, listSeatsMap, regSeatsMap, preset]);
 
+  // Button styles
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
   const btnMuted  = `${btnBase} border border-default text-ink-3 hover:bg-hover hover:text-ink`;
   const btnActive = `${btnBase} bg-ink/8 border border-default text-ink`;
 
-  const showProv     = !!selectedProv && !simOpen;
-  const showTutorial = tutorialOpen  || exitPanel === 'tutorial';
-  const showParli    = parliOpen     || exitPanel === 'parli';
-  const showCoal     = coalitionOpen || exitPanel === 'coal';
+  // Panel visibility
+  const showParli     = parliOpen     || exitPanel === 'parli';
+  const showCoal      = coalitionOpen || exitPanel === 'coal';
+  const showProv      = !!selectedProv && !simOpen;
+  const showTutorial  = tutorialOpen  || tutorialExiting;
+  const showBreakdown = breakdownOpen || breakdownExiting;
+  const showList      = listOpen      || listExiting;
+  const showSim       = simOpen       || simExiting;
+  const showParties   = partiesOpen   || partiesExiting;
+  const inactiveCount = SA_PARTIES.length - activeParties.size;
 
   return (
     <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="za">
 
-      {/* ── Topbar ── */}
-      <header className={`h-[52px] ${dark?'bg-[rgba(7,13,28,0.94)]':'bg-[rgba(245,244,240,0.92)]'} backdrop-blur-xl border-b border-default shadow-header shrink-0 flex items-center z-50`}>
+      {/* ── Topbar ──────────────────────────────────────────────────────────── */}
+      <header className={`h-[52px] ${dark ? 'bg-[rgba(7,13,28,0.94)]' : 'bg-[rgba(245,244,240,0.92)]'} backdrop-blur-xl border-b border-default shadow-header shrink-0 flex items-center z-50`}>
+
         <button onClick={() => navigate('/')} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer shrink-0 pl-4" title="Home">
           <GlobeLogo />
         </button>
 
-        <div ref={headerScrollRef} className="flex-1 min-w-0 flex items-center gap-2 px-2 overflow-x-auto scroll-none">
+        {/* Scrollable button strip */}
+        <div ref={headerScrollRef} className="flex-1 min-w-0 header-scroll-strip flex items-center gap-2 px-2">
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={loadBaseline} className={preset==='baseline' ? btnGold : btnMuted}>2024 Results</button>
-          <button onClick={loadBlank}    className={preset==='blank'    ? btnGold : btnMuted}>Blank Map</button>
-          <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={() => setSimOpen(v => !v)} className={simOpen ? btnActive : btnMuted}>▶ Simulation</button>
-          <button onClick={() => setScoreboardVisible(v => !v)} className={scoreboardVisible ? btnActive : btnMuted}>Scoreboard</button>
-          <button onClick={() => { if (parliOpen) { setParliOpen(false); triggerExit('parli'); } else { setParliOpen(true); setCoalitionOpen(false); } }} className={parliOpen ? btnActive : btnMuted}>Parliament</button>
-          <button onClick={() => { if (coalitionOpen) { setCoalitionOpen(false); triggerExit('coal'); } else { setCoalitionOpen(true); setParliOpen(false); } }} className={coalitionOpen ? btnActive : btnMuted}>Coalition</button>
-          <button onClick={() => { if (tutorialOpen) { setTutorialOpen(false); triggerExit('tutorial'); } else setTutorialOpen(true); }} className={tutorialOpen ? btnActive : btnMuted}>Tutorial</button>
-          <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={() => setMapMode('choropleth')} className={mapMode === 'choropleth' ? btnActive : btnMuted} title="Choropleth map">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ display:'inline', verticalAlign:'middle', marginRight:3 }}>
-              <rect x="1" y="1" width="4.5" height="4.5" rx="0.5" fill="currentColor" opacity="0.9"/>
-              <rect x="6.5" y="1" width="4.5" height="4.5" rx="0.5" fill="currentColor" opacity="0.5"/>
-              <rect x="1" y="6.5" width="4.5" height="4.5" rx="0.5" fill="currentColor" opacity="0.6"/>
-              <rect x="6.5" y="6.5" width="4.5" height="4.5" rx="0.5" fill="currentColor" opacity="0.3"/>
-            </svg>
-            Map
+
+          {/* Presets */}
+          <button onClick={loadBaseline}    className={preset === 'baseline'    ? btnGold : btnMuted}>2024 Results</button>
+          <button onClick={loadPolling2026} className={preset === 'polling2026' ? btnGold : btnMuted}>2026 Polling</button>
+          <button onClick={loadBlank}       className={preset === 'blank'       ? btnGold : btnMuted}>Blank Map</button>
+
+          {/* Parties — toggle which parties participate */}
+          <button
+            onClick={() => {
+              if (partiesOpen) { setPartiesExiting(true); setTimeout(() => { setPartiesExiting(false); setPartiesOpen(false); }, 280); }
+              else { setPartiesOpen(true); }
+            }}
+            className={partiesOpen ? btnActive : inactiveCount > 0
+              ? `${btnBase} border border-amber-400 text-amber-600 hover:bg-amber-400 hover:text-white`
+              : btnMuted}
+            title={inactiveCount > 0 ? `${inactiveCount} parties excluded` : 'Select parties for the election'}
+          >
+            {inactiveCount > 0 ? `Parties (${activeParties.size})` : 'Parties'}
           </button>
-          <button onClick={() => setMapMode('bubbles')} className={mapMode === 'bubbles' ? btnActive : btnMuted} title="Bubble map">
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ display:'inline', verticalAlign:'middle', marginRight:3 }}>
-              <circle cx="4" cy="4" r="3" fill="currentColor" opacity="0.85"/>
-              <circle cx="9" cy="8" r="2" fill="currentColor" opacity="0.55"/>
-            </svg>
-            Bubbles
-          </button>
+
+          {/* List Seats — like Germany's "List Seats" / ZweitstimmenPanel */}
+          <button
+            onClick={() => {
+              if (listOpen) { setListExiting(true); setTimeout(() => { setListExiting(false); setListOpen(false); }, 280); }
+              else { setListOpen(true); }
+            }}
+            className={listOpen ? btnActive : preset === 'blank'
+              ? `${btnBase} border-2 border-gold text-gold animate-pulse hover:bg-gold hover:text-white`
+              : btnMuted}
+          >List Seats</button>
+
+          <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
+
+          {/* Simulation */}
+          <button
+            onClick={() => {
+              if (simOpen) { setSimExiting(true); setTimeout(() => { setSimExiting(false); setSimOpen(false); }, 280); }
+              else { setSimOpen(true); }
+            }}
+            className={simOpen ? btnActive : btnMuted}
+          >▶ Simulation</button>
+
+          {/* Parliament */}
+          <button
+            onClick={() => {
+              if (parliOpen) { setParliOpen(false); triggerExit('parli'); }
+              else { setParliOpen(true); setCoalitionOpen(false); }
+            }}
+            className={parliOpen ? btnActive : btnMuted}
+          >Parliament</button>
+
+          {/* Breakdown */}
+          <button
+            onClick={() => {
+              if (breakdownOpen) { setBreakdownExiting(true); setTimeout(() => { setBreakdownExiting(false); setBreakdownOpen(false); }, 280); }
+              else { setBreakdownOpen(true); }
+            }}
+            className={breakdownOpen ? btnActive : btnMuted}
+          >Breakdown</button>
+
+          {/* Coalition */}
+          <button
+            onClick={() => {
+              if (coalitionOpen) { setCoalitionOpen(false); triggerExit('coal'); }
+              else { setCoalitionOpen(true); setParliOpen(false); }
+            }}
+            className={coalitionOpen ? btnActive : btnMuted}
+          >Coalition</button>
+
+          {/* Tutorial */}
+          <button
+            onClick={() => {
+              if (tutorialOpen) { setTutorialExiting(true); setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280); }
+              else { setTutorialOpen(true); }
+            }}
+            className={tutorialOpen ? btnActive : btnMuted}
+          >Tutorial</button>
+
         </div>
 
-        <div className="shrink-0 flex items-center gap-2 pr-4">
-          <button onClick={() => setDark(v => !v)} className="w-7 h-7 flex items-center justify-center rounded-[4px] border border-default text-ink-3 hover:text-ink transition-colors">{dark ? '☀' : '☾'}</button>
+        {/* Right controls */}
+        <div className="shrink-0 flex items-center gap-2.5 pr-4">
+          <button
+            onClick={() => setDark(d => !d)}
+            className="w-7 h-7 flex items-center justify-center rounded-[4px] border border-default text-ink-3 hover:bg-hover hover:text-ink transition-colors"
+            title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+          >
+            {dark ? (
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                <circle cx="7" cy="7" r="2.7" stroke="currentColor" strokeWidth="1.4" fill="none"/>
+                <line x1="7" y1="0.5" x2="7" y2="2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <line x1="7" y1="11.8" x2="7" y2="13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <line x1="0.5" y1="7" x2="2.2" y2="7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <line x1="11.8" y1="7" x2="13.5" y2="7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <line x1="2.5" y1="2.5" x2="3.6" y2="3.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <line x1="10.4" y1="10.4" x2="11.5" y2="11.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <line x1="11.5" y1="2.5" x2="10.4" y2="3.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                <line x1="3.6" y1="10.4" x2="2.5" y2="11.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              </svg>
+            ) : (
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+                <path d="M11 7.8A5.5 5.5 0 0 1 5.2 2a5.5 5.5 0 1 0 5.8 5.8z" stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinejoin="round"/>
+              </svg>
+            )}
+          </button>
         </div>
       </header>
 
-      {/* ── Scoreboard ── */}
-      {scoreboardVisible && <SaScoreboard natPcts={natPcts} simSeats={simSeats} isBaseline={preset==='baseline'} />}
+      {/* ── Body ────────────────────────────────────────────────────────────── */}
+      <div className="flex flex-col flex-1 min-h-0 relative">
 
-      {/* ── Body ── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-
-        {/* Parliament — LEFT */}
-        {showParli && <SaParliamentPanel seats={displaySeats} onClose={() => { setParliOpen(false); triggerExit('parli'); }} exiting={exitPanel==='parli'} dark={dark} />}
-
-        {/* Map */}
-        <SaMapView natPcts={natPcts} onSelect={id => setSelectedProv(prev => prev === id ? null : id)} dark={dark} declaredProvs={declaredProvs} overrides={provOverrides} mapMode={mapMode} />
-
-        {/* Right panels */}
-        {simOpen && (
-          <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
-            <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0 flex items-center justify-between">
-              <div>
-                <h2 className="text-[14px] font-bold text-ink leading-none">Simulation</h2>
-                <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Vote shares · D'Hondt · No threshold</p>
-              </div>
-              <button onClick={() => setSimOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+        {/* Collapsible scoreboard — Germany animated grid-rows trick */}
+        <div className="relative shrink-0">
+          <div style={{
+            display: 'grid',
+            gridTemplateRows: scoreboardVisible ? '1fr' : '0fr',
+            transition: 'grid-template-rows 280ms cubic-bezier(0.4,0,0.2,1)',
+          }}>
+            <div className="overflow-hidden">
+              <SaScoreboard
+                natListPcts={natListPcts}
+                natRegPcts={natPcts}
+                provOverrides={provOverrides}
+                simTotalSeats={simSeats}
+                isBaseline={preset === 'baseline'}
+              />
             </div>
-            <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
-              {([...SA_PARTIES] as SaParty[]).sort((a, b) => (natPcts[b.id]??0) - (natPcts[a.id]??0)).map((party: SaParty) => {
-                const pct = natPcts[party.id] ?? 0; const isLocked = locks.has(party.id); const color = partyColor(party.id);
-                return (
-                  <div key={party.id}>
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background:color }} />
-                      <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{party.fullName}</span>
-                      <button onClick={() => setLocks(prev => { const n = new Set(prev); n.has(party.id) ? n.delete(party.id) : n.add(party.id); return n; })}
-                        className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked?'text-gold':'text-ink-3 hover:text-ink'}`} title={isLocked?'Unlock':'Lock'}>
-                        {isLocked
-                          ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                          : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                        }
-                      </button>
-                    </div>
-                    <input type="range" min={0} max={60} step={0.1} value={pct} disabled={isLocked}
-                      onChange={e => { setNatPcts(redistributePcts(natPcts, party.id, parseFloat(e.target.value), locks)); setPreset('custom'); }}
-                      className="br-party-slider w-full"
-                      style={{ '--party-color': color, '--pct': `${(pct/60)*100}%` } as React.CSSProperties} />
-                    <div className="flex justify-between mt-0.5">
-                      <span className="text-[8px] font-mono text-ink-3">{party.name}</span>
-                      <span className="text-[8.5px] font-mono tabular-nums text-ink-3">{pct.toFixed(1)}%</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
-              <button disabled={simRunning} onClick={() => {
-                stopSim(); natPctsAtSimStart.current = { ...natPcts };
-                const allProvs = [...SA_PROVINCES].sort(() => Math.random() - 0.5);
-                const NCHUNKS = SA_PROVINCES.length;
-                const chunkTimes = saBellCurveTimes(NCHUNKS, 10_000);
-                setSimRunning(true); setSimProgress(0); setSimSeats(undefined); setDeclaredProvs(new Set());
-                let declared = new Set<SaProvId>();
-                const timers: ReturnType<typeof setTimeout>[] = [];
-                for (let ci = 0; ci < NCHUNKS; ci++) {
-                  const prov = allProvs[ci]; const t = chunkTimes[ci];
-                  timers.push(setTimeout(() => {
-                    declared = new Set(declared); declared.add(prov.id);
-                    setDeclaredProvs(new Set(declared)); setSimProgress(declared.size);
-                    setSimSeats(calcPartialSeats(natPctsAtSimStart.current, declared));
-                    if (declared.size >= SA_PROVINCES.length) { setSimSeats(calcSeats(natPctsAtSimStart.current)); setSimRunning(false); }
-                  }, t));
-                }
-                simTimersRef.current = timers;
+          </div>
+          {/* Toggle chevron */}
+          <button
+            onClick={() => setScoreboardVisible(v => !v)}
+            className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-[1001] h-4 px-3 rounded-full bg-white border border-default shadow-sm hover:bg-hover text-ink-3 hover:text-ink transition-colors flex items-center gap-1"
+          >
+            <svg width="8" height="5" viewBox="0 0 8 5" fill="none" aria-hidden="true">
+              {scoreboardVisible
+                ? <path d="M7 4L4 1L1 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+                : <path d="M1 1L4 4L7 1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
+              }
+            </svg>
+            <span className="text-[7.5px] font-mono uppercase tracking-wider leading-none">
+              {scoreboardVisible ? 'Hide' : 'Results'}
+            </span>
+          </button>
+        </div>
+
+        {/* Map + panels row */}
+        <div className="flex flex-1 min-h-0 relative">
+
+          {/* Parliament — LEFT side */}
+          {showParli && (
+            <SaParliamentPanel
+              seats={displaySeats}
+              onClose={() => { setParliOpen(false); triggerExit('parli'); }}
+              exiting={exitPanel === 'parli'}
+              dark={dark}
+            />
+          )}
+
+          {/* Map — centre */}
+          <div className="flex-1 min-w-0 relative">
+            <SaMapView
+              natPcts={natPcts}
+              onSelect={id => setSelectedProv(prev => prev === id ? null : id)}
+              dark={dark}
+              declaredProvs={declaredProvs}
+              overrides={provOverrides}
+            />
+          </div>
+
+          {/* ── RIGHT PANELS (only one visible at a time, left-to-right priority) ── */}
+
+          {/* Simulation panel */}
+          {showSim && (
+            <SaSimulationPanel
+              onStart={handleSimStart}
+              onClose={() => { setSimExiting(true); setTimeout(() => { setSimExiting(false); setSimOpen(false); }, 280); }}
+              simRunning={simRunning}
+              simProgress={simProgress}
+              stopSim={stopSim}
+              natPcts={natPcts}
+              activeParties={activeParties}
+              dark={dark}
+            />
+          )}
+
+          {/* National List panel */}
+          {showList && !simOpen && (
+            <SaListPanel
+              natListPcts={natListPcts}
+              onListPctsChange={pcts => {
+                setNatListPcts(pcts);
+                if (preset !== 'blank') setPreset('custom');
               }}
-                className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                {simRunning ? `${simProgress}/${SA_PROVINCES.length} provinces reporting…` : '▶ Run Simulation'}
-              </button>
-              {(simSeats || declaredProvs) && (
-                <button onClick={resetSim} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">Reset</button>
-              )}
-            </div>
-          </aside>
-        )}
+              regSeatsMap={regSeatsMap}
+              activeParties={activeParties}
+              onProject={handleProject}
+              onClose={() => {
+                setListExiting(true);
+                setTimeout(() => { setListExiting(false); setListOpen(false); }, 280);
+              }}
+              exiting={listExiting}
+              dark={dark}
+            />
+          )}
 
-        {showCoal && !simOpen && <SaCoalitionPanel seats={displaySeats} onClose={() => { setCoalitionOpen(false); triggerExit('coal'); }} exiting={exitPanel==='coal'} dark={dark} />}
-        {showProv && selectedProv && !simOpen && !showCoal && (
-          <SaProvPanel provId={selectedProv} natPcts={natPcts}
-            onUpdate={(id, pcts) => setProvOverrides(prev => ({ ...prev, [id]: pcts }))}
-            onClose={() => setSelectedProv(null)} dark={dark}
-            override={provOverrides[selectedProv]} />
-        )}
-        {showTutorial && !simOpen && !showCoal && <SaTutorialPanel onClose={() => { setTutorialOpen(false); triggerExit('tutorial'); }} exiting={exitPanel==='tutorial'} dark={dark} />}
+          {/* Province detail panel — shown when not sim-open */}
+          {showProv && selectedProv && !simOpen && (
+            <SaProvPanel
+              provId={selectedProv}
+              natPcts={natPcts}
+              onUpdate={(id, pcts) => {
+                setProvOverrides(prev => ({ ...prev, [id]: pcts }));
+                if (preset !== 'blank') setPreset('custom');
+              }}
+              onClose={() => setSelectedProv(null)}
+              dark={dark}
+              override={provOverrides[selectedProv]}
+            />
+          )}
+
+          {/* Coalition panel */}
+          {showCoal && !simOpen && (
+            <SaCoalitionPanel
+              seats={displaySeats}
+              onClose={() => { setCoalitionOpen(false); triggerExit('coal'); }}
+              exiting={exitPanel === 'coal'}
+              dark={dark}
+            />
+          )}
+
+          {/* Breakdown panel */}
+          {showBreakdown && !simOpen && (
+            <SaBreakdownPanel
+              natPcts={natPcts}
+              displaySeats={displaySeats}
+              onClose={() => { setBreakdownExiting(true); setTimeout(() => { setBreakdownExiting(false); setBreakdownOpen(false); }, 280); }}
+              exiting={breakdownExiting}
+              dark={dark}
+            />
+          )}
+
+          {/* Parties panel */}
+          {showParties && !simOpen && (
+            <SaPartiesPanel
+              activeParties={activeParties}
+              onToggle={handlePartyToggle}
+              onSetActive={handleSetActiveParties}
+              natPcts={natPcts}
+              onClose={() => { setPartiesExiting(true); setTimeout(() => { setPartiesExiting(false); setPartiesOpen(false); }, 280); }}
+              exiting={partiesExiting}
+              dark={dark}
+            />
+          )}
+
+          {/* Tutorial panel */}
+          {showTutorial && !simOpen && (
+            <SaTutorialPanel
+              onClose={() => { setTutorialExiting(true); setTimeout(() => { setTutorialExiting(false); setTutorialOpen(false); }, 280); }}
+              exiting={tutorialExiting}
+              dark={dark}
+            />
+          )}
+        </div>
       </div>
     </div>
   );
