@@ -694,7 +694,7 @@ const SaScoreboard = React.memo(function SaScoreboard({ natListPcts, natRegPcts,
 }); // React.memo
 
 // ── Province panel — WahlkreisPanel style (sliders + lock + edit + delta + ref) ─
-function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportingChange, activeParties, dark, override }: {
+function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportingChange, activeParties, dark, override, storedReportingPct }: {
   provId: SaProvId; natPcts: Record<SaPartyId, number>;
   onUpdate: (id: SaProvId, pcts: Record<SaPartyId, number>) => void;
   /** Called when "Project Result" is clicked — declares this province on the map */
@@ -704,6 +704,8 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportin
   activeParties: Set<SaPartyId>;
   onClose: () => void; dark?: boolean;
   override?: Record<SaPartyId, number>;
+  /** Last saved % Reporting for this province — restored when re-opening the panel */
+  storedReportingPct?: number;
 }) {
   const initFromNat = useCallback((): Record<SaPartyId, number> => {
     if (override) return { ...override };
@@ -724,11 +726,12 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportin
   const onReportingChangeRef = useRef(onReportingChange);
   useEffect(() => { onReportingChangeRef.current = onReportingChange; }, [onReportingChange]);
 
-  // Re-init when province changes
+  // Re-init when province changes — restore the saved reporting % instead of resetting to 100
   useEffect(() => {
     setPcts(initFromNat()); setLocks(new Set()); setEditId(null);
-    setReportingPct(100);
-    onReportingChangeRef.current?.(100);
+    const rpt = storedReportingPct ?? 100;
+    setReportingPct(rpt);
+    onReportingChangeRef.current?.(rpt);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provId]);
 
@@ -2373,6 +2376,7 @@ export default function SouthAfricaApp() {
               onClose={() => setSelectedProv(null)}
               dark={dark}
               override={provOverrides[selectedProv]}
+              storedReportingPct={provReporting[selectedProv]}
             />
           )}
 
