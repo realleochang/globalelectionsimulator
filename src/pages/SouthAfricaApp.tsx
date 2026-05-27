@@ -6,33 +6,55 @@ import 'leaflet/dist/leaflet.css';
 import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import { GlobeLogo } from './HomePage';
 
-type SaPartyId = 'ANC' | 'DA' | 'MK' | 'EFF' | 'IFP' | 'PA' | 'FFP' | 'RISE' | 'UDM';
+type SaPartyId = 'ANC' | 'DA' | 'MK' | 'EFF' | 'IFP' | 'PA' | 'FFP' | 'ASA' | 'UDM' | 'ACDP' | 'RISE' | 'ATM' | 'NCC' | 'AJ' | 'BOSA' | 'GOOD' | 'PAC' | 'UAT';
 type SaParty = { id: SaPartyId; name: string; fullName: string; color: string; seats2024: number; leader: string; wikiTitle?: string };
 
 const SA_PARTIES: SaParty[] = [
-  { id: 'ANC',  name: 'ANC',  fullName: 'African National Congress',  color: '#007A4D', seats2024: 159, leader: 'Cyril Ramaphosa',     wikiTitle: 'Cyril_Ramaphosa' },
-  { id: 'DA',   name: 'DA',   fullName: 'Democratic Alliance',        color: '#1565C0', seats2024:  87, leader: 'John Steenhuisen',    wikiTitle: 'John_Steenhuisen' },
-  { id: 'MK',   name: 'MK',   fullName: 'uMkhonto we Sizwe Party',    color: '#B71C1C', seats2024:  58, leader: 'Jacob Zuma',          wikiTitle: 'Jacob_Zuma' },
-  { id: 'EFF',  name: 'EFF',  fullName: 'Economic Freedom Fighters',  color: '#E53935', seats2024:  39, leader: 'Julius Malema',       wikiTitle: 'Julius_Malema' },
-  { id: 'IFP',  name: 'IFP',  fullName: 'Inkatha Freedom Party',      color: '#6A1B9A', seats2024:  17, leader: 'Velenkosini Hlabisa', wikiTitle: 'Velenkosini_Hlabisa' },
-  { id: 'PA',   name: 'PA',   fullName: 'Patriotic Alliance',         color: '#E65100', seats2024:   9, leader: 'Gayton McKenzie',     wikiTitle: 'Gayton_McKenzie' },
-  { id: 'FFP',  name: 'FF+',  fullName: 'Freedom Front Plus',         color: '#FF8F00', seats2024:   6, leader: 'Pieter Groenewald',   wikiTitle: 'Pieter_Groenewald' },
-  { id: 'RISE', name: 'Rise', fullName: 'Rise Mzansi',                color: '#00838F', seats2024:   6, leader: 'Songezo Zibi',        wikiTitle: 'Songezo_Zibi' },
-  { id: 'UDM',  name: 'UDM',  fullName: 'United Democratic Movement', color: '#558B2F', seats2024:   3, leader: 'Bantu Holomisa',      wikiTitle: 'Bantu_Holomisa' },
+  { id: 'ANC',  name: 'ANC',      fullName: 'African National Congress',          color: '#007A4D', seats2024: 159, leader: 'Cyril Ramaphosa',     wikiTitle: 'Cyril_Ramaphosa' },
+  { id: 'DA',   name: 'DA',       fullName: 'Democratic Alliance',                color: '#1565C0', seats2024:  87, leader: 'John Steenhuisen',    wikiTitle: 'John_Steenhuisen' },
+  { id: 'MK',   name: 'MK',       fullName: 'uMkhonto we Sizwe Party',            color: '#B71C1C', seats2024:  58, leader: 'Jacob Zuma',          wikiTitle: 'Jacob_Zuma' },
+  { id: 'EFF',  name: 'EFF',      fullName: 'Economic Freedom Fighters',          color: '#E53935', seats2024:  39, leader: 'Julius Malema',       wikiTitle: 'Julius_Malema' },
+  { id: 'IFP',  name: 'IFP',      fullName: 'Inkatha Freedom Party',              color: '#6A1B9A', seats2024:  17, leader: 'Velenkosini Hlabisa', wikiTitle: 'Velenkosini_Hlabisa' },
+  { id: 'PA',   name: 'PA',       fullName: 'Patriotic Alliance',                 color: '#E65100', seats2024:   9, leader: 'Gayton McKenzie',     wikiTitle: 'Gayton_McKenzie' },
+  { id: 'FFP',  name: 'FF+',      fullName: 'Freedom Front Plus',                 color: '#FF8F00', seats2024:   6, leader: 'Pieter Groenewald',   wikiTitle: 'Pieter_Groenewald' },
+  { id: 'ASA',  name: 'ActionSA', fullName: 'ActionSA',                           color: '#00ACC1', seats2024:   6, leader: 'Herman Mashaba',      wikiTitle: 'Herman_Mashaba' },
+  { id: 'UDM',  name: 'UDM',      fullName: 'United Democratic Movement',         color: '#558B2F', seats2024:   3, leader: 'Bantu Holomisa',      wikiTitle: 'Bantu_Holomisa' },
+  { id: 'ACDP', name: 'ACDP',     fullName: 'African Christian Democratic Party', color: '#1A237E', seats2024:   3, leader: 'Kenneth Meshoe',      wikiTitle: 'Kenneth_Meshoe' },
+  { id: 'RISE', name: 'Rise',     fullName: 'Rise Mzansi',                        color: '#00838F', seats2024:   2, leader: 'Songezo Zibi',        wikiTitle: 'Songezo_Zibi' },
+  { id: 'ATM',  name: 'ATM',      fullName: 'African Transformation Movement',    color: '#880E4F', seats2024:   2, leader: 'Vuyo Zungula',        wikiTitle: 'Vuyo_Zungula' },
+  { id: 'NCC',  name: 'NCC',      fullName: 'National Coloured Congress',         color: '#78909C', seats2024:   2, leader: 'Nic Koornhof',        wikiTitle: undefined },
+  { id: 'AJ',   name: 'Al Jama-ah', fullName: 'Al Jama-ah',                      color: '#2E7D32', seats2024:   2, leader: 'Ganief Hendricks',    wikiTitle: 'Ganief_Hendricks' },
+  { id: 'BOSA', name: 'BOSA',     fullName: 'Build One South Africa',             color: '#0288D1', seats2024:   2, leader: 'Mmusi Maimane',       wikiTitle: 'Mmusi_Maimane' },
+  { id: 'GOOD', name: 'GOOD',     fullName: 'Good Party',                         color: '#43A047', seats2024:   1, leader: 'Patricia de Lille',   wikiTitle: 'Patricia_de_Lille' },
+  { id: 'PAC',  name: 'PAC',      fullName: 'Pan Africanist Congress',            color: '#9C27B0', seats2024:   1, leader: 'Narius Moloto',       wikiTitle: undefined },
+  { id: 'UAT',  name: 'UAT',      fullName: 'United Africans Transformation',     color: '#795548', seats2024:   1, leader: 'Mzwandile Maphanga',  wikiTitle: undefined },
 ];
 
 const SA_PARTY_MAP = Object.fromEntries(SA_PARTIES.map(p => [p.id, p])) as Record<SaPartyId, SaParty>;
 const SA_TOTAL_SEATS = 400;
 const SA_MAJORITY = 201;
 
+// Official 2024 IEC national results
 const SA_VOTE_PCT_2024: Record<SaPartyId, number> = {
-  ANC: 42.54, DA: 23.09, MK: 15.44, EFF: 10.08, IFP: 4.08, PA: 2.08, FFP: 1.12, RISE: 0.90, UDM: 0.68,
+  ANC: 40.18, DA: 21.81, MK: 14.58, EFF: 9.52, IFP: 3.83, PA: 1.95,
+  FFP: 1.34, ASA: 1.43, UDM: 0.91, ACDP: 0.65, RISE: 0.77, ATM: 0.59,
+  NCC: 0.30, AJ: 0.28, BOSA: 0.38, GOOD: 0.23, PAC: 0.24, UAT: 0.24,
 };
 const SA_VOTE_RAW_2024: Record<SaPartyId, number> = {
-  ANC: 6_494_000, DA: 3_531_000, MK: 2_364_000, EFF: 1_554_000,
-  IFP: 620_000, PA: 320_000, FFP: 170_000, RISE: 140_000, UDM: 105_000,
+  ANC: 6_487_000, DA: 3_522_000, MK: 2_354_000, EFF: 1_537_000,
+  IFP: 618_000,   PA: 315_000,   FFP: 216_000,   ASA: 231_000,
+  UDM: 147_000,   ACDP: 105_000, RISE: 124_000,  ATM:  95_000,
+  NCC:  48_000,   AJ:   45_000,  BOSA:  61_000,  GOOD:  37_000,
+  PAC:  39_000,   UAT:  39_000,
 };
-const SA_GRAND_TOTAL_VOTES = 16_200_000;
+const SA_GRAND_TOTAL_VOTES = 16_143_000;
+
+// Official 2024 seat allocation (used for baseline display)
+const SA_SEATS_2024: Record<SaPartyId, number> = {
+  ANC: 159, DA: 87, MK: 58, EFF: 39, IFP: 17, PA: 9,
+  FFP: 6,   ASA: 6, UDM: 3, ACDP: 3, RISE: 2, ATM: 2,
+  NCC: 2,   AJ: 2,  BOSA: 2, GOOD: 1, PAC: 1, UAT: 1,
+};
 
 type SaProvId = 'GP' | 'KZN' | 'WC' | 'EC' | 'LP' | 'MP' | 'NC' | 'NW' | 'FS';
 type SaProvince = { id: SaProvId; name: string; pop: number; lat: number; lng: number; votes2024: number };
@@ -51,15 +73,16 @@ const SA_PROVINCES: SaProvince[] = [
 const SA_PROV_MAP = Object.fromEntries(SA_PROVINCES.map(p => [p.id, p])) as Record<SaProvId, SaProvince>;
 
 const SA_PROV_RESULTS_2024: Record<SaProvId, Record<SaPartyId, number>> = {
-  GP:  { ANC:34.0, DA:28.0, MK:14.0, EFF:13.0, IFP:3.0,  PA:4.0, FFP:2.0, RISE:1.0, UDM:1.0 },
-  KZN: { ANC:17.0, DA:15.0, MK:45.0, EFF:5.0,  IFP:14.0, PA:2.0, FFP:1.0, RISE:0.5, UDM:0.5 },
-  WC:  { ANC:22.0, DA:56.0, MK:5.0,  EFF:5.0,  IFP:1.0,  PA:4.0, FFP:3.0, RISE:3.0, UDM:1.0 },
-  EC:  { ANC:56.0, DA:14.0, MK:10.0, EFF:12.0, IFP:1.0,  PA:2.0, FFP:0.5, RISE:2.0, UDM:2.5 },
-  LP:  { ANC:65.0, DA:8.0,  MK:10.0, EFF:13.0, IFP:1.0,  PA:1.0, FFP:0.5, RISE:0.5, UDM:1.0 },
-  MP:  { ANC:52.0, DA:12.0, MK:18.0, EFF:10.0, IFP:4.0,  PA:2.0, FFP:1.0, RISE:0.5, UDM:0.5 },
-  NC:  { ANC:48.0, DA:26.0, MK:8.0,  EFF:9.0,  IFP:1.0,  PA:5.0, FFP:2.0, RISE:0.5, UDM:0.5 },
-  NW:  { ANC:50.0, DA:16.0, MK:16.0, EFF:11.0, IFP:2.0,  PA:3.0, FFP:1.0, RISE:0.5, UDM:0.5 },
-  FS:  { ANC:55.0, DA:16.0, MK:11.0, EFF:13.0, IFP:1.0,  PA:2.0, FFP:1.0, RISE:0.5, UDM:0.5 },
+  //         ANC    DA    MK    EFF   IFP   PA    FFP   ASA   UDM  ACDP  RISE  ATM   NCC   AJ    BOSA  GOOD  PAC   UAT
+  GP:  { ANC:35.0, DA:28.0, MK:11.0, EFF:12.0, IFP:3.0,  PA:4.5, FFP:2.0, ASA:2.5, UDM:0.5, ACDP:0.7, RISE:0.8, ATM:0.4, NCC:0.1, AJ:0.1, BOSA:0.5, GOOD:0.1, PAC:0.2, UAT:0.2 },
+  KZN: { ANC:17.0, DA:9.0,  MK:45.0, EFF:6.0,  IFP:13.0, PA:2.0, FFP:1.0, ASA:1.0, UDM:0.5, ACDP:0.3, RISE:0.3, ATM:0.3, NCC:0.1, AJ:0.2, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
+  WC:  { ANC:20.0, DA:56.0, MK:4.0,  EFF:5.0,  IFP:0.5,  PA:4.0, FFP:3.0, ASA:1.0, UDM:0.3, ACDP:1.0, RISE:2.0, ATM:0.2, NCC:1.5, AJ:0.8, BOSA:0.8, GOOD:0.7, PAC:0.2, UAT:0.2 },
+  EC:  { ANC:56.0, DA:12.0, MK:10.0, EFF:12.0, IFP:0.5,  PA:2.0, FFP:0.4, ASA:0.5, UDM:2.5, ACDP:0.5, RISE:1.5, ATM:1.0, NCC:0.1, AJ:0.1, BOSA:0.3, GOOD:0.1, PAC:0.3, UAT:0.1 },
+  LP:  { ANC:65.0, DA:5.0,  MK:10.0, EFF:13.0, IFP:0.5,  PA:1.0, FFP:0.4, ASA:0.5, UDM:1.0, ACDP:0.3, RISE:0.3, ATM:0.5, NCC:0.1, AJ:0.1, BOSA:0.2, GOOD:0.1, PAC:0.2, UAT:0.1 },
+  MP:  { ANC:52.0, DA:10.0, MK:18.0, EFF:10.0, IFP:3.0,  PA:2.0, FFP:1.0, ASA:1.0, UDM:0.5, ACDP:0.3, RISE:0.3, ATM:0.4, NCC:0.1, AJ:0.1, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
+  NC:  { ANC:47.0, DA:26.0, MK:8.0,  EFF:9.0,  IFP:0.3,  PA:5.0, FFP:2.0, ASA:1.0, UDM:0.2, ACDP:0.5, RISE:0.3, ATM:0.2, NCC:1.0, AJ:0.3, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
+  NW:  { ANC:50.0, DA:13.0, MK:16.0, EFF:11.0, IFP:1.5,  PA:3.0, FFP:1.0, ASA:1.0, UDM:0.3, ACDP:0.3, RISE:0.3, ATM:0.5, NCC:0.1, AJ:0.1, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
+  FS:  { ANC:55.0, DA:15.0, MK:11.0, EFF:13.0, IFP:0.5,  PA:2.0, FFP:1.0, ASA:0.8, UDM:0.3, ACDP:0.3, RISE:0.3, ATM:0.4, NCC:0.1, AJ:0.1, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
 };
 
 function calcSeats(votePcts: Partial<Record<SaPartyId, number>>, totalSeats = SA_TOTAL_SEATS): Partial<Record<SaPartyId, number>> {
@@ -154,7 +177,7 @@ type ProvTooltipState = {
   leader: SaPartyId | null;
 } | null;
 
-const SA_LR_ORDER: SaPartyId[] = ['EFF', 'RISE', 'MK', 'ANC', 'UDM', 'IFP', 'PA', 'FFP', 'DA'];
+const SA_LR_ORDER: SaPartyId[] = ['EFF', 'ATM', 'PAC', 'MK', 'ANC', 'UDM', 'GOOD', 'AJ', 'NCC', 'RISE', 'BOSA', 'ASA', 'IFP', 'PA', 'ACDP', 'FFP', 'DA', 'UAT'];
 
 // ── Scoreboard tile ────────────────────────────────────────────────────────────
 function SaScoreboardTile({ partyId, seats, pct, rawVotes, isLeader, isWinner }: {
@@ -226,7 +249,11 @@ function SaScoreboard({ natPcts, simSeats, isBaseline }: {
     el.addEventListener('wheel', handler, { passive: false }); return () => el.removeEventListener('wheel', handler);
   }, []);
 
-  const seats = useMemo(() => simSeats ?? calcSeats(natPcts), [simSeats, natPcts]);
+  const seats = useMemo(() => {
+    if (simSeats) return simSeats;
+    if (isBaseline) return SA_SEATS_2024 as Partial<Record<SaPartyId, number>>;
+    return calcSeats(natPcts);
+  }, [simSeats, natPcts, isBaseline]);
   const pctTotal = Object.values(natPcts).reduce((s, v) => s + (v ?? 0), 0);
   const sorted = useMemo(
     () => SA_PARTIES.filter(p => (seats[p.id] ?? 0) > 0 || (natPcts[p.id] ?? 0) > 0)
@@ -243,7 +270,7 @@ function SaScoreboard({ natPcts, simSeats, isBaseline }: {
           {sorted.map(party => {
             const s = seats[party.id] ?? 0;
             const pct = pctTotal > 0 ? (natPcts[party.id] ?? 0) / pctTotal * 100 : 0;
-            const rawVotes = isBaseline ? SA_VOTE_RAW_2024[party.id] : Math.round((natPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
+            const rawVotes = isBaseline ? (SA_VOTE_RAW_2024[party.id] ?? 0) : Math.round((natPcts[party.id] ?? 0) / 100 * SA_GRAND_TOTAL_VOTES);
             return (
               <SaScoreboardTile key={party.id} partyId={party.id} seats={s} pct={pct}
                 rawVotes={rawVotes} isLeader={party.id === leader && !winner} isWinner={party.id === winner} />
@@ -568,14 +595,14 @@ function SaParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: { seats:
 
 // ── Coalition builder ──────────────────────────────────────────────────────────
 const SA_PRESET_COALITIONS: { name: string; emoji: string; parties: SaPartyId[] }[] = [
-  { name: 'GNU (Current)',     emoji: '🇿🇦', parties: ['ANC','DA','IFP','PA','FFP','RISE','UDM'] },
+  { name: 'GNU (Current)',     emoji: '🇿🇦', parties: ['ANC','DA','IFP','PA','FFP','ASA','UDM','RISE','ACDP','BOSA','GOOD','PAC'] },
   { name: 'ANC + MK + EFF',   emoji: '✊',  parties: ['ANC','MK','EFF'] },
-  { name: 'DA-Led Opposition', emoji: '🔵', parties: ['DA','IFP','FFP','RISE','PA'] },
+  { name: 'DA-Led Opposition', emoji: '🔵', parties: ['DA','IFP','FFP','ASA','RISE','PA','BOSA'] },
   { name: 'ANC + MK',         emoji: '🤝', parties: ['ANC','MK'] },
 ];
 
 function SaCoalitionPanel({ seats, onClose, exiting, dark }: { seats: Partial<Record<SaPartyId, number>>; onClose: () => void; exiting?: boolean; dark?: boolean }) {
-  const [selected, setSelected] = useState<Set<SaPartyId>>(new Set(['ANC','DA','IFP','PA','FFP','RISE','UDM']));
+  const [selected, setSelected] = useState<Set<SaPartyId>>(new Set(['ANC','DA','IFP','PA','FFP','ASA','UDM','RISE','ACDP','BOSA','GOOD','PAC']));
   const toggle = (id: SaPartyId) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   const totalCoalSeats = [...selected].reduce((s, id) => s + (seats[id] ?? 0), 0);
   const hasMajority = totalCoalSeats >= SA_MAJORITY;
@@ -657,6 +684,8 @@ function SaTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <P>There is <strong>no formal threshold</strong>. Even very small parties win seats. Roughly 0.25% of the national vote earns a single seat.</P>
         <H2>2024 Historic Election</H2>
         <P>In 2024, the <strong>ANC fell below 50%</strong> for the first time since 1994. The outcome was a <strong>Government of National Unity (GNU)</strong> — ANC + DA + IFP + several smaller parties, together holding 275+ seats.</P>
+        <H2>18 Parties</H2>
+        <P>This simulator tracks all <strong>18 parties</strong> that won seats in 2024, from the ANC (159 seats) down to small parties like GOOD, PAC, and UAT (1 seat each). The baseline loads the official IEC result.</P>
         <H2>9 Provinces on the Map</H2>
         <P>Each coloured bubble represents one of South Africa's 9 provinces. Bubble colour shows the leading party; size reflects the margin of victory. Click any bubble to see the provincial breakdown.</P>
         <H2>Sliders</H2>
@@ -718,7 +747,11 @@ export default function SouthAfricaApp() {
     el.addEventListener('wheel', h, { passive: false }); return () => el.removeEventListener('wheel', h);
   }, []);
 
-  const displaySeats = useMemo(() => simSeats ?? calcSeats(natPcts), [simSeats, natPcts]);
+  const displaySeats = useMemo(() => {
+    if (simSeats) return simSeats;
+    if (preset === 'baseline') return SA_SEATS_2024 as Partial<Record<SaPartyId, number>>;
+    return calcSeats(natPcts);
+  }, [simSeats, natPcts, preset]);
 
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
