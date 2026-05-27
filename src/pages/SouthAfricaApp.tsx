@@ -85,38 +85,6 @@ const SA_PROV_RESULTS_2024: Record<SaProvId, Record<SaPartyId, number>> = {
   FS:  { ANC:55.0, DA:15.0, MK:11.0, EFF:13.0, IFP:0.5,  PA:2.0, FFP:1.0, ASA:0.8, UDM:0.3, ACDP:0.3, RISE:0.3, ATM:0.4, NCC:0.1, AJ:0.1, BOSA:0.3, GOOD:0.1, PAC:0.2, UAT:0.1 },
 };
 
-// Maps each of the 52 districts in south-africa-provinces.geojson → its province
-const SA_DISTRICT_TO_PROV: Record<string, SaProvId> = {
-  // Gauteng
-  'City of Johannesburg Metropolitan': 'GP', 'City of Tshwane Metropolitan': 'GP',
-  'Ekurhuleni Metropolitan': 'GP', 'West Rand District': 'GP', 'Sedibeng District': 'GP',
-  // KwaZulu-Natal
-  'eThekwini Metropolitan': 'KZN', 'iLembe District': 'KZN', 'uMgungundlovu District': 'KZN',
-  'uThungulu District': 'KZN', 'Zululand District': 'KZN', 'Umkhanyakude District': 'KZN',
-  'Uthukela District': 'KZN', 'Umzinyathi District': 'KZN', 'Amajuba District': 'KZN',
-  'Sisonke District': 'KZN', 'Ugu District': 'KZN',
-  // Western Cape
-  'City of Cape Town': 'WC', 'West Coast District': 'WC', 'Cape Winelands District': 'WC',
-  'Eden District': 'WC', 'Central Karoo District': 'WC', 'Overberg District': 'WC',
-  // Eastern Cape
-  'Buffalo City Metropolitan': 'EC', 'Nelson Mandela Bay Metropolitan': 'EC',
-  'Amathole District': 'EC', 'Chris Hani District': 'EC', 'Joe Gqabi District': 'EC',
-  'O.R. Tambo District': 'EC', 'Alfred Nzo District': 'EC', 'Sarah Baartman District': 'EC',
-  // Limpopo
-  'Capricorn District': 'LP', 'Vhembe District': 'LP', 'Mopani District': 'LP',
-  'Waterberg District': 'LP', 'Sekhukhune District': 'LP',
-  // Mpumalanga
-  'Ehlanzeni District': 'MP', 'Nkangala District': 'MP', 'Gert Sibande District': 'MP',
-  // Northern Cape
-  'Frances Baard District': 'NC', 'Namakwa District': 'NC', 'Pixley ka Seme District': 'NC',
-  'ZF Mgcawu District': 'NC', 'John Taolo Gaetsewe District': 'NC',
-  // North West
-  'Bojanala Platinum District': 'NW', 'Dr Kenneth Kaunda District': 'NW',
-  'Ngaka Modiri Molema District': 'NW', 'Dr Ruth Segomotsi Mompati District': 'NW',
-  // Free State
-  'Mangaung Metropolitan': 'FS', 'Lejweleputswa District': 'FS',
-  'Thabo Mofutsanyana District': 'FS', 'Fezile Dabi District': 'FS', 'Xhariep District': 'FS',
-};
 
 function calcSeats(votePcts: Partial<Record<SaPartyId, number>>, totalSeats = SA_TOTAL_SEATS): Partial<Record<SaPartyId, number>> {
   const qualifying: Partial<Record<SaPartyId, number>> = {};
@@ -326,7 +294,7 @@ function MapController() {
   return null;
 }
 
-// ── Province choropleth layer (fills 52 districts coloured by province winner) ──
+// ── Province choropleth layer (9 merged province polygons) ────────────────────
 function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides, dark }: {
   natPcts: Record<SaPartyId, number>;
   containerRef: React.RefObject<HTMLDivElement | null>;
@@ -342,61 +310,53 @@ function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPct
   const onSelectRef = useRef(onSelect);
   useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
 
-  // Fetch GeoJSON once and cache it
   const [geoData, setGeoData] = useState<GeoJSON.FeatureCollection | null>(null);
   useEffect(() => {
-    fetch('/south-africa-provinces.geojson').then(r => r.json()).then(setGeoData).catch(() => {});
+    fetch('/south-africa-province-outlines.geojson').then(r => r.json()).then(setGeoData).catch(() => {});
   }, []);
 
   useEffect(() => {
     if (!geoData) return;
     if (layerRef.current) { layerRef.current.remove(); layerRef.current = null; }
 
-    const borderColor = dark ? 'rgba(255,255,255,0.18)' : 'rgba(255,255,255,0.60)';
+    const borderColor = dark ? 'rgba(255,255,255,0.30)' : 'rgba(255,255,255,0.85)';
     const undeclaredFill = dark ? '#1e2a3a' : '#d1d5db';
 
     const layer = L.geoJSON(geoData as GeoJSON.GeoJsonObject, {
       style: (feature) => {
-        const distName: string = (feature as GeoJSON.Feature)?.properties?.name ?? '';
-        const provId = SA_DISTRICT_TO_PROV[distName];
-        if (!provId) return { fillColor: undeclaredFill, fillOpacity: 0.5, weight: 0.8, color: borderColor, opacity: 1 };
+        const provId = (feature as GeoJSON.Feature)?.properties?.province_id as SaProvId | undefined;
+        if (!provId) return { fillColor: undeclaredFill, fillOpacity: 0.5, weight: 1.8, color: borderColor, opacity: 1 };
         if (declaredProvs && !declaredProvs.has(provId)) {
-          return { fillColor: undeclaredFill, fillOpacity: 0.5, weight: 0.8, color: borderColor, opacity: 1 };
+          return { fillColor: undeclaredFill, fillOpacity: 0.5, weight: 1.8, color: borderColor, opacity: 1 };
         }
         const rv = overrides?.[provId] ?? calcProvVotes(natPcts, provId);
         const sorted = (Object.entries(rv) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
         const winnerId = sorted[0]?.[0] as SaPartyId | undefined;
         const color = winnerId ? partyColor(winnerId) : '#888';
         const margin = (sorted[0]?.[1] ?? 0) - (sorted[1]?.[1] ?? 0);
-        const opacity = 0.45 + Math.min(margin / 40, 1) * 0.30; // stronger colour = bigger margin
-        return { fillColor: color, fillOpacity: opacity, weight: 0.8, color: borderColor, opacity: 1 };
+        const opacity = 0.45 + Math.min(margin / 40, 1) * 0.32;
+        return { fillColor: color, fillOpacity: opacity, weight: 1.8, color: borderColor, opacity: 1 };
       },
       onEachFeature: (feature, lyr) => {
-        const distName: string = (feature as GeoJSON.Feature)?.properties?.name ?? '';
-        const provId = SA_DISTRICT_TO_PROV[distName];
-
-        lyr.on('click', () => {
-          if (provId) { setTooltip(null); onSelectRef.current(provId); }
-        });
+        const provId = (feature as GeoJSON.Feature)?.properties?.province_id as SaProvId | undefined;
+        const provName = (feature as GeoJSON.Feature)?.properties?.name ?? '';
+        lyr.on('click', () => { if (provId) { setTooltip(null); onSelectRef.current(provId); } });
         lyr.on('mouseover', (e: L.LeafletMouseEvent) => {
-          if (lyr instanceof L.Path) lyr.setStyle({ fillOpacity: Math.min(((lyr.options.fillOpacity ?? 0.55) as number) + 0.18, 0.92), weight: 1.5 });
+          if (lyr instanceof L.Path) lyr.setStyle({ fillOpacity: Math.min(((lyr.options.fillOpacity ?? 0.55) as number) + 0.20, 0.92), weight: 2.5 });
           if (!provId) return;
           const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
           const cur = overrides?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
           const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6).map(([id, pct]) => ({ id, pct }));
-          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: SA_PROV_MAP[provId]?.name ?? distName, parties, leader: parties[0]?.id ?? null });
+          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: provName, parties, leader: parties[0]?.id ?? null });
         });
         lyr.on('mousemove', (e: L.LeafletMouseEvent) => {
           if (!provId) return;
           const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
           const cur = overrides?.[provId] ?? calcProvVotes(natPctsRef.current, provId);
           const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6).map(([id, pct]) => ({ id, pct }));
-          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: SA_PROV_MAP[provId]?.name ?? distName, parties, leader: parties[0]?.id ?? null });
+          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: provName, parties, leader: parties[0]?.id ?? null });
         });
-        lyr.on('mouseout', () => {
-          if (lyr instanceof L.Path) layer.resetStyle(lyr);
-          setTooltip(null);
-        });
+        lyr.on('mouseout', () => { if (lyr instanceof L.Path) layer.resetStyle(lyr); setTooltip(null); });
       },
     }).addTo(map);
 
@@ -407,11 +367,70 @@ function SaChoroplethLayer({ natPcts, containerRef, setTooltip, onSelect, natPct
   return null;
 }
 
+// ── Province bubble layer ──────────────────────────────────────────────────────
+type BubbleEntry = { marker: L.CircleMarker; baseRadius: number };
+function zoomScale(zoom: number): number { return Math.max(0.40, Math.min(1.0, (zoom - 4) / (9 - 4))); }
+
+function SaBubbleLayer({ natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredProvs, overrides }: {
+  natPcts: Record<SaPartyId, number>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  setTooltip: (t: ProvTooltipState) => void;
+  onSelect: (id: SaProvId) => void;
+  natPctsRef: React.MutableRefObject<Record<SaPartyId, number>>;
+  overrides?: Record<string, Record<SaPartyId, number>>;
+  declaredProvs?: Set<SaProvId>;
+}) {
+  const map = useMap();
+  const bubblesRef = useRef<BubbleEntry[]>([]);
+  const onSelectRef = useRef(onSelect);
+  useEffect(() => { onSelectRef.current = onSelect; }, [onSelect]);
+
+  useEffect(() => {
+    const onZoom = () => {
+      const scale = zoomScale(map.getZoom());
+      for (const { marker, baseRadius } of bubblesRef.current) marker.setRadius(baseRadius * scale);
+    };
+    map.on('zoomend', onZoom); return () => { map.off('zoomend', onZoom); };
+  }, [map]);
+
+  useEffect(() => {
+    for (const { marker } of bubblesRef.current) marker.remove();
+    bubblesRef.current = [];
+    const scale = zoomScale(map.getZoom());
+    for (const prov of SA_PROVINCES) {
+      if (declaredProvs && !declaredProvs.has(prov.id)) continue;
+      const rv = overrides?.[prov.id] ?? calcProvVotes(natPcts, prov.id);
+      const sorted = (Object.entries(rv) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
+      if (!sorted.length) continue;
+      const [winId, winPct] = sorted[0];
+      const margin = winPct - (sorted[1]?.[1] ?? 0);
+      const baseRadius = 7 + Math.min(margin / 20, 1) * 17;
+      const color = partyColor(winId);
+      const marker = L.circleMarker([prov.lat, prov.lng] as L.LatLngExpression, {
+        radius: baseRadius * scale, color, fillColor: color, fillOpacity: 0.72, weight: 1.5, opacity: 0.9,
+      }).addTo(map);
+      marker.on('click', () => { setTooltip(null); onSelectRef.current(prov.id); });
+      marker.on('mousemove', (e: L.LeafletMouseEvent) => {
+        const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+        const cur = overrides?.[prov.id] ?? calcProvVotes(natPctsRef.current, prov.id);
+        const parties = (Object.entries(cur) as [SaPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6).map(([id, pct]) => ({ id, pct }));
+        setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: prov.name, parties, leader: parties[0]?.id ?? null });
+      });
+      marker.on('mouseout', () => setTooltip(null));
+      bubblesRef.current.push({ marker, baseRadius });
+    }
+    return () => { for (const { marker } of bubblesRef.current) marker.remove(); bubblesRef.current = []; };
+  }, [map, natPcts, declaredProvs, overrides]);
+
+  return null;
+}
+
 // ── Map view ───────────────────────────────────────────────────────────────────
-function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
+function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides, mapMode }: {
   natPcts: Record<SaPartyId, number>; onSelect: (id: SaProvId) => void;
   dark: boolean; declaredProvs?: Set<SaProvId>;
   overrides?: Record<string, Record<SaPartyId, number>>;
+  mapMode: 'choropleth' | 'bubbles';
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const [tooltip, setTooltip] = useState<ProvTooltipState>(null);
@@ -429,9 +448,14 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
           attribution='&copy; OpenStreetMap &copy; CARTO'
           subdomains="abcd" updateWhenZooming={false} updateWhenIdle maxZoom={20} />
         <MapController />
-        <SaChoroplethLayer natPcts={natPcts} containerRef={containerRef}
-          setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
-          declaredProvs={declaredProvs} overrides={overrides} dark={dark} />
+        {mapMode === 'choropleth'
+          ? <SaChoroplethLayer natPcts={natPcts} containerRef={containerRef}
+              setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
+              declaredProvs={declaredProvs} overrides={overrides} dark={dark} />
+          : <SaBubbleLayer natPcts={natPcts} containerRef={containerRef}
+              setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
+              declaredProvs={declaredProvs} overrides={overrides} />
+        }
       </MapContainer>
       {tooltip && (() => {
         const cw = containerRef.current?.clientWidth ?? 9999;
@@ -464,7 +488,9 @@ function SaMapView({ natPcts, onSelect, dark, declaredProvs, overrides }: {
           </div>
         );
       })()}
-      <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono">Scroll to zoom · Click province to open</div>
+      <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono">
+        {mapMode === 'choropleth' ? 'Scroll to zoom · Click province to open' : 'Scroll to zoom · Click bubble to open'}
+      </div>
     </div>
   );
 }
@@ -786,6 +812,7 @@ export default function SouthAfricaApp() {
     exitTimerRef.current = setTimeout(() => setExitPanel(null), 280);
   }, []);
 
+  const [mapMode, setMapMode]             = useState<'choropleth' | 'bubbles'>('choropleth');
   const [simSeats, setSimSeats]           = useState<Partial<Record<SaPartyId, number>> | undefined>();
   const [simProgress, setSimProgress]     = useState(0);
   const [simRunning, setSimRunning]       = useState(false);
@@ -837,6 +864,23 @@ export default function SouthAfricaApp() {
           <button onClick={() => { if (parliOpen) { setParliOpen(false); triggerExit('parli'); } else { setParliOpen(true); setCoalitionOpen(false); } }} className={parliOpen ? btnActive : btnMuted}>Parliament</button>
           <button onClick={() => { if (coalitionOpen) { setCoalitionOpen(false); triggerExit('coal'); } else { setCoalitionOpen(true); setParliOpen(false); } }} className={coalitionOpen ? btnActive : btnMuted}>Coalition</button>
           <button onClick={() => { if (tutorialOpen) { setTutorialOpen(false); triggerExit('tutorial'); } else setTutorialOpen(true); }} className={tutorialOpen ? btnActive : btnMuted}>Tutorial</button>
+          <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
+          <button onClick={() => setMapMode('choropleth')} className={mapMode === 'choropleth' ? btnActive : btnMuted} title="Choropleth map">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ display:'inline', verticalAlign:'middle', marginRight:3 }}>
+              <rect x="1" y="1" width="4.5" height="4.5" rx="0.5" fill="currentColor" opacity="0.9"/>
+              <rect x="6.5" y="1" width="4.5" height="4.5" rx="0.5" fill="currentColor" opacity="0.5"/>
+              <rect x="1" y="6.5" width="4.5" height="4.5" rx="0.5" fill="currentColor" opacity="0.6"/>
+              <rect x="6.5" y="6.5" width="4.5" height="4.5" rx="0.5" fill="currentColor" opacity="0.3"/>
+            </svg>
+            Map
+          </button>
+          <button onClick={() => setMapMode('bubbles')} className={mapMode === 'bubbles' ? btnActive : btnMuted} title="Bubble map">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ display:'inline', verticalAlign:'middle', marginRight:3 }}>
+              <circle cx="4" cy="4" r="3" fill="currentColor" opacity="0.85"/>
+              <circle cx="9" cy="8" r="2" fill="currentColor" opacity="0.55"/>
+            </svg>
+            Bubbles
+          </button>
         </div>
 
         <div className="shrink-0 flex items-center gap-2 pr-4">
@@ -854,7 +898,7 @@ export default function SouthAfricaApp() {
         {showParli && <SaParliamentPanel seats={displaySeats} onClose={() => { setParliOpen(false); triggerExit('parli'); }} exiting={exitPanel==='parli'} dark={dark} />}
 
         {/* Map */}
-        <SaMapView natPcts={natPcts} onSelect={id => setSelectedProv(prev => prev === id ? null : id)} dark={dark} declaredProvs={declaredProvs} overrides={provOverrides} />
+        <SaMapView natPcts={natPcts} onSelect={id => setSelectedProv(prev => prev === id ? null : id)} dark={dark} declaredProvs={declaredProvs} overrides={provOverrides} mapMode={mapMode} />
 
         {/* Right panels */}
         {simOpen && (
