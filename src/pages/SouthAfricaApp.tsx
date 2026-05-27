@@ -726,12 +726,11 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportin
   const onReportingChangeRef = useRef(onReportingChange);
   useEffect(() => { onReportingChangeRef.current = onReportingChange; }, [onReportingChange]);
 
-  // Re-init when province changes — restore the saved reporting % instead of resetting to 100
+  // Re-init when province changes — restore the saved reporting % instead of resetting to 100.
+  // Don't push anything to the parent here; only "Project Result" commits data upstream.
   useEffect(() => {
     setPcts(initFromNat()); setLocks(new Set()); setEditId(null);
-    const rpt = storedReportingPct ?? 100;
-    setReportingPct(rpt);
-    onReportingChangeRef.current?.(rpt);
+    setReportingPct(storedReportingPct ?? 100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [provId]);
 
@@ -739,7 +738,10 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportin
     // Lock inactive parties at 0 so redistribution never spills into them
     const effectiveLocks = new Set([...locks, ...SA_PARTIES.map(p => p.id).filter(pid => !activeParties.has(pid))]);
     const next = redistributePcts(pctsRef.current, id, val, effectiveLocks);
-    pctsRef.current = next; setPcts(next); onUpdate(provId, next);
+    pctsRef.current = next; setPcts(next);
+    // On blank map (onDeclare defined) sliders are draft-only — commit happens on "Project Result".
+    // On polling/baseline (onDeclare undefined) live-update the map.
+    if (!onDeclare) onUpdate(provId, next);
   }
   function toggleLock(id: SaPartyId) {
     setLocks(prev => {
@@ -800,11 +802,7 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportin
               </span>
             </div>
             <input type="range" min={0} max={100} step={1} value={reportingPct}
-              onChange={e => {
-                const v = Number(e.target.value);
-                setReportingPct(v);
-                onReportingChangeRef.current?.(v);
-              }}
+              onChange={e => setReportingPct(Number(e.target.value))}
               className="party-slider w-full"
               style={{ '--party-color': reportingPct === 100 ? '#16a34a' : '#f59e0b', '--pct': `${reportingPct}%` } as React.CSSProperties} />
             <div className="flex justify-between mt-0.5">
@@ -919,7 +917,8 @@ function SaProvPanel({ provId, natPcts, onUpdate, onClose, onDeclare, onReportin
             <button onClick={() => {
               const rv = calcProvVotes(natPcts, provId);
               const reset = Object.fromEntries(SA_PARTIES.map(p => [p.id, rv[p.id] ?? 0])) as Record<SaPartyId, number>;
-              setPcts(reset); setLocks(new Set()); onUpdate(provId, reset);
+              setPcts(reset); setLocks(new Set());
+              if (!onDeclare) onUpdate(provId, reset);
             }} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
               Reset to Estimate
             </button>
