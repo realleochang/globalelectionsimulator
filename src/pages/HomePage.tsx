@@ -122,7 +122,7 @@ export const COUNTRIES = [
     lat: -29, lng: 25,
     accent: 'linear-gradient(90deg,#007A4D,#FFB612,#003DA5)',
     parties: [
-      { color: '#E53935', abbr: 'EFF' }, { color: '#B71C1C', abbr: 'MK'  },
+      { color: '#E53935', abbr: 'EFF' }, { color: '#1B5E20', abbr: 'MK'  },
       { color: '#007A4D', abbr: 'ANC' }, { color: '#1565C0', abbr: 'DA'  },
     ],
   },

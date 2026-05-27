@@ -14,7 +14,7 @@ const SA_PARTIES: SaParty[] = [
   { id: 'ANC',  name: 'ANC',       fullName: 'African National Congress',          color: '#007A4D', seats2024: 159, leader: 'Cyril Ramaphosa',     wikiTitle: 'Cyril_Ramaphosa' },
   // DA: Steenhuisen stepped down Feb 2026 → Geordin Hill-Lewis elected leader Apr 12 2026
   { id: 'DA',   name: 'DA',        fullName: 'Democratic Alliance',                color: '#1565C0', seats2024:  87, leader: 'Geordin Hill-Lewis',  wikiTitle: 'Geordin_Hill-Lewis',  leader2024: 'John Steenhuisen', wikiTitle2024: 'John_Steenhuisen' },
-  { id: 'MK',   name: 'MK',        fullName: 'uMkhonto we Sizwe Party',            color: '#B71C1C', seats2024:  58, leader: 'Jacob Zuma',          wikiTitle: 'Jacob_Zuma' },
+  { id: 'MK',   name: 'MK',        fullName: 'uMkhonto we Sizwe Party',            color: '#1B5E20', seats2024:  58, leader: 'Jacob Zuma',          wikiTitle: 'Jacob_Zuma' },
   { id: 'EFF',  name: 'EFF',       fullName: 'Economic Freedom Fighters',          color: '#E53935', seats2024:  39, leader: 'Julius Malema',       wikiTitle: 'Julius_Malema' },
   { id: 'IFP',  name: 'IFP',       fullName: 'Inkatha Freedom Party',              color: '#6A1B9A', seats2024:  17, leader: 'Velenkosini Hlabisa', wikiTitle: 'Velenkosini_Hlabisa' },
   { id: 'PA',   name: 'PA',        fullName: 'Patriotic Alliance',                 color: '#E65100', seats2024:   9, leader: 'Gayton McKenzie',     wikiTitle: 'Gayton_McKenzie' },
