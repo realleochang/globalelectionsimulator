@@ -1975,6 +1975,9 @@ export default function RomaniaApp() {
 
   // Draft inputs for sim panel — ISOLATED from natPcts so typing doesn't update the map
   const [simDraftPcts,   setSimDraftPcts]   = useState<Record<RoPartyId, number>>(() => ({ ...natPcts }));
+  // Edit buffer: raw string shown while an input is focused, committed on blur
+  const [simEditBuf, setSimEditBuf] = useState<{ key: string; raw: string } | null>(null);
+
   // Others is also a free-typed independent value — not auto-computed
   const [simDraftOthers, setSimDraftOthers] = useState<number>(() => {
     const s = RO_PARTIES.reduce((acc, p) => acc + (natPcts[p.id] ?? 0), 0);
@@ -2269,14 +2272,20 @@ export default function RomaniaApp() {
                                 <div style={{ width: `${Math.min(pct / 55 * 100, 100)}%`, background: color, height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
                               </div>
                               <input
-                                type="number" min={0} max={100} step={0.1}
-                                value={pct.toFixed(1)}
-                                onChange={e => {
-                                  const v = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
-                                  // ← writes ONLY to draft; map (natPcts) is untouched
-                                  setSimDraftPcts(prev => ({ ...prev, [party.id]: v }));
+                                type="text" inputMode="decimal"
+                                value={simEditBuf?.key === party.id ? simEditBuf.raw : pct.toFixed(1)}
+                                onFocus={e => { setSimEditBuf({ key: party.id, raw: pct.toFixed(1) }); e.target.select(); }}
+                                onChange={e => setSimEditBuf({ key: party.id, raw: e.target.value })}
+                                onBlur={() => {
+                                  if (simEditBuf?.key === party.id) {
+                                    const v = Math.max(0, Math.min(100, parseFloat(simEditBuf.raw) || 0));
+                                    setSimDraftPcts(prev => ({ ...prev, [party.id]: v }));
+                                    setSimEditBuf(null);
+                                  }
                                 }}
-                                onFocus={e => e.target.select()}
+                                onKeyDown={e => {
+                                  if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                                }}
                                 className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none transition-colors"
                                 style={{
                                   color,
@@ -2303,13 +2312,20 @@ export default function RomaniaApp() {
                             <div style={{ width: `${Math.min(simDraftOthers / 55 * 100, 100)}%`, background: '#9CA3AF', height: '100%', borderRadius: '9999px', transition: 'width 0.15s ease' }} />
                           </div>
                           <input
-                            type="number" min={0} max={100} step={0.1}
-                            value={simDraftOthers.toFixed(1)}
-                            onChange={e => {
-                              const v = Math.max(0, Math.min(100, parseFloat(e.target.value) || 0));
-                              setSimDraftOthers(v);
+                            type="text" inputMode="decimal"
+                            value={simEditBuf?.key === '__others' ? simEditBuf.raw : simDraftOthers.toFixed(1)}
+                            onFocus={e => { setSimEditBuf({ key: '__others', raw: simDraftOthers.toFixed(1) }); e.target.select(); }}
+                            onChange={e => setSimEditBuf({ key: '__others', raw: e.target.value })}
+                            onBlur={() => {
+                              if (simEditBuf?.key === '__others') {
+                                const v = Math.max(0, Math.min(100, parseFloat(simEditBuf.raw) || 0));
+                                setSimDraftOthers(v);
+                                setSimEditBuf(null);
+                              }
                             }}
-                            onFocus={e => e.target.select()}
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+                            }}
                             className="w-14 text-[12px] font-mono font-bold tabular-nums text-center rounded-md outline-none transition-colors"
                             style={{
                               color: '#9CA3AF',
