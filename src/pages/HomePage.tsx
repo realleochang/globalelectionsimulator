@@ -126,6 +126,18 @@ export const COUNTRIES = [
       { color: '#007A4D', abbr: 'ANC' }, { color: '#1565C0', abbr: 'DA'  },
     ],
   },
+  {
+    id: 'sweden', path: '/sweden', name: 'Sweden', flag: '🇸🇪', demonym: 'Swedish', mapColor: '#006AA7',
+    flagSrc: 'sweden-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'General Election', subtitle: 'Riksdag',
+    lat: 62, lng: 17,
+    accent: 'linear-gradient(90deg,#006AA7,#FECC02,#006AA7)',
+    parties: [
+      { color: '#C8101E', abbr: 'V'  }, { color: '#ED1B34', abbr: 'S'  },
+      { color: '#009A44', abbr: 'C'  }, { color: '#1B4F8A', abbr: 'M'  },
+      { color: '#EDB820', abbr: 'SD' },
+    ],
+  },
 ];
 
 export type Country = typeof COUNTRIES[0];
@@ -133,20 +145,20 @@ export type Country = typeof COUNTRIES[0];
 const ISO_TO_COLOR: Record<string, string> = {
   'GB': '#C8102E', 'FR': '#002395', 'CA': '#D52B1E', 'US': '#002868',
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
-  'ZA': '#FFB612', 'RO': '#FCD116',
+  'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
-  'ZA': 'south-africa', 'RO': 'romania',
+  'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
 const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
-  '710': 'ZA', '642': 'RO',
+  '710': 'ZA', '642': 'RO', '752': 'SE',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -936,7 +948,7 @@ function AboutOverlay({ dark, onClose }: { dark: boolean; onClose: () => void })
               body: 'No accounts. No paywalls. No barriers. Every simulation, every country, every time — completely free.',
             },
             {
-              label: '11 Countries',
+              label: '12 Countries',
               body: 'From Westminster first-past-the-post to German proportional representation — explore real electoral systems.',
             },
             {
