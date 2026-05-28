@@ -23,7 +23,11 @@ import JapanApp from './pages/JapanApp.tsx'
 import NigeriaApp from './pages/NigeriaApp.tsx'
 import CountriesPage from './pages/CountriesPage.tsx'
 
-document.getElementById('splash')?.remove()
+const splash = document.getElementById('splash')
+if (splash) {
+  splash.classList.add('splash-hide')
+  setTimeout(() => splash.remove(), 500)
+}
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

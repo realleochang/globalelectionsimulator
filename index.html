@@ -8,29 +8,179 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=JetBrains+Mono:wght@400;500;600&family=Barlow+Condensed:wght@700;900&family=Space+Grotesk:wght@500;600;700&family=Cinzel:wght@700;800;900&family=DM+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" />
+    <style>
+      /* ===== Loading splash ===== */
+      #splash {
+        position: fixed; inset: 0; z-index: 9999;
+        display: flex; flex-direction: column;
+        align-items: center; justify-content: center; gap: 30px;
+        background:
+          radial-gradient(900px 600px at 50% 36%, rgba(59,130,246,0.10), transparent 70%),
+          radial-gradient(700px 500px at 78% 80%, rgba(239,68,68,0.07), transparent 70%),
+          #0b0b0d;
+        font-family: 'Space Grotesk', system-ui, sans-serif;
+        opacity: 1; transition: opacity .45s ease;
+      }
+      #splash.splash-hide { opacity: 0; }
+      /* subtle moving grid backdrop */
+      #splash::before {
+        content: ""; position: absolute; inset: -50%;
+        background-image:
+          linear-gradient(rgba(255,255,255,0.035) 1px, transparent 1px),
+          linear-gradient(90deg, rgba(255,255,255,0.035) 1px, transparent 1px);
+        background-size: 44px 44px;
+        mask-image: radial-gradient(circle at 50% 42%, #000 0%, transparent 60%);
+        -webkit-mask-image: radial-gradient(circle at 50% 42%, #000 0%, transparent 60%);
+        animation: splash-grid 14s linear infinite;
+      }
+      @keyframes splash-grid { to { transform: translate(44px, 44px); } }
+
+      .splash-globe-wrap {
+        position: relative; width: 168px; height: 168px;
+        display: flex; align-items: center; justify-content: center;
+      }
+      /* glow ring behind globe */
+      .splash-globe-wrap::after {
+        content: ""; position: absolute; width: 132px; height: 132px;
+        border-radius: 50%;
+        box-shadow: 0 0 60px 6px rgba(59,130,246,0.35);
+        animation: splash-pulse 2.4s ease-in-out infinite;
+      }
+      @keyframes splash-pulse { 0%,100% { opacity: .45; } 50% { opacity: 1; } }
+
+      .splash-globe { width: 132px; height: 132px; position: relative; }
+      /* spinning wireframe meridians: each pulses scaleX, staggered = rotation illusion */
+      .splash-globe .mer {
+        transform-box: fill-box; transform-origin: center;
+        animation: splash-mer 2.6s linear infinite;
+      }
+      .splash-globe .mer:nth-child(1) { animation-delay: 0s; }
+      .splash-globe .mer:nth-child(2) { animation-delay: -.43s; }
+      .splash-globe .mer:nth-child(3) { animation-delay: -.86s; }
+      .splash-globe .mer:nth-child(4) { animation-delay: -1.30s; }
+      .splash-globe .mer:nth-child(5) { animation-delay: -1.73s; }
+      .splash-globe .mer:nth-child(6) { animation-delay: -2.16s; }
+      @keyframes splash-mer {
+        0%   { transform: scaleX(1);    opacity: .85; }
+        50%  { transform: scaleX(.04);  opacity: .25; }
+        100% { transform: scaleX(1);    opacity: .85; }
+      }
+      /* rotating radar sweep */
+      .splash-sweep {
+        position: absolute; inset: 0; transform-origin: center;
+        animation: splash-spin 3.2s linear infinite;
+      }
+      @keyframes splash-spin { to { transform: rotate(360deg); } }
+      /* orbiting data pins */
+      .splash-orbit {
+        position: absolute; inset: -6px; transform-origin: center;
+        animation: splash-spin 6s linear infinite reverse;
+      }
+      .splash-orbit span {
+        position: absolute; width: 7px; height: 7px; border-radius: 50%;
+        top: 50%; left: 50%; margin: -3.5px;
+      }
+      .splash-orbit span:nth-child(1) { background:#3b82f6; box-shadow:0 0 8px #3b82f6; transform: rotate(0deg)   translateX(72px); }
+      .splash-orbit span:nth-child(2) { background:#ef4444; box-shadow:0 0 8px #ef4444; transform: rotate(135deg) translateX(72px); }
+      .splash-orbit span:nth-child(3) { background:#22c55e; box-shadow:0 0 8px #22c55e; transform: rotate(255deg) translateX(72px); }
+
+      /* live-tally vote bars */
+      .splash-bars { display: flex; align-items: flex-end; gap: 7px; height: 34px; }
+      .splash-bars i {
+        display: block; width: 7px; border-radius: 3px 3px 0 0;
+        animation: splash-bar 1.5s ease-in-out infinite;
+      }
+      .splash-bars i:nth-child(1){ background:#3b82f6; animation-delay:0s;   }
+      .splash-bars i:nth-child(2){ background:#60a5fa; animation-delay:.1s;  }
+      .splash-bars i:nth-child(3){ background:#ef4444; animation-delay:.2s;  }
+      .splash-bars i:nth-child(4){ background:#f87171; animation-delay:.3s;  }
+      .splash-bars i:nth-child(5){ background:#22c55e; animation-delay:.4s;  }
+      .splash-bars i:nth-child(6){ background:#eab308; animation-delay:.5s;  }
+      .splash-bars i:nth-child(7){ background:#a855f7; animation-delay:.6s;  }
+      @keyframes splash-bar { 0%,100% { height: 18%; } 50% { height: 100%; } }
+
+      .splash-title {
+        font-size: 23px; font-weight: 700; letter-spacing: -0.02em;
+        background: linear-gradient(100deg, #9ca3af 25%, #ffffff 50%, #9ca3af 75%);
+        background-size: 200% auto; -webkit-background-clip: text; background-clip: text;
+        -webkit-text-fill-color: transparent; color: transparent;
+        animation: splash-sheen 2.6s linear infinite;
+      }
+      @keyframes splash-sheen { to { background-position: -200% center; } }
+      .splash-sub {
+        color:#5a5f6b; font-size:10px; font-weight:500; letter-spacing:.18em;
+        text-transform:uppercase; margin-top:8px; font-family:'JetBrains Mono',monospace;
+      }
+      .splash-sub b { color:#3b82f6; font-weight:600; animation: splash-blink 1.2s steps(1) infinite; }
+      @keyframes splash-blink { 50% { opacity: 0; } }
+
+      /* progress bar */
+      .splash-prog {
+        width: 220px; height: 3px; border-radius: 99px;
+        background: rgba(255,255,255,0.08); overflow: hidden;
+      }
+      .splash-prog i {
+        display: block; height: 100%; width: 40%; border-radius: 99px;
+        background: linear-gradient(90deg, #3b82f6, #a855f7, #ef4444);
+        animation: splash-load 1.6s ease-in-out infinite;
+      }
+      @keyframes splash-load {
+        0%   { transform: translateX(-120%); width: 38%; }
+        50%  { width: 62%; }
+        100% { transform: translateX(360%); width: 38%; }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        #splash *, #splash::before { animation: none !important; }
+      }
+    </style>
   </head>
   <body>
     <div id="root">
-      <div id="splash" style="
-        position:fixed;inset:0;
-        background:#0f0f0f;
-        display:flex;flex-direction:column;
-        align-items:center;justify-content:center;
-        gap:16px;
-        font-family:'Space Grotesk',system-ui,sans-serif;
-      ">
-        <!-- Globe SVG -->
-        <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" style="opacity:0.9">
-          <circle cx="24" cy="24" r="20" stroke="#3b82f6" stroke-width="2" fill="none"/>
-          <ellipse cx="24" cy="24" rx="9" ry="20" stroke="#3b82f6" stroke-width="1.5" fill="none"/>
-          <line x1="4" y1="24" x2="44" y2="24" stroke="#3b82f6" stroke-width="1.5"/>
-          <line x1="7" y1="15" x2="41" y2="15" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 2"/>
-          <line x1="7" y1="33" x2="41" y2="33" stroke="#3b82f6" stroke-width="1" stroke-dasharray="2 2"/>
-        </svg>
-        <div style="text-align:center;line-height:1.2">
-          <div style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-0.02em">Global Election Simulator</div>
-          <div style="color:#555;font-size:10px;font-weight:500;letter-spacing:0.12em;text-transform:uppercase;margin-top:6px;font-family:'JetBrains Mono',monospace">Loading…</div>
+      <div id="splash">
+        <div class="splash-globe-wrap">
+          <div class="splash-orbit"><span></span><span></span><span></span></div>
+          <svg class="splash-globe" viewBox="0 0 132 132" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+              <radialGradient id="splashGlobeFill" cx="38%" cy="34%" r="75%">
+                <stop offset="0%" stop-color="#1e3a8a" stop-opacity="0.55"/>
+                <stop offset="100%" stop-color="#0b0b0d" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="splashSweep" x1="66" y1="66" x2="66" y2="6" gradientUnits="userSpaceOnUse">
+                <stop offset="0%" stop-color="#3b82f6" stop-opacity="0"/>
+                <stop offset="100%" stop-color="#60a5fa" stop-opacity="0.9"/>
+              </linearGradient>
+            </defs>
+            <!-- globe body -->
+            <circle cx="66" cy="66" r="58" fill="url(#splashGlobeFill)"/>
+            <circle cx="66" cy="66" r="58" stroke="#3b82f6" stroke-width="2"/>
+            <!-- latitude lines (static) -->
+            <ellipse cx="66" cy="66" rx="58" ry="20" stroke="#3b82f6" stroke-opacity="0.45" stroke-width="1"/>
+            <ellipse cx="66" cy="66" rx="58" ry="40" stroke="#3b82f6" stroke-opacity="0.3" stroke-width="1"/>
+            <line x1="8" y1="66" x2="124" y2="66" stroke="#3b82f6" stroke-opacity="0.5" stroke-width="1"/>
+            <!-- meridians (animated → spinning sphere) -->
+            <ellipse class="mer" cx="66" cy="66" rx="58" ry="58" stroke="#60a5fa" stroke-width="1.4"/>
+            <ellipse class="mer" cx="66" cy="66" rx="46" ry="58" stroke="#60a5fa" stroke-width="1.2"/>
+            <ellipse class="mer" cx="66" cy="66" rx="30" ry="58" stroke="#3b82f6" stroke-width="1.1"/>
+            <ellipse class="mer" cx="66" cy="66" rx="14" ry="58" stroke="#3b82f6" stroke-width="1"/>
+            <ellipse class="mer" cx="66" cy="66" rx="58" ry="58" stroke="#3b82f6" stroke-width="1" stroke-opacity="0.6"/>
+            <ellipse class="mer" cx="66" cy="66" rx="38" ry="58" stroke="#60a5fa" stroke-width="1" stroke-opacity="0.7"/>
+          </svg>
+          <!-- radar sweep -->
+          <svg class="splash-sweep" viewBox="0 0 132 132" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M66 66 L66 8 A58 58 0 0 1 110 30 Z" fill="url(#splashSweep)" opacity="0.5"/>
+          </svg>
         </div>
+
+        <div class="splash-bars">
+          <i></i><i></i><i></i><i></i><i></i><i></i><i></i>
+        </div>
+
+        <div style="text-align:center;line-height:1.2">
+          <div class="splash-title">Global Election Simulator</div>
+          <div class="splash-sub">Tallying the vote<b>_</b></div>
+        </div>
+
+        <div class="splash-prog"><i></i></div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

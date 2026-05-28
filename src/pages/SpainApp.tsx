@@ -22,6 +22,8 @@ type EsParty = {
   wikiTitle?:     string;
   leader2026?:    string;
   wikiTitle2026?: string;
+  name2026?:      string;  // prospective-election display name (e.g. Sumar → Un Paso al Frente)
+  fullName2026?:  string;
   regional?:      boolean;
 };
 
@@ -36,23 +38,28 @@ const ES_PARTIES: EsParty[] = [
   { id: 'VOX',      name: 'Vox',   fullName: 'Vox',                         color: '#63BE21', seats2023:  33,
     leader: 'Santiago Abascal',     wikiTitle: 'Santiago_Abascal' },
   { id: 'SUMAR',    name: 'Sumar', fullName: 'Sumar',                       color: '#BF399E', seats2023:  31,
-    leader: 'Yolanda Díaz',         wikiTitle: 'Yolanda_Díaz' },
+    leader: 'Yolanda Díaz',         wikiTitle: 'Yolanda_Díaz',
+    leader2026: 'TBD',              name2026: 'UPF', fullName2026: 'Un Paso al Frente' },
   { id: 'ERC',      name: 'ERC',   fullName: 'Esquerra Republicana',        color: '#F4B400', seats2023:   7,
     leader: 'Oriol Junqueras',      wikiTitle: 'Oriol_Junqueras',
     leader2026: 'Gabriel Rufián',   wikiTitle2026: 'Gabriel_Rufián',  regional: true },
   { id: 'JUNTS',    name: 'Junts', fullName: 'Junts per Catalunya',         color: '#00AACD', seats2023:   7,
-    leader: 'Carles Puigdemont',    wikiTitle: 'Carles_Puigdemont',   regional: true },
+    leader: 'Carles Puigdemont',    wikiTitle: 'Carles_Puigdemont',
+    leader2026: 'Míriam Nogueras',  wikiTitle2026: 'Míriam_Nogueras', regional: true },
   { id: 'EH_BILDU', name: 'Bildu', fullName: 'EH Bildu',                    color: '#9BC73B', seats2023:   6,
     leader: 'Arnaldo Otegi',        wikiTitle: 'Arnaldo_Otegi',
     leader2026: 'Mertxe Aizpurua', wikiTitle2026: 'Mertxe_Aizpurua', regional: true },
   { id: 'PNV',      name: 'PNV',   fullName: 'Euzko Alderdi Jeltzalea',    color: '#007442', seats2023:   5,
-    leader: 'Aitor Esteban',        wikiTitle: 'Aitor_Esteban',       regional: true },
+    leader: 'Aitor Esteban',        wikiTitle: 'Aitor_Esteban',
+    leader2026: 'Maribel Vaquero',  wikiTitle2026: 'Maribel_Vaquero', regional: true },
   { id: 'CC',       name: 'CC',    fullName: 'Coalición Canaria',           color: '#FFD700', seats2023:   1,
     leader: 'Cristina Valido',      wikiTitle: 'Cristina_Valido',     regional: true },
   { id: 'BNG',      name: 'BNG',   fullName: 'Bloque Nacionalista Gallego',color: '#52B4DC', seats2023:   1,
-    leader: 'Ana Pontón',           wikiTitle: 'Ana_Pontón',          regional: true },
+    leader: 'Ana Pontón',           wikiTitle: 'Ana_Pontón',
+    leader2026: 'Néstor Rego',      wikiTitle2026: 'Néstor_Rego',     regional: true },
   { id: 'UPN',      name: 'UPN',   fullName: 'Unión del Pueblo Navarro',    color: '#00857C', seats2023:   1,
-    leader: 'Javier Esparza',       wikiTitle: 'Javier_Esparza_(politician)', regional: true },
+    leader: 'Javier Esparza',       wikiTitle: 'Javier_Esparza_(politician)',
+    leader2026: 'Alberto Catalán',  wikiTitle2026: 'Alberto_Catalán_(politician)', regional: true },
 ];
 
 const ES_PARTY_MAP = Object.fromEntries(ES_PARTIES.map(p => [p.id, p])) as Record<EsPartyId, EsParty>;
@@ -488,6 +495,8 @@ function EsScoreboardTile({
   const party      = ES_PARTY_MAP[partyId];
   const leaderName = is2026 && party.leader2026 ? party.leader2026 : party.leader;
   const leaderWiki = is2026 && party.wikiTitle2026 ? party.wikiTitle2026 : party.wikiTitle;
+  const partyName  = is2026 && party.name2026 ? party.name2026 : party.name;
+  const partyFull  = is2026 && party.fullName2026 ? party.fullName2026 : party.fullName;
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -523,9 +532,9 @@ function EsScoreboardTile({
         )}
       </div>
       <span className="cand-leader-name" title={leaderName}>{leaderName.split(' ').slice(-1)[0]}</span>
-      <span className="cand-party-abbrev">{party.name}</span>
+      <span className="cand-party-abbrev">{partyName}</span>
       <span className="cand-seats">{seats}</span>
-      <span className="cand-party-name" title={party.fullName}>{party.fullName}</span>
+      <span className="cand-party-name" title={partyFull}>{partyFull}</span>
       <div style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:1 }}>
         <span style={{ fontSize:6.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:600, color:hexToRgba(color,0.48), letterSpacing:'0.10em', textTransform:'uppercase' }}>VOTES</span>
         <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color }}>{pct.toFixed(1)}%</span>
