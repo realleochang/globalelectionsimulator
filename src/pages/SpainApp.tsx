@@ -10,7 +10,7 @@ import { GlobeLogo } from './HomePage';
 // ── Party types ───────────────────────────────────────────────────────────────
 type EsPartyId =
   | 'PP' | 'PSOE' | 'VOX' | 'SUMAR'
-  | 'ERC' | 'JUNTS' | 'EH_BILDU' | 'PNV' | 'CC' | 'BNG';
+  | 'ERC' | 'JUNTS' | 'EH_BILDU' | 'PNV' | 'CC' | 'BNG' | 'UPN';
 
 type EsParty = {
   id:             EsPartyId;
@@ -26,12 +26,12 @@ type EsParty = {
 };
 
 // Ideological order left → right for parliament hemicycle
-const ES_LR_ORDER: EsPartyId[] = ['EH_BILDU','BNG','SUMAR','ERC','PSOE','JUNTS','CC','PNV','PP','VOX'];
+const ES_LR_ORDER: EsPartyId[] = ['EH_BILDU','BNG','SUMAR','ERC','PSOE','JUNTS','CC','PNV','UPN','PP','VOX'];
 
 const ES_PARTIES: EsParty[] = [
   { id: 'PP',       name: 'PP',    fullName: 'Partido Popular',             color: '#0066CC', seats2023: 137,
     leader: 'Alberto Núñez Feijóo', wikiTitle: 'Alberto_Núñez_Feijóo' },
-  { id: 'PSOE',     name: 'PSOE',  fullName: 'Partido Socialista',          color: '#E4003B', seats2023: 122,
+  { id: 'PSOE',     name: 'PSOE',  fullName: 'Partido Socialista',          color: '#E4003B', seats2023: 121,
     leader: 'Pedro Sánchez',        wikiTitle: 'Pedro_Sánchez' },
   { id: 'VOX',      name: 'Vox',   fullName: 'Vox',                         color: '#63BE21', seats2023:  33,
     leader: 'Santiago Abascal',     wikiTitle: 'Santiago_Abascal' },
@@ -51,6 +51,8 @@ const ES_PARTIES: EsParty[] = [
     leader: 'Cristina Valido',      wikiTitle: 'Cristina_Valido',     regional: true },
   { id: 'BNG',      name: 'BNG',   fullName: 'Bloque Nacionalista Gallego',color: '#52B4DC', seats2023:   1,
     leader: 'Ana Pontón',           wikiTitle: 'Ana_Pontón',          regional: true },
+  { id: 'UPN',      name: 'UPN',   fullName: 'Unión del Pueblo Navarro',    color: '#00857C', seats2023:   1,
+    leader: 'Javier Esparza',       wikiTitle: 'Javier_Esparza_(politician)', regional: true },
 ];
 
 const ES_PARTY_MAP = Object.fromEntries(ES_PARTIES.map(p => [p.id, p])) as Record<EsPartyId, EsParty>;
@@ -60,19 +62,19 @@ const ES_MAJORITY    = 176;
 // 2023 national results — source: Ministerio del Interior, 23-J 2023
 const ES_VOTE_PCT_2023: Record<EsPartyId, number> = {
   PP: 33.06, PSOE: 31.71, VOX: 12.40, SUMAR: 12.31,
-  ERC: 1.89, JUNTS: 1.62, EH_BILDU: 1.36, PNV: 1.13, CC: 0.63, BNG: 0.62,
+  ERC: 1.89, JUNTS: 1.62, EH_BILDU: 1.36, PNV: 1.13, CC: 0.63, BNG: 0.62, UPN: 0.21,
 };
 const ES_VOTE_RAW_2023: Record<EsPartyId, number> = {
   PP:        8_091_840, PSOE:    7_760_970, VOX:     3_033_744, SUMAR:   3_014_006,
   ERC:         462_883, JUNTS:     396_472, EH_BILDU:  332_839, PNV:       275_449,
-  CC:          154_588, BNG:       152_327,
+  CC:          154_588, BNG:       152_327, UPN:        52_188,
 };
 const ES_GRAND_TOTAL_VOTES = 24_474_836;
 
 // 2026 polling — PP well ahead, PSOE declining, Sumar fragmented
 const ES_VOTE_PCT_2026: Record<EsPartyId, number> = {
   PP: 36.0, PSOE: 28.5, VOX: 13.0, SUMAR: 9.0,
-  ERC: 1.5, JUNTS: 1.8, EH_BILDU: 1.4, PNV: 1.1, CC: 0.65, BNG: 0.60,
+  ERC: 1.5, JUNTS: 1.8, EH_BILDU: 1.4, PNV: 1.1, CC: 0.65, BNG: 0.60, UPN: 0.20,
 };
 
 // ── Province types ────────────────────────────────────────────────────────────
@@ -126,137 +128,174 @@ const ES_GEOID_TO_ID: Record<string, EsProvId> = {
   CEUTA:'CEUTA', MELILLA:'MELILLA',
 };
 
-// ── 52 provinces — seats (2023 allocation) + 2023 vote % ─────────────────────
-// Vote %s are for the 10 modelled parties only; remaining % = other/minor parties.
+// ── 52 provinces — district magnitude (2023 apportionment) + 2023 vote % ─────
+// Vote %s are the OFFICIAL constituency results for the 11 modelled parties;
+// remaining % = other/minor parties (the engine normalises within the modelled set).
 // D'Hondt 3% provincial threshold is applied per-province in calcAllProvinceSeats.
-// Sources: Ministerio del Interior 23-J 2023, aggregated by province.
+// VERIFIED: D'Hondt on these %s reproduces the official per-constituency seats and
+// the national totals (PP 137, PSOE 121, Vox 33, Sumar 31, ERC 7, Junts 7, Bildu 6,
+// PNV 5, BNG 1, CC 1, UPN 1). See scripts/verify-spain-2023.mjs.
+// Source: Wikipedia "Results breakdown of the 2023 Spanish general election (Congress)".
 const ES_PROVINCES: EsProvince[] = [
   // ── Andalusia ──────────────────────────────────────────────────────────────
   { id:'ALMERIA',    name:'Almería',   seats: 6, weight:1.74,
-    v2023:{PP:49.0,PSOE:23.0,VOX:17.0,SUMAR: 8.0} },
+    v2023:{PP:41.0,PSOE:29.0,VOX:21.4,SUMAR: 6.6} },
   { id:'CADIZ',      name:'Cádiz',     seats: 9, weight:2.77,
-    v2023:{PP:37.0,PSOE:30.0,VOX:15.0,SUMAR:14.0} },
+    v2023:{PP:34.8,PSOE:33.2,VOX:15.2,SUMAR:12.9} },
   { id:'CORDOBA',    name:'Córdoba',   seats: 6, weight:1.87,
-    v2023:{PP:42.0,PSOE:27.0,VOX:16.0,SUMAR:11.0} },
+    v2023:{PP:37.9,PSOE:32.1,VOX:13.9,SUMAR:13.7} },
   { id:'GRANADA',    name:'Granada',   seats: 7, weight:2.25,
-    v2023:{PP:44.0,PSOE:25.0,VOX:17.0,SUMAR:11.0} },
+    v2023:{PP:37.0,PSOE:33.0,VOX:16.1,SUMAR:11.6} },
   { id:'HUELVA',     name:'Huelva',    seats: 5, weight:1.41,
-    v2023:{PP:42.0,PSOE:31.0,VOX:14.0,SUMAR:10.0} },
+    v2023:{PP:36.4,PSOE:36.0,VOX:14.6,SUMAR:10.4} },
   { id:'JAEN',       name:'Jaén',      seats: 5, weight:1.49,
-    v2023:{PP:40.0,PSOE:34.0,VOX:12.0,SUMAR:11.0} },
+    v2023:{PP:37.3,PSOE:36.3,VOX:14.8,SUMAR: 8.0} },
   { id:'MALAGA',     name:'Málaga',    seats:11, weight:3.54,
-    v2023:{PP:47.0,PSOE:23.0,VOX:15.0,SUMAR:11.0} },
+    v2023:{PP:38.3,PSOE:30.3,VOX:16.5,SUMAR:12.3} },
   { id:'SEVILLA',    name:'Sevilla',   seats:12, weight:3.82,
-    v2023:{PP:40.0,PSOE:31.0,VOX:14.0,SUMAR:12.0} },
+    v2023:{PSOE:36.6,PP:33.4,SUMAR:14.0,VOX:13.3} },
   // ── Aragon ─────────────────────────────────────────────────────────────────
   { id:'HUESCA',     name:'Huesca',    seats: 3, weight:0.68,
-    v2023:{PP:38.0,PSOE:29.0,VOX:12.0,SUMAR:13.0} },
+    v2023:{PP:38.2,PSOE:33.6,VOX:12.6,SUMAR:11.5} },
   { id:'TERUEL',     name:'Teruel',    seats: 3, weight:0.47,
-    v2023:{PP:42.0,PSOE:27.0,VOX:14.0,SUMAR:10.0} },
+    v2023:{PP:35.0,PSOE:29.3,VOX:13.1,SUMAR: 5.4} },
   { id:'ZARAGOZA',   name:'Zaragoza',  seats: 7, weight:2.22,
-    v2023:{PP:37.0,PSOE:28.0,VOX:12.0,SUMAR:16.0} },
+    v2023:{PP:36.0,PSOE:30.8,VOX:15.3,SUMAR:13.5} },
   // ── Asturias ───────────────────────────────────────────────────────────────
-  { id:'ASTURIAS',   name:'Asturias',  seats: 8, weight:2.24,
-    v2023:{PP:31.0,PSOE:34.0,VOX: 9.0,SUMAR:19.0} },
+  { id:'ASTURIAS',   name:'Asturias',  seats: 7, weight:2.24,
+    v2023:{PP:35.6,PSOE:34.3,SUMAR:14.8,VOX:12.5} },
   // ── Baleares ───────────────────────────────────────────────────────────────
   { id:'BALEARES',   name:'Illes Balears', seats: 8, weight:2.46,
-    v2023:{PP:34.0,PSOE:24.0,VOX:12.0,SUMAR:20.0} },
+    v2023:{PP:35.6,PSOE:30.2,SUMAR:16.6,VOX:15.2} },
   // ── Basque Country ─────────────────────────────────────────────────────────
   { id:'ALAVA',      name:'Álava',     seats: 4, weight:0.99,
-    v2023:{PNV:24.0,EH_BILDU:20.0,PSOE:24.0,PP:15.0,SUMAR: 9.0,VOX:4.0} },
+    v2023:{PSOE:27.7,EH_BILDU:19.5,PP:17.9,PNV:16.6,SUMAR:12.7,VOX:3.9} },
   { id:'GUIPUZCOA',  name:'Gipuzkoa', seats: 6, weight:1.86,
-    v2023:{EH_BILDU:31.0,PNV:25.0,PSOE:21.0,PP:10.0,SUMAR: 8.0,VOX:3.0} },
+    v2023:{EH_BILDU:31.2,PSOE:23.3,PNV:22.6,SUMAR:10.6,PP:8.7,VOX:2.1} },
   { id:'VIZCAYA',    name:'Bizkaia',   seats: 8, weight:3.09,
-    v2023:{PNV:27.0,EH_BILDU:22.0,PSOE:25.0,PP:12.0,SUMAR: 9.0,VOX:3.0} },
+    v2023:{PNV:27.0,PSOE:25.8,EH_BILDU:20.7,PP:11.5,SUMAR:10.9,VOX:2.6} },
   // ── Canary Islands ─────────────────────────────────────────────────────────
   { id:'LAS_PALMAS', name:'Las Palmas',         seats: 8, weight:2.45,
-    v2023:{PSOE:32.0,PP:26.0,CC:18.0,SUMAR:14.0,VOX:8.0} },
+    v2023:{PSOE:33.2,PP:25.9,VOX:14.6,SUMAR:10.3,CC:6.3} },
   { id:'TENERIFE',   name:'Santa Cruz de Tenerife', seats: 7, weight:2.21,
-    v2023:{PSOE:33.0,PP:29.0,CC:14.0,SUMAR:13.0,VOX:8.0} },
+    v2023:{PP:35.4,PSOE:33.5,CC:16.7,SUMAR:10.8,VOX:7.7} },
   // ── Cantabria ──────────────────────────────────────────────────────────────
   { id:'CANTABRIA',  name:'Cantabria', seats: 5, weight:1.55,
-    v2023:{PP:37.0,PSOE:27.0,SUMAR:14.0,VOX:11.0} },
+    v2023:{PP:42.1,PSOE:33.3,VOX:14.1,SUMAR: 8.5} },
   // ── Castilla-La Mancha ─────────────────────────────────────────────────────
   { id:'ALBACETE',   name:'Albacete',  seats: 4, weight:1.11,
-    v2023:{PP:46.0,PSOE:31.0,VOX:14.0,SUMAR: 7.0} },
+    v2023:{PP:39.9,PSOE:34.5,VOX:16.6,SUMAR: 7.2} },
   { id:'CIUDAD_REAL',name:'Ciudad Real',seats:5, weight:1.40,
-    v2023:{PP:45.0,PSOE:33.0,VOX:14.0,SUMAR: 7.0} },
+    v2023:{PP:40.5,PSOE:35.4,VOX:16.3,SUMAR: 6.2} },
   { id:'CUENCA',     name:'Cuenca',    seats: 3, weight:0.60,
-    v2023:{PP:50.0,PSOE:29.0,VOX:14.0,SUMAR: 6.0} },
+    v2023:{PP:39.8,PSOE:37.4,VOX:15.6,SUMAR: 5.6} },
   { id:'GUADALAJARA',name:'Guadalajara',seats:3, weight:0.72,
-    v2023:{PP:48.0,PSOE:26.0,VOX:15.0,SUMAR: 8.0} },
+    v2023:{PP:36.3,PSOE:33.0,VOX:19.3,SUMAR: 9.2} },
   { id:'TOLEDO',     name:'Toledo',    seats: 6, weight:1.83,
-    v2023:{PP:45.0,PSOE:32.0,VOX:14.0,SUMAR: 8.0} },
+    v2023:{PP:37.8,PSOE:32.6,VOX:19.6,SUMAR: 8.2} },
   // ── Castilla y León ────────────────────────────────────────────────────────
   { id:'AVILA',      name:'Ávila',     seats: 3, weight:0.47,
-    v2023:{PP:52.0,PSOE:22.0,VOX:16.0,SUMAR: 7.0} },
+    v2023:{PP:43.3,PSOE:27.4,VOX:15.4,SUMAR: 5.1} },
   { id:'BURGOS',     name:'Burgos',    seats: 4, weight:1.00,
-    v2023:{PP:48.0,PSOE:25.0,VOX:14.0,SUMAR:10.0} },
+    v2023:{PP:40.6,PSOE:34.4,VOX:12.8,SUMAR: 8.6} },
   { id:'LEON',       name:'León',      seats: 4, weight:1.07,
-    v2023:{PP:46.0,PSOE:28.0,VOX:12.0,SUMAR:11.0} },
+    v2023:{PP:36.9,PSOE:33.6,VOX:12.9,SUMAR: 6.7} },
   { id:'PALENCIA',   name:'Palencia',  seats: 3, weight:0.50,
-    v2023:{PP:50.0,PSOE:25.0,VOX:14.0,SUMAR: 9.0} },
+    v2023:{PP:42.0,PSOE:34.7,VOX:12.9,SUMAR: 6.1} },
   { id:'SALAMANCA',  name:'Salamanca', seats: 4, weight:0.83,
-    v2023:{PP:51.0,PSOE:24.0,VOX:14.0,SUMAR: 9.0} },
+    v2023:{PP:47.0,PSOE:30.4,VOX:14.7,SUMAR: 5.5} },
   { id:'SEGOVIA',    name:'Segovia',   seats: 3, weight:0.53,
-    v2023:{PP:49.0,PSOE:25.0,VOX:15.0,SUMAR: 9.0} },
+    v2023:{PP:45.0,PSOE:30.6,VOX:14.1,SUMAR: 8.1} },
   { id:'SORIA',      name:'Soria',     seats: 2, weight:0.26,
-    v2023:{PP:51.0,PSOE:24.0,VOX:14.0,SUMAR: 8.0} },
+    v2023:{PP:37.2,PSOE:29.5,VOX: 9.8,SUMAR: 3.4} },
   { id:'VALLADOLID', name:'Valladolid',seats: 5, weight:1.48,
-    v2023:{PP:44.0,PSOE:27.0,VOX:14.0,SUMAR:13.0} },
+    v2023:{PP:40.8,PSOE:32.8,VOX:15.2,SUMAR: 8.9} },
   { id:'ZAMORA',     name:'Zamora',    seats: 3, weight:0.50,
-    v2023:{PP:50.0,PSOE:30.0,VOX:12.0,SUMAR: 7.0} },
+    v2023:{PP:44.8,PSOE:32.5,VOX:13.2,SUMAR: 5.6} },
   // ── Catalonia ──────────────────────────────────────────────────────────────
   { id:'BARCELONA',  name:'Barcelona', seats:32, weight:11.48,
-    v2023:{PSOE:34.0,ERC:15.0,JUNTS:14.0,PP:14.0,SUMAR:13.0,VOX:7.0} },
-  { id:'GIRONA',     name:'Girona',    seats: 5, weight:1.95,
-    v2023:{JUNTS:22.0,ERC:20.0,PSOE:20.0,PP:12.0,SUMAR:10.0,VOX:6.0} },
+    v2023:{PSOE:35.7,SUMAR:15.2,PP:13.8,ERC:12.3,JUNTS: 9.7,VOX:7.6} },
+  { id:'GIRONA',     name:'Girona',    seats: 6, weight:1.95,
+    v2023:{PSOE:28.9,JUNTS:19.6,ERC:14.7,SUMAR:10.9,PP: 9.7,VOX:7.0} },
   { id:'LLEIDA',     name:'Lleida',    seats: 4, weight:1.24,
-    v2023:{ERC:23.0,PSOE:21.0,JUNTS:18.0,PP:14.0,SUMAR:11.0,VOX:6.0} },
+    v2023:{PSOE:29.5,ERC:18.6,JUNTS:18.0,PP:12.8,SUMAR: 7.9,VOX:6.8} },
   { id:'TARRAGONA',  name:'Tarragona', seats: 6, weight:2.02,
-    v2023:{PSOE:28.0,ERC:16.0,JUNTS:14.0,PP:17.0,SUMAR:13.0,VOX:9.0} },
+    v2023:{PSOE:32.9,ERC:15.1,PP:13.9,SUMAR:11.3,JUNTS:11.1,VOX:10.3} },
   // ── Extremadura ────────────────────────────────────────────────────────────
-  { id:'BADAJOZ',    name:'Badajoz',   seats: 6, weight:1.75,
-    v2023:{PP:40.0,PSOE:38.0,VOX:12.0,SUMAR: 8.0} },
+  { id:'BADAJOZ',    name:'Badajoz',   seats: 5, weight:1.75,
+    v2023:{PSOE:39.2,PP:37.8,VOX:13.7,SUMAR: 6.8} },
   { id:'CACERES',    name:'Cáceres',   seats: 4, weight:1.02,
-    v2023:{PP:43.0,PSOE:35.0,VOX:13.0,SUMAR: 7.0} },
+    v2023:{PSOE:38.9,PP:38.1,VOX:13.6,SUMAR: 6.9} },
   // ── Galicia ────────────────────────────────────────────────────────────────
   { id:'CORUNA',     name:'A Coruña',  seats: 8, weight:2.83,
-    v2023:{PP:48.0,PSOE:19.0,BNG:13.0,SUMAR:11.0,VOX:7.0} },
+    v2023:{PP:43.1,PSOE:28.2,SUMAR:12.2,BNG:10.0,VOX:5.1} },
   { id:'LUGO',       name:'Lugo',      seats: 4, weight:0.93,
-    v2023:{PP:52.0,PSOE:21.0,BNG:11.0,SUMAR: 8.0,VOX:7.0} },
+    v2023:{PP:50.2,PSOE:30.3,BNG: 8.7,SUMAR: 5.2,VOX:4.4} },
   { id:'OURENSE',    name:'Ourense',   seats: 4, weight:0.87,
-    v2023:{PP:55.0,PSOE:18.0,BNG:10.0,SUMAR: 7.0,VOX:8.0} },
+    v2023:{PP:50.0,PSOE:30.1,BNG: 8.2,SUMAR: 5.5,VOX:4.9} },
   { id:'PONTEVEDRA', name:'Pontevedra',seats: 7, weight:2.55,
-    v2023:{PP:44.0,PSOE:22.0,BNG:15.0,SUMAR:12.0,VOX:7.0} },
+    v2023:{PP:39.6,PSOE:31.4,SUMAR:13.2,BNG: 9.4,VOX:4.7} },
   // ── La Rioja ───────────────────────────────────────────────────────────────
   { id:'RIOJA',      name:'La Rioja',  seats: 4, weight:0.87,
-    v2023:{PP:40.0,PSOE:30.0,VOX:12.0,SUMAR:14.0} },
+    v2023:{PP:45.6,PSOE:35.7,VOX: 9.8,SUMAR: 6.6} },
   // ── Madrid ─────────────────────────────────────────────────────────────────
   { id:'MADRID',     name:'Madrid',    seats:37, weight:13.84,
-    v2023:{PP:35.0,PSOE:26.0,SUMAR:20.0,VOX:13.0} },
+    v2023:{PP:40.5,PSOE:27.8,SUMAR:15.5,VOX:14.0} },
   // ── Murcia ─────────────────────────────────────────────────────────────────
   { id:'MURCIA',     name:'Murcia',    seats:10, weight:3.14,
-    v2023:{PP:48.0,PSOE:22.0,VOX:16.0,SUMAR:10.0} },
+    v2023:{PP:41.2,PSOE:25.3,VOX:21.8,SUMAR: 9.6} },
   // ── Navarra ────────────────────────────────────────────────────────────────
   { id:'NAVARRA',    name:'Navarra',   seats: 5, weight:1.73,
-    v2023:{PP:25.0,PSOE:20.0,EH_BILDU:20.0,PNV: 9.0,SUMAR:12.0,VOX:8.0} },
+    v2023:{PSOE:27.4,EH_BILDU:17.2,PP:16.7,UPN:15.3,SUMAR:12.8,VOX:5.7} },
   // ── Valencian Community ────────────────────────────────────────────────────
   { id:'ALICANTE',   name:'Alicante',  seats:12, weight:3.68,
-    v2023:{PP:41.0,PSOE:24.0,VOX:15.0,SUMAR:14.0} },
+    v2023:{PP:36.7,PSOE:32.0,VOX:16.3,SUMAR:12.9} },
   { id:'CASTELLON',  name:'Castellón', seats: 5, weight:1.50,
-    v2023:{PP:38.0,PSOE:24.0,VOX:14.0,SUMAR:16.0} },
-  { id:'VALENCIA',   name:'Valencia',  seats:15, weight:5.09,
-    v2023:{PP:34.0,PSOE:26.0,SUMAR:17.0,VOX:13.0} },
+    v2023:{PP:35.2,PSOE:32.6,VOX:15.9,SUMAR:14.3} },
+  { id:'VALENCIA',   name:'Valencia',  seats:16, weight:5.09,
+    v2023:{PP:33.6,PSOE:32.1,SUMAR:16.9,VOX:15.2} },
   // ── Autonomous cities ──────────────────────────────────────────────────────
   { id:'CEUTA',      name:'Ceuta',     seats: 1, weight:0.24,
-    v2023:{PP:55.0,PSOE:22.0,VOX:15.0,SUMAR: 5.0} },
+    v2023:{PP:38.8,PSOE:34.0,VOX:23.3,SUMAR: 2.5} },
   { id:'MELILLA',    name:'Melilla',   seats: 1, weight:0.21,
-    v2023:{PP:52.0,PSOE:20.0,VOX:18.0,SUMAR: 5.0} },
+    v2023:{PP:49.2,PSOE:25.4,VOX:15.9,SUMAR: 3.0} },
 ];
 
 const ES_PROVINCE_MAP   = Object.fromEntries(ES_PROVINCES.map(p => [p.id, p])) as Record<EsProvId, EsProvince>;
 const ES_TOTAL_PROV_WEIGHT = ES_PROVINCES.reduce((s, p) => s + p.weight, 0);
+
+// ── Regional parties are landlocked to their home provinces ───────────────────
+// A nationalist/regionalist party can NEVER pick up votes outside the provinces
+// listed here (enforced in calcProvVotes). National parties have no entry → they
+// contest everywhere.
+const ES_REGIONAL_HOME: Partial<Record<EsPartyId, EsProvId[]>> = {
+  ERC:      ['BARCELONA','GIRONA','LLEIDA','TARRAGONA'],          // Catalonia
+  JUNTS:    ['BARCELONA','GIRONA','LLEIDA','TARRAGONA'],          // Catalonia
+  EH_BILDU: ['ALAVA','GUIPUZCOA','VIZCAYA','NAVARRA'],            // Basque Country + Navarre
+  PNV:      ['ALAVA','GUIPUZCOA','VIZCAYA'],                      // Basque Country
+  BNG:      ['CORUNA','LUGO','OURENSE','PONTEVEDRA'],             // Galicia
+  CC:       ['LAS_PALMAS','TENERIFE'],                           // Canary Islands
+  UPN:      ['NAVARRA'],                                          // Navarre
+};
+function esContests(partyId: EsPartyId, provId: EsProvId): boolean {
+  const home = ES_REGIONAL_HOME[partyId];
+  return !home || home.includes(provId);
+}
+
+// Max national vote % each party can reach in the simulator. National parties:
+// 55 (the slider ceiling). Regional parties: their home region's share of the
+// national electorate — i.e. the most they could win even taking 100% of every
+// province they contest — so e.g. ERC cannot be dialled past ~Catalonia's size.
+const ES_PARTY_VOTE_CAP: Record<EsPartyId, number> = (() => {
+  const caps = {} as Record<EsPartyId, number>;
+  for (const p of ES_PARTIES) {
+    const home = ES_REGIONAL_HOME[p.id];
+    caps[p.id] = home
+      ? Math.round(home.reduce((s, id) => s + (ES_PROVINCE_MAP[id]?.weight ?? 0), 0) / ES_TOTAL_PROV_WEIGHT * 1000) / 10
+      : 55;
+  }
+  return caps;
+})();
 
 // ── D'Hondt — applied per province with 3 % provincial threshold ──────────────
 function calcDHondtProv(
@@ -290,7 +329,8 @@ function calcProvVotes(
   if (override && Object.keys(override).length > 0) {
     const raw: Record<EsPartyId, number> = {} as Record<EsPartyId, number>;
     let total = 0;
-    for (const p of ES_PARTIES) { raw[p.id] = Math.max(0, override[p.id] ?? 0); total += raw[p.id]; }
+    // Landlock: regional parties get 0 outside their home provinces even if an override sets them.
+    for (const p of ES_PARTIES) { raw[p.id] = esContests(p.id, provId) ? Math.max(0, override[p.id] ?? 0) : 0; total += raw[p.id]; }
     if (total === 0) return raw;
     for (const p of ES_PARTIES) raw[p.id] = (raw[p.id] / total) * 100;
     return raw;
@@ -302,8 +342,8 @@ function calcProvVotes(
     const newNat = natPcts[p.id] ?? 0;
     const oldNat = ES_VOTE_PCT_2023[p.id] ?? 0;
     const basePct = base[p.id] ?? 0;
-    // Regional parties stay proportional within their territory; national parties swing nationally
-    raw[p.id] = basePct === 0 ? 0 : oldNat === 0 ? basePct : basePct * (newNat / oldNat);
+    // Regional parties stay landlocked + proportional within their territory; national parties swing nationally
+    raw[p.id] = !esContests(p.id, provId) ? 0 : basePct === 0 ? 0 : oldNat === 0 ? basePct : basePct * (newNat / oldNat);
     total += raw[p.id];
   }
   if (total === 0) return raw;
@@ -368,19 +408,34 @@ function redistributePcts(
   changedId: EsPartyId,
   newRaw:    number,
   locks:     Set<EsPartyId>,
+  caps?:     Record<EsPartyId, number>,   // per-party ceiling (e.g. region size); absent ⇒ uncapped
 ): Record<EsPartyId, number> {
+  const capOf     = (id: EsPartyId) => caps?.[id] ?? 100;
   const ids       = Object.keys(current) as EsPartyId[];
   const lockedSum = ids.filter(id => locks.has(id) && id !== changedId).reduce((s, id) => s + (current[id] ?? 0), 0);
-  const clamped   = Math.min(Math.max(newRaw, 0), 100 - lockedSum);
-  const unlocked  = ids.filter(id => !locks.has(id) && id !== changedId);
-  const remaining = 100 - lockedSum - clamped;
+  const clamped   = Math.min(Math.max(newRaw, 0), capOf(changedId), 100 - lockedSum);
+  const pool      = ids.filter(id => !locks.has(id) && id !== changedId);
+  const seedSum   = pool.reduce((s, id) => s + (current[id] ?? 0), 0);
   const next: Record<EsPartyId, number> = { ...current, [changedId]: clamped };
-  const unlockedSum = unlocked.reduce((s, id) => s + (current[id] ?? 0), 0);
-  if (unlockedSum > 0) {
-    for (const id of unlocked) next[id] = ((current[id] ?? 0) / unlockedSum) * remaining;
-  } else if (unlocked.length > 0) {
-    const share = remaining / unlocked.length;
-    for (const id of unlocked) next[id] = share;
+  for (const id of pool) next[id] = 0;
+  // Distribute the remainder proportionally to prior shares, but never above each
+  // party's cap — overflow from capped parties spills to those with headroom.
+  let remaining = 100 - lockedSum - clamped;
+  let active = [...pool];
+  for (let iter = 0; iter < 8 && active.length > 0 && remaining > 1e-6; iter++) {
+    const wSum = active.reduce((s, id) => s + (seedSum > 0 ? (current[id] ?? 0) : 1), 0) || 1;
+    const stillOpen: EsPartyId[] = [];
+    let used = 0;
+    for (const id of active) {
+      const give = remaining * ((seedSum > 0 ? (current[id] ?? 0) : 1) / wSum);
+      const add  = Math.min(give, Math.max(0, capOf(id) - (next[id] ?? 0)));
+      next[id]   = (next[id] ?? 0) + add;
+      used      += add;
+      if (capOf(id) - (next[id] ?? 0) > 1e-6) stillOpen.push(id);
+    }
+    remaining -= used;
+    active = stillOpen;
+    if (used <= 1e-9) break;
   }
   return next;
 }
@@ -489,11 +544,12 @@ function EsScoreboardTile({
 }
 
 // ── Scoreboard ────────────────────────────────────────────────────────────────
-// Spain blocs: Bloque Progresista (PSOE coalition) vs Bloque Conservador (PP+Vox)
-// Pivotal regional parties (Junts, PNV, CC) displayed in their own group
-const ES_LEFT_IDS:     EsPartyId[] = ['EH_BILDU','BNG','SUMAR','ERC','PSOE'];
+// Spain blocs: national left (PSOE + Sumar) vs national right (PP + Vox). ALL
+// nationalist/regionalist parties — ERC, Junts, EH Bildu, PNV, BNG, CC, UPN — are
+// grouped together in the Regional bloc (ordered by 2023 seat size as a fallback).
+const ES_LEFT_IDS:     EsPartyId[] = ['SUMAR','PSOE'];
 const ES_RIGHT_IDS:    EsPartyId[] = ['PP','VOX'];
-const ES_REGIONAL_IDS: EsPartyId[] = ['JUNTS','PNV','CC'];
+const ES_REGIONAL_IDS: EsPartyId[] = ['ERC','JUNTS','EH_BILDU','PNV','BNG','CC','UPN'];
 
 function EsScoreboard({
   natPcts, simSeats, isBaseline, is2026, dark, reportedVoteScale,
@@ -553,20 +609,25 @@ function EsScoreboard({
       : isLeading ? { borderColor:hexToRgba(accent,0.42), background:hexToRgba(accent,0.04) } : {};
     const labelStyle: React.CSSProperties = (isMajority||isLeading) ? { color:hexToRgba(accent,0.85) } : {};
     return (
-      <div className="ni-group" style={groupStyle}>
+      <div key={label} className="ni-group" style={groupStyle}>
         <span className="ni-group-label" style={labelStyle}>{label}</span>
         <div className="ni-group-tiles">{shown.map(id=>makeTile(id))}</div>
       </div>
     );
   };
 
+  // Blocs listed by combined seat size (largest first).
+  const blocDefs = [
+    { ids: ES_LEFT_IDS,     label: 'Bloque Progresista', total: leftSeats,     isLeading: leftLeading  && !leftMajority,  isMajority: leftMajority },
+    { ids: ES_REGIONAL_IDS, label: 'Regional',           total: regionalSeats, isLeading: false,                          isMajority: false },
+    { ids: ES_RIGHT_IDS,    label: 'Bloque Conservador', total: rightSeats,    isLeading: rightLeading && !rightMajority, isMajority: rightMajority },
+  ].sort((a,b)=>b.total-a.total);
+
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
-          {renderBloc(ES_LEFT_IDS,  'Bloque Progresista', leftLeading  && !leftMajority,  leftMajority)}
-          {renderBloc(ES_REGIONAL_IDS, 'Regional', false, false)}
-          {renderBloc(ES_RIGHT_IDS, 'Bloque Conservador', rightLeading && !rightMajority, rightMajority)}
+          {blocDefs.map(b=>renderBloc(b.ids, b.label, b.isLeading, b.isMajority))}
         </div>
       </div>
     </div>
@@ -901,17 +962,21 @@ function EsParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
             </div>
             <div className="px-3.5 pb-4">
               {(() => {
-                const left=ES_LEFT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0);
-                const right=ES_RIGHT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0);
-                const reg=ES_REGIONAL_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0);
+                const dot=dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.25)';
+                const blocs=[
+                  {label:'Prog',    seats:ES_LEFT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0),     color:'#E4003B'},
+                  {label:'Regional',seats:ES_REGIONAL_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0), color:'#007442'},
+                  {label:'Cons',    seats:ES_RIGHT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0),    color:'#0066CC'},
+                ].sort((a,b)=>b.seats-a.seats);
                 return (
                   <div className="flex items-center gap-1.5 mb-3 text-[9px] font-mono">
-                    <span style={{color:'#E4003B',fontWeight:700}}>Prog {left}</span>
-                    <span style={{color:dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.25)'}}>·</span>
-                    <span style={{color:'#007442',fontWeight:700}}>Regional {reg}</span>
-                    <span style={{color:dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.25)'}}>·</span>
-                    <span style={{color:'#0066CC',fontWeight:700}}>Cons {right}</span>
-                    <span style={{color:dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.25)',marginLeft:'auto'}}>need {ES_MAJORITY}</span>
+                    {blocs.map((b,i)=>(
+                      <React.Fragment key={b.label}>
+                        {i>0&&<span style={{color:dot}}>·</span>}
+                        <span style={{color:b.color,fontWeight:700}}>{b.label} {b.seats}</span>
+                      </React.Fragment>
+                    ))}
+                    <span style={{color:dot,marginLeft:'auto'}}>need {ES_MAJORITY}</span>
                   </div>
                 );
               })()}
@@ -1232,10 +1297,10 @@ function EsBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
         <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3.5 space-y-5">
           <Section title="Three Blocs">
             {[
-              {label:'Bloque Progresista',desc:'EH Bildu+BNG+Sumar+ERC+PSOE',seats:leftS, color:'#E4003B'},
-              {label:'Partidos Regionales',desc:'Junts+PNV+CC',              seats:regS,  color:'#007442'},
-              {label:'Bloque Conservador', desc:'PP+Vox',                    seats:rightS,color:'#0066CC'},
-            ].map(b=>(
+              {label:'Bloque Progresista', desc:'PSOE + Sumar',                   seats:leftS, color:'#E4003B'},
+              {label:'Partidos Regionales',desc:'ERC+Junts+Bildu+PNV+BNG+CC+UPN', seats:regS,  color:'#007442'},
+              {label:'Bloque Conservador', desc:'PP + Vox',                       seats:rightS,color:'#0066CC'},
+            ].sort((a,b)=>b.seats-a.seats).map(b=>(
               <div key={b.label} style={{background:cardBg,borderRadius:5,padding:'6px 8px',borderLeft:`3px solid ${b.color}`}}>
                 <div className="flex items-center justify-between">
                   <div><div className="text-[10px] font-bold text-ink">{b.label}</div><div className="text-[8px] font-mono" style={{color:ink2}}>{b.desc}</div></div>
@@ -1431,6 +1496,21 @@ export default function SpainApp() {
     return Math.min(1,projW/ES_TOTAL_PROV_WEIGHT);
   },[preset,projectedProvs,provReportingPct]);
 
+  // Blank map: which provinces have been projected (reported), with their % reporting.
+  const blankProvFractions=useMemo<Partial<Record<EsProvId,number>>>(()=>{
+    if(preset!=='blank') return {};
+    const f:Partial<Record<EsProvId,number>>={};
+    for(const cId of projectedProvs) f[cId]=(provReportingPct[cId]??100)/100;
+    return f;
+  },[preset,projectedProvs,provReportingPct]);
+
+  // Seats accrue province-by-province from 0 as each is projected — ONLY reported
+  // provinces contribute (real Spanish per-constituency D'Hondt), never a national
+  // extrapolation across all 52 provinces.
+  const blankSeats=useMemo<Partial<Record<EsPartyId,number>>|undefined>(()=>
+    preset==='blank'?calcPartialSeats(natPcts,blankProvFractions,provOverrides):undefined,
+  [preset,natPcts,blankProvFractions,provOverrides]);
+
   const overrideDisplayPcts=useMemo<Record<EsPartyId,number>>(()=>{
     const hasAny=Object.values(provOverrides).some(o=>o&&Object.keys(o).length>0);
     if(!hasAny) return natPcts;
@@ -1535,7 +1615,7 @@ export default function SpainApp() {
     simTimersRef.current=timers;
   }
 
-  const displaySeats=useMemo(()=>simSeats??calcAllProvinceSeats(displayPcts),[simSeats,displayPcts]);
+  const displaySeats=useMemo(()=>simSeats??blankSeats??calcAllProvinceSeats(displayPcts),[simSeats,blankSeats,displayPcts]);
 
   const simPartialPcts=useMemo<Record<EsPartyId,number>|null>(()=>{
     if(!simNatPcts) return null;
@@ -1607,7 +1687,7 @@ export default function SpainApp() {
       {scoreboardVisible&&(
         <EsScoreboard
           natPcts={simPartialPcts??(simNatPcts??displayPcts)}
-          simSeats={simSeats}
+          simSeats={simSeats??blankSeats}
           isBaseline={preset==='baseline'&&!simNatPcts}
           is2026={preset!=='baseline'||!!simNatPcts}
           dark={dark}
@@ -1664,7 +1744,7 @@ export default function SpainApp() {
             <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
               {simSortOrder.filter(id=>!hiddenParties.has(id)).map(id=>{
                 const party=ES_PARTY_MAP[id]; const pct=simDraftPcts[id]??0; const isLocked=simDraftLocks.has(id); const color=partyColor(id);
-                const rawVotes=Math.round(pct/100*ES_GRAND_TOTAL_VOTES);
+                const rawVotes=Math.round(pct/100*ES_GRAND_TOTAL_VOTES); const cap=ES_PARTY_VOTE_CAP[id]; const capped=cap<55;
                 return (
                   <div key={id}>
                     <div className="flex items-center gap-1 mb-0.5">
@@ -1676,12 +1756,12 @@ export default function SpainApp() {
                       </button>
                       <span className="text-[10px] font-mono font-bold tabular-nums" style={{color}}>{pct.toFixed(1)}%</span>
                     </div>
-                    <input type="range" min={0} max={55} step={0.1} value={pct} disabled={isLocked}
-                      onChange={e=>{setSimDraftPcts(redistributePcts(simDraftPcts,id,parseFloat(e.target.value),simEffLocks));setSimDraftTouched(true);}}
+                    <input type="range" min={0} max={cap} step={0.1} value={Math.min(pct,cap)} disabled={isLocked}
+                      onChange={e=>{setSimDraftPcts(redistributePcts(simDraftPcts,id,parseFloat(e.target.value),simEffLocks,ES_PARTY_VOTE_CAP));setSimDraftTouched(true);}}
                       className="br-party-slider w-full"
-                      style={{'--party-color':color,'--pct':`${(pct/55)*100}%`}as React.CSSProperties}/>
+                      style={{'--party-color':color,'--pct':`${(pct/cap)*100}%`}as React.CSSProperties}/>
                     <div className="flex justify-between mt-0.5">
-                      <span className="text-[8px] font-mono" style={{color:dark?'rgba(255,255,255,0.22)':'rgba(0,0,0,0.28)'}}>{fmtN(rawVotes)}</span>
+                      <span className="text-[8px] font-mono" style={{color:dark?'rgba(255,255,255,0.22)':'rgba(0,0,0,0.28)'}}>{fmtN(rawVotes)}{capped?` · region max ${cap}%`:''}</span>
                       <span className="text-[7.5px] font-mono" style={{color:pct>=3?'#16a34a':'#f59e0b'}}>{pct>=3?'✓ above 3%':'⚠ below 3%'}</span>
                     </div>
                   </div>

@@ -1567,7 +1567,28 @@ function simulateFranceR2FromTransfers(
   return out;
 }
 
-// Scale ideology-derived dept results so national split matches player's target %
+// Logit / sigmoid helpers — the runoff swing is applied on the log-odds scale
+// (a "proportional"/uniform-swing model) rather than the raw percentage scale.
+// This preserves each département's ideological ordering: a stronghold stays a
+// stronghold unless the national result is a genuine landslide, instead of every
+// département flipping in lock-step the moment the national number crosses 50%.
+const frLogit   = (p: number): number => { const c = Math.min(0.985, Math.max(0.015, p)); return Math.log(c / (1 - c)); };
+const frSigmoid = (x: number): number => 1 / (1 + Math.exp(-x));
+
+// Geographic spread factor (>1). Widens the gap between a candidate's home turf
+// and hostile ground so ideological strongholds show decisive margins — Paris &
+// the Mediterranean arc break hard for the left, the rural north-east & PACA
+// hinterland break hard for the right — matching real French runoffs. It only
+// shapes the *distribution*; the national total is re-centred to the target below.
+const FR_R2_SPREAD = 1.7;
+
+// Scale ideology-derived dept results so the national split matches the player's
+// target %. Each département keeps the lean implied by its R1 ideology mix (via the
+// transfer table), that lean is exaggerated on the logit scale by FR_R2_SPREAD, and
+// then every département is shifted by ONE national constant (found by bisection) so
+// the turnout-weighted national result equals the target exactly. Consequence: a
+// right-wing "Divers" candidate cannot carry a left bastion like Paris over a
+// left-wing opponent unless they are winning nationally by a landslide.
 function simulateFranceR2WithTarget(
   r1Results: Record<string, Partial<Record<string, number>>>,
   r2Candidates: [string, string],
@@ -1581,8 +1602,10 @@ function simulateFranceR2WithTarget(
   const scoreB = FR_IDEOLOGY_SCORE[candB] ?? 8;
   const leftId  = scoreA <= scoreB ? candA : candB;
   const rightId = scoreA <= scoreB ? candB : candA;
-  const targetLeftPct = (scoreA <= scoreB ? targetPcts[0] : targetPcts[1]) / 100;
+  const targetLeftPct = Math.min(0.99, Math.max(0.01,
+    (scoreA <= scoreB ? targetPcts[0] : targetPcts[1]) / 100));
 
+  // National raw left share — the centre the per-département leans deviate from.
   let rawNatLeft = 0, rawNatRight = 0;
   for (const r of Object.values(raw)) {
     rawNatLeft  += r[leftId]  ?? 0;
@@ -1590,25 +1613,49 @@ function simulateFranceR2WithTarget(
   }
   const rawNatTotal = rawNatLeft + rawNatRight;
   if (rawNatTotal === 0) return raw;
-  const rawLeftPct = rawNatLeft / rawNatTotal;
+  const rawNatLogit = frLogit(rawNatLeft / rawNatTotal);
 
-  const out: Record<string, Partial<Record<string, number>>> = {};
+  // Per-département exaggerated lean (log-odds, centred near 0 nationally).
+  const codes: string[] = [];
+  const base:  number[] = [];
+  const totals: number[] = [];
   for (const code of Object.keys(DEPT_2022R2_TOTALS)) {
     const deptTotal = DEPT_2022R2_TOTALS[code] ?? 0;
-    if (deptTotal === 0) continue;
     const r = raw[code];
-    if (!r) continue;
-    const dL = r[leftId]  ?? 0;
-    const dR = r[rightId] ?? 0;
+    if (deptTotal === 0 || !r) continue;
+    const dL = r[leftId] ?? 0, dR = r[rightId] ?? 0;
     if (dL + dR === 0) continue;
-    const deviation = dL / (dL + dR) - rawLeftPct;
-    const adjLeft = Math.max(0.01, Math.min(0.99, targetLeftPct + deviation));
+    codes.push(code);
+    base.push(FR_R2_SPREAD * (frLogit(dL / (dL + dR)) - rawNatLogit));
+    totals.push(deptTotal);
+  }
+  if (codes.length === 0) return raw;
+  const grandTotal = totals.reduce((s, t) => s + t, 0);
+
+  // Bisect for the single national shift that makes the turnout-weighted left
+  // share equal the target (national share is monotonic increasing in `shift`).
+  const natLeftShareAt = (shift: number): number => {
+    let left = 0;
+    for (let i = 0; i < codes.length; i++) left += totals[i] * frSigmoid(shift + base[i]);
+    return left / grandTotal;
+  };
+  let lo = -16, hi = 16;
+  for (let i = 0; i < 50; i++) {
+    const mid = (lo + hi) / 2;
+    if (natLeftShareAt(mid) < targetLeftPct) lo = mid; else hi = mid;
+  }
+  const shift = (lo + hi) / 2;
+
+  const out: Record<string, Partial<Record<string, number>>> = {};
+  for (let i = 0; i < codes.length; i++) {
+    const deptTotal = totals[i];
+    const adjLeft = Math.min(0.99, Math.max(0.01, frSigmoid(shift + base[i])));
     const leftVotes  = Math.round(deptTotal * adjLeft);
     const rightVotes = deptTotal - leftVotes;
     const dept: Partial<Record<string, number>> = {};
     if (leftVotes  > 0) dept[leftId]  = leftVotes;
     if (rightVotes > 0) dept[rightId] = rightVotes;
-    out[code] = dept;
+    out[codes[i]] = dept;
   }
   return out;
 }

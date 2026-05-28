@@ -141,12 +141,22 @@ export const COUNTRIES = [
   {
     id: 'nigeria', path: '/nigeria', name: 'Nigeria', flag: '🇳🇬', demonym: 'Nigerian', mapColor: '#008751',
     flagSrc: 'nigeria-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'Presidential Election', subtitle: 'Federal Republic — 36 States + FCT',
+    electionType: 'Presidential Election', subtitle: 'Aso Rock Villa',
     lat: 9.082, lng: 8.6753,
     accent: 'linear-gradient(90deg,#008751,#FFFFFF,#008751)',
     parties: [
-      { color: '#991B1B', abbr: 'LP'   }, { color: '#166534', abbr: 'PDP'  },
-      { color: '#4ADE80', abbr: 'NNPP' }, { color: '#0EA5E9', abbr: 'APC'  },
+      { color: '#166534', abbr: 'PDP' }, { color: '#0EA5E9', abbr: 'APC' },
+    ],
+  },
+  {
+    id: 'spain', path: '/spain', name: 'Spain', flag: '🇪🇸', demonym: 'Spanish', mapColor: '#AA151B',
+    flagSrc: 'spain-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'General Election', subtitle: 'Congreso de los Diputados',
+    lat: 40, lng: -3.5,
+    accent: 'linear-gradient(90deg,#AA151B,#F1BF00,#AA151B)',
+    parties: [
+      { color: '#BF399E', abbr: 'Sumar' }, { color: '#E4003B', abbr: 'PSOE' },
+      { color: '#0066CC', abbr: 'PP' }, { color: '#63BE21', abbr: 'Vox' },
     ],
   },
   {
@@ -159,18 +169,6 @@ export const COUNTRIES = [
       { color: '#00529F', abbr: 'NAT' }, { color: '#D82A20', abbr: 'LAB' },
       { color: '#098137', abbr: 'GRN' }, { color: '#FFCC00', abbr: 'ACT' },
       { color: '#C0392B', abbr: 'TPM' },
-    ],
-  },
-  {
-    id: 'spain', path: '/spain', name: 'Spain', flag: '🇪🇸', demonym: 'Spanish', mapColor: '#AA151B', locked: true as const,
-    flagSrc: 'spain-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'General Election', subtitle: 'Congreso de los Diputados',
-    lat: 40, lng: -3.5,
-    accent: 'linear-gradient(90deg,#AA151B,#F1BF00,#AA151B)',
-    parties: [
-      { color: '#0066CC', abbr: 'PP'   }, { color: '#E4003B', abbr: 'PSOE' },
-      { color: '#63BE21', abbr: 'Vox'  }, { color: '#BF399E', abbr: 'Sumar'},
-      { color: '#F4B400', abbr: 'ERC'  },
     ],
   },
   {
@@ -218,13 +216,14 @@ const ISO_TO_COLOR: Record<string, string> = {
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
   'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7',
   'PL': '#DC143C', 'IN': '#FF6B1A', 'JP': '#C62828', 'NG': '#008751',
+  'ES': '#AA151B',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
   'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden',
-  'PL': 'poland', 'NG': 'nigeria',
+  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
@@ -232,7 +231,7 @@ const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
   '710': 'ZA', '642': 'RO', '752': 'SE',
-  '566': 'NG',
+  '566': 'NG', '724': 'ES',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
