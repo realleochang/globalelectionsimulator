@@ -675,39 +675,41 @@ function SeMapView({
       .then(r => r.json()).then(setGeoData).catch(console.error);
   }, []);
 
+  // getStyle closes over current props/state directly so react-leaflet's updateGeoJSON
+  // re-applies styles correctly when any dep changes (refs are stale at apply-time).
   const getStyle = useCallback((feature: any): L.PathOptions => {
     const geoId    = feature?.properties?.id ?? '';
     const countyId = SE_GEOID_TO_ID[geoId];
-    const isSel    = countyId === selectedRef.current;
-    const border   = darkRef.current ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
+    const isSel    = countyId === selectedCounty;
+    const border   = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
 
-    if (bubbleRef.current) {
-      return { fillOpacity: 0, weight: 0.4, color: darkRef.current ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)', opacity: 0.6 };
+    if (bubbleMap) {
+      return { fillOpacity: 0, weight: 0.4, color: dark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)', opacity: 0.6 };
     }
-    if (!countyId) return { fillColor: darkRef.current ? '#374151' : '#E5E7EB', fillOpacity: 0.5, weight: 0.4, color: border, opacity: 1 };
+    if (!countyId) return { fillColor: dark ? '#374151' : '#E5E7EB', fillOpacity: 0.5, weight: 0.4, color: border, opacity: 1 };
 
     // Simulation data takes priority — check before blank-mode grey
-    const simFrac    = simFracRef2.current[countyId];
+    const simFrac    = simCountyFractions?.[countyId];
     const hasSimData = simFrac !== undefined && simFrac > 0;
 
-    if (blankModeRef.current && !hasSimData) {
-      const hasOverride = !!countyOverridesRef.current[countyId] && Object.keys(countyOverridesRef.current[countyId]!).length > 0;
-      if (!hasOverride) return { fillColor: darkRef.current ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: isSel ? 2 : 0.4, color: isSel ? '#c8a020' : border, opacity: 1 };
+    if (blankMode && !hasSimData) {
+      const hasOverride = !!countyOverrides?.[countyId] && Object.keys(countyOverrides[countyId]!).length > 0;
+      if (!hasOverride) return { fillColor: dark ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: isSel ? 2 : 0.4, color: isSel ? '#c8a020' : border, opacity: 1 };
     }
 
-    const isDeclared  = !declaredRef.current || declaredRef.current.has(countyId);
-    if (!isDeclared && !hasSimData) return { fillColor: darkRef.current ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: 0.4, color: border, opacity: 1 };
+    const isDeclared = !declaredCounties || declaredCounties.has(countyId);
+    if (!isDeclared && !hasSimData) return { fillColor: dark ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: 0.4, color: border, opacity: 1 };
 
-    const effectiveNatPcts = simNatPctsRef2.current ?? natPctsRef.current;
-    const fill = getCountyFill(effectiveNatPcts, countyId, darkRef.current, countyOverridesRef.current?.[countyId]);
-    // Partially-reported counties render slightly dimmer
+    const effectiveNatPcts = simNatPcts ?? natPcts;
+    const fill = getCountyFill(effectiveNatPcts, countyId, dark, countyOverrides?.[countyId]);
     const opacity = isDeclared ? 0.78 : Math.max(0.35, 0.78 * (simFrac ?? 1));
     return { fillColor: fill, fillOpacity: opacity, weight: isSel ? 2 : 0.4, color: isSel ? '#c8a020' : border, opacity: 1 };
-  }, []);
+  }, [natPcts, selectedCounty, dark, bubbleMap, declaredCounties, countyOverrides, blankMode, simCountyFractions, simNatPcts]);
 
+  // Belt-and-suspenders: also call setStyle manually when getStyle changes
   useEffect(() => {
     layerRef.current?.setStyle((f: any) => getStyle(f));
-  }, [natPcts, selectedCounty, dark, bubbleMap, declaredCounties, countyOverrides, blankMode, projectedCounties, simCountyFractions, simNatPcts, getStyle]);
+  }, [getStyle]);
 
   const onEachFeature = useCallback((feature: any, layer: L.Layer) => {
     const geoId    = feature?.properties?.id ?? '';
