@@ -619,9 +619,12 @@ function SeBubbleLayer({
 }
 
 // ── Map view ──────────────────────────────────────────────────────────────────
+type SeCountyDraft = { countyId: SeCountyId; pcts: Record<SePartyId, number>; rptPct: number };
+
 function SeMapView({
   natPcts, selectedCounty, onSelect, dark, bubbleMap,
   declaredCounties, countyOverrides, blankMode, projectedCounties, simCountyFractions,
+  countyDraft,
 }: {
   natPcts:             Record<SePartyId, number>;
   selectedCounty:      SeCountyId | null;
@@ -633,6 +636,7 @@ function SeMapView({
   blankMode?:          boolean;
   projectedCounties?:  Set<SeCountyId>;
   simCountyFractions?: Partial<Record<SeCountyId, number>>;
+  countyDraft?:        SeCountyDraft | null;
 }) {
   const containerRef       = useRef<HTMLDivElement>(null);
   const layerRef           = useRef<L.GeoJSON | null>(null);
@@ -649,6 +653,7 @@ function SeMapView({
   const blankModeRef       = useRef(blankMode ?? false);
   const projectedRef       = useRef(projectedCounties ?? new Set<SeCountyId>());
   const simFracRef2        = useRef(simCountyFractions ?? {});
+  const countyDraftRef2    = useRef<SeCountyDraft | null>(countyDraft ?? null);
 
   useEffect(() => { natPctsRef.current         = natPcts;               }, [natPcts]);
   useEffect(() => { selectedRef.current        = selectedCounty;        }, [selectedCounty]);
@@ -660,6 +665,7 @@ function SeMapView({
   useEffect(() => { blankModeRef.current       = blankMode ?? false;    }, [blankMode]);
   useEffect(() => { projectedRef.current       = projectedCounties ?? new Set(); }, [projectedCounties]);
   useEffect(() => { simFracRef2.current        = simCountyFractions ?? {}; }, [simCountyFractions]);
+  useEffect(() => { countyDraftRef2.current    = countyDraft ?? null;       }, [countyDraft]);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}sweden-counties.geojson`)
@@ -701,15 +707,26 @@ function SeMapView({
 
     layer.on('mousemove', (e: L.LeafletMouseEvent) => {
       if (bubbleRef.current || !countyId) { setTooltip(null); return; }
+
+      const draft    = countyDraftRef2.current;
+      const hasDraft = draft?.countyId === countyId;
+
       if (blankModeRef.current) {
         const hasOverride = !!countyOverridesRef.current[countyId] && Object.keys(countyOverridesRef.current[countyId]!).length > 0;
-        if (!hasOverride) { setTooltip(null); return; }
+        if (!hasOverride && !hasDraft) { setTooltip(null); return; }
       }
-      const rect     = containerRef.current?.getBoundingClientRect();
+
+      const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
-      const fraction = simFracRef2.current[countyId] ?? (declaredRef.current?.has(countyId) ? 1 : undefined);
+
+      // Draft overrides committed data for the open county
+      const overrideToUse = hasDraft ? draft!.pcts : countyOverridesRef.current?.[countyId];
+      const fraction = hasDraft
+        ? draft!.rptPct / 100
+        : simFracRef2.current[countyId] ?? (declaredRef.current?.has(countyId) ? 1 : undefined);
+
       const cntVotes = SE_GRAND_TOTAL_VOTES * (SE_COUNTY_WEIGHTS[countyId] ?? 0) / SE_TOTAL_COUNTY_WEIGHT;
-      const pv       = calcCountyVotes(natPctsRef.current, countyId, countyOverridesRef.current?.[countyId]);
+      const pv       = calcCountyVotes(natPctsRef.current, countyId, overrideToUse);
       const parties  = (Object.entries(pv) as [SePartyId, number][])
         .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6)
         .map(([id, pct]) => ({
@@ -717,7 +734,7 @@ function SeMapView({
           pct,
           rawVotes: Math.round(pct / 100 * cntVotes * (fraction ?? 1)),
         }));
-      const county   = SE_COUNTIES.find(c => c.id === countyId);
+      const county = SE_COUNTIES.find(c => c.id === countyId);
       setTooltip({
         x: e.originalEvent.clientX - rect.left,
         y: e.originalEvent.clientY - rect.top,
@@ -791,7 +808,7 @@ function SeMapView({
                       <span style={{ flex: 1, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{SE_PARTY_MAP[id]?.name ?? id}</span>
                       <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: pColor }}>{pct.toFixed(1)}%</span>
                       {rawVotes != null && (
-                        <span style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginLeft: 2 }}>{fmtN(rawVotes)}</span>
+                        <span style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginLeft: 2 }}>{rawVotes.toLocaleString()}</span>
                       )}
                     </div>
                   );
@@ -1055,7 +1072,8 @@ function SePartiesPanel({ hiddenParties, onToggle, onClose, dark }: {
 // ── County breakdown panel ─────────────────────────────────────────────────────
 function SeCountyPanel({
   countyId, natPcts, countyOverride, onOverride, onResetOverride, onClose,
-  isBlankMode, isProjected, reportingPct, onProject, onReportingPctChange, hiddenParties, dark,
+  isBlankMode, isProjected, reportingPct, onProject, onReportingPctChange,
+  onDraftChange, hiddenParties, dark,
 }: {
   countyId:              SeCountyId;
   natPcts:               Record<SePartyId, number>;
@@ -1068,6 +1086,7 @@ function SeCountyPanel({
   reportingPct?:         number;
   onProject?:            () => void;
   onReportingPctChange?: (pct: number) => void;
+  onDraftChange?:        (pcts: Record<SePartyId, number>, rptPct: number) => void;
   hiddenParties?:        Set<SePartyId>;
   dark?:                 boolean;
 }) {
@@ -1087,6 +1106,11 @@ function SeCountyPanel({
     setTouched(!!countyOverride && Object.keys(countyOverride).length > 0);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countyId]);
+
+  // Propagate live draft upward so tooltip + scoreboard always reflect current sliders
+  useEffect(() => {
+    if (isBlankMode) onDraftChange?.(draftPcts, localRptPct);
+  }, [draftPcts, localRptPct, isBlankMode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const effectiveLocks = useMemo(() => new Set<SePartyId>([...locks, ...(hiddenParties ?? [])]), [locks, hiddenParties]);
   const displayPv      = isBlankMode ? draftPcts : calcCountyVotes(natPcts, countyId, countyOverride);
@@ -1162,7 +1186,7 @@ function SeCountyPanel({
             const pct     = displayPv[id] ?? 0;
             const isLocked = locks.has(id);
             const color   = p.color;
-            const rawVotes = Math.round((pct/100) * countyTotalVotes);
+            const rawVotes = Math.round((pct/100) * countyTotalVotes * (isBlankMode ? localRptPct/100 : 1));
             return (
               <div key={id}>
                 <div className="flex items-center gap-1 mb-0.5">
@@ -1499,35 +1523,53 @@ export default function SwedenApp() {
     setSimSeats(undefined); setDeclaredCounties(undefined);
     setCountyOverrides({}); setProjectedCounties(new Set());
     setCountyReportingPct({}); setSimCountyFractions({});
+    setCountyDraft(null);
     stopSim();
   }
 
   // ── County overrides (blank map) ───────────────────────────────────────────
-  const [countyOverrides, setCountyOverrides]     = useState<Partial<Record<SeCountyId,Partial<Record<SePartyId,number>>>>>({});
-  const [projectedCounties, setProjectedCounties] = useState<Set<SeCountyId>>(new Set());
+  const [countyOverrides, setCountyOverrides]       = useState<Partial<Record<SeCountyId,Partial<Record<SePartyId,number>>>>>({});
+  const [projectedCounties, setProjectedCounties]   = useState<Set<SeCountyId>>(new Set());
   const [countyReportingPct, setCountyReportingPct] = useState<Partial<Record<SeCountyId,number>>>({});
+  // Live draft from the open county panel — updates on every slider drag
+  const [countyDraft, setCountyDraft] = useState<SeCountyDraft|null>(null);
 
   const blankDisplayPcts = useMemo<Record<SePartyId,number>>(() => {
     const zero = Object.fromEntries(SE_PARTIES.map(p=>[p.id,0])) as Record<SePartyId,number>;
-    if (preset !== 'blank' || projectedCounties.size === 0) return zero;
+    if (preset !== 'blank') return zero;
     const weighted: Partial<Record<SePartyId,number>> = {};
     let totalW = 0;
+    const draftCId = countyDraft?.countyId;
+    // Projected counties (skip the one currently being drafted — draft supersedes it)
     for (const cId of projectedCounties) {
+      if (cId === draftCId) continue;
       const cv   = calcCountyVotes(natPcts, cId, countyOverrides[cId]);
       const rPct = (countyReportingPct[cId]??100)/100;
       const w    = (SE_COUNTY_WEIGHTS[cId]??0) * rPct;
       for (const p of SE_PARTIES) weighted[p.id] = (weighted[p.id]??0) + (cv[p.id]??0) * w;
       totalW += w;
     }
+    // Live draft preview (always included while panel is open)
+    if (countyDraft) {
+      const cv   = calcCountyVotes(natPcts, countyDraft.countyId, countyDraft.pcts);
+      const rPct = countyDraft.rptPct / 100;
+      const w    = (SE_COUNTY_WEIGHTS[countyDraft.countyId]??0) * rPct;
+      for (const p of SE_PARTIES) weighted[p.id] = (weighted[p.id]??0) + (cv[p.id]??0) * w;
+      totalW += w;
+    }
     if (totalW === 0) return zero;
     return Object.fromEntries(SE_PARTIES.map(p=>[p.id,(weighted[p.id]??0)/totalW])) as Record<SePartyId,number>;
-  }, [preset, projectedCounties, countyOverrides, countyReportingPct, natPcts]);
+  }, [preset, projectedCounties, countyOverrides, countyReportingPct, natPcts, countyDraft]);
 
   const blankVoteScale = useMemo(() => {
     if (preset !== 'blank') return 1;
-    const w = [...projectedCounties].reduce((s,cId) => s + (SE_COUNTY_WEIGHTS[cId]??0) * ((countyReportingPct[cId]??100)/100), 0);
-    return Math.min(1, w / SE_TOTAL_COUNTY_WEIGHT);
-  }, [preset, projectedCounties, countyReportingPct]);
+    const draftCId = countyDraft?.countyId;
+    const projW = [...projectedCounties]
+      .filter(cId => cId !== draftCId)
+      .reduce((s,cId) => s + (SE_COUNTY_WEIGHTS[cId]??0) * ((countyReportingPct[cId]??100)/100), 0);
+    const draftW = countyDraft ? (SE_COUNTY_WEIGHTS[countyDraft.countyId]??0) * (countyDraft.rptPct/100) : 0;
+    return Math.min(1, (projW + draftW) / SE_TOTAL_COUNTY_WEIGHT);
+  }, [preset, projectedCounties, countyReportingPct, countyDraft]);
 
   const displayPcts = preset === 'blank' ? blankDisplayPcts : natPcts;
 
@@ -1732,6 +1774,7 @@ export default function SwedenApp() {
             blankMode={preset==='blank'}
             projectedCounties={projectedCounties}
             simCountyFractions={simCountyFractions}
+            countyDraft={preset==='blank' ? countyDraft : null}
           />
           {(preset==='blank'||simRunning||simSeats!=null) && (
             <SeReportingWidget
@@ -1824,13 +1867,14 @@ export default function SwedenApp() {
             natPcts={natPcts}
             countyOverride={countyOverrides[selectedCounty]}
             onOverride={pcts=>setCountyOverrides(prev=>({...prev,[selectedCounty]:pcts}))}
-            onResetOverride={()=>{ setCountyOverrides(prev=>{const n={...prev};delete n[selectedCounty];return n;}); setProjectedCounties(prev=>{const n=new Set(prev);n.delete(selectedCounty);return n;}); }}
-            onClose={()=>setSelectedCounty(null)}
+            onResetOverride={()=>{ setCountyOverrides(prev=>{const n={...prev};delete n[selectedCounty];return n;}); setProjectedCounties(prev=>{const n=new Set(prev);n.delete(selectedCounty);return n;}); setCountyDraft(null); }}
+            onClose={()=>{ setSelectedCounty(null); setCountyDraft(null); }}
             isBlankMode={preset==='blank'}
             isProjected={projectedCounties.has(selectedCounty)}
             reportingPct={countyReportingPct[selectedCounty]??100}
             onProject={()=>setProjectedCounties(prev=>new Set([...prev,selectedCounty]))}
             onReportingPctChange={pct=>setCountyReportingPct(prev=>({...prev,[selectedCounty]:pct}))}
+            onDraftChange={preset==='blank' ? (pcts,rpt)=>setCountyDraft({countyId:selectedCounty,pcts,rptPct:rpt}) : undefined}
             hiddenParties={hiddenParties}
             dark={dark}
           />
