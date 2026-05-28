@@ -419,22 +419,37 @@ function SeScoreboard({
     [seats, natPcts],
   );
 
-  // Per-tile leader/winner indicators
-  const bySeats     = [...visible].sort((a, b) => (seats[b] ?? 0) - (seats[a] ?? 0));
-  const topParty    = bySeats[0] ?? null;
-  const indivWinner = topParty && (seats[topParty] ?? 0) >= SE_MAJORITY ? topParty : null;
-
   // C always sits after the Right Bloc — sorted by seat count: Left > Right >> C
   const cAfterRight = true;
 
-  const makeTile = (id: SePartyId, inGroup = false) => {
+  // Bloc totals
+  const leftBlocSeats  = SE_LEFT_BLOC_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
+  const rightBlocSeats = SE_RIGHT_BLOC_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
+  const cSeats         = seats['C'] ?? 0;
+
+  const leftMajority  = leftBlocSeats  >= SE_MAJORITY;
+  const rightMajority = rightBlocSeats >= SE_MAJORITY;
+  const cMajority     = cSeats         >= SE_MAJORITY;
+
+  const maxGroup      = Math.max(leftBlocSeats, rightBlocSeats, cSeats);
+  const leftLeading   = maxGroup > 0 && leftBlocSeats  === maxGroup;
+  const rightLeading  = maxGroup > 0 && rightBlocSeats === maxGroup;
+  const cLeading      = maxGroup > 0 && cSeats         === maxGroup && !leftLeading && !rightLeading;
+
+  const makeTile = (id: SePartyId) => {
     const s        = seats[id] ?? 0;
     const pct      = pctTotal > 0 ? (natPcts[id] ?? 0) / pctTotal * 100 : 0;
     const rawVotes = isBaseline
       ? Math.round((SE_VOTE_RAW_2022[id] ?? 0) * scale)
       : Math.round((natPcts[id] ?? 0) / 100 * SE_GRAND_TOTAL_VOTES * scale);
-    const isLeader = !inGroup && id === topParty && !indivWinner;
-    const isWinner = !inGroup && id === indivWinner;
+
+    const inLeft  = SE_LEFT_BLOC_IDS.includes(id);
+    const inRight = SE_RIGHT_BLOC_IDS.includes(id);
+    const isWinner = inLeft ? leftMajority  : inRight ? rightMajority  : cMajority;
+    const isLeader = inLeft ? (leftLeading  && !leftMajority)
+                  : inRight ? (rightLeading && !rightMajority)
+                  :           (cLeading     && !cMajority);
+
     return (
       <SeScoreboardTile key={id} partyId={id} seats={s} pct={pct} rawVotes={rawVotes}
         isLeader={isLeader} isWinner={isWinner} is2026={is2026} dark={dark} />
@@ -445,14 +460,23 @@ function SeScoreboard({
   const sortedBloc = (ids: SePartyId[]) =>
     ids.filter(id => visible.includes(id)).sort((a, b) => (seats[b] ?? 0) - (seats[a] ?? 0));
 
-  const renderBloc = (ids: SePartyId[], label: string) => {
+  const renderBloc = (ids: SePartyId[], label: string, isLeading: boolean, isMajority: boolean) => {
     const shown = sortedBloc(ids);
     if (shown.length === 0) return null;
+    const accent = partyColor(shown[0]);
+    const groupStyle: React.CSSProperties = isMajority
+      ? { borderColor: hexToRgba(accent, 0.72), background: hexToRgba(accent, 0.08) }
+      : isLeading
+      ? { borderColor: hexToRgba(accent, 0.42), background: hexToRgba(accent, 0.04) }
+      : {};
+    const labelStyle: React.CSSProperties = (isMajority || isLeading)
+      ? { color: hexToRgba(accent, 0.85) }
+      : {};
     return (
-      <div className="ni-group">
-        <span className="ni-group-label">{label}</span>
+      <div className="ni-group" style={groupStyle}>
+        <span className="ni-group-label" style={labelStyle}>{label}</span>
         <div className="ni-group-tiles">
-          {shown.map(id => makeTile(id, true))}
+          {shown.map(id => makeTile(id))}
         </div>
       </div>
     );
@@ -466,13 +490,13 @@ function SeScoreboard({
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
 
           {/* Left Bloc: V + MP + S */}
-          {renderBloc(SE_LEFT_BLOC_IDS, 'Vänster')}
+          {renderBloc(SE_LEFT_BLOC_IDS, 'Vänster', leftLeading && !leftMajority, leftMajority)}
 
           {/* C between blocs when left is larger */}
           {!cAfterRight && cTile}
 
           {/* Right Bloc: L + KD + M + SD */}
-          {renderBloc(SE_RIGHT_BLOC_IDS, 'Tidö')}
+          {renderBloc(SE_RIGHT_BLOC_IDS, 'Tidö', rightLeading && !rightMajority, rightMajority)}
 
           {/* C after right bloc when right is larger (default: 2022 baseline) */}
           {cAfterRight && cTile}
