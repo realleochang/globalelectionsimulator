@@ -525,7 +525,7 @@ function zoomScale(zoom: number): number { return Math.max(0.15, Math.min(2.0, (
 function SeBubbleLayer({
   geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef,
   declaredCounties, countyOverrides, countyOverridesRef, blankMode, projectedCounties,
-  simCountyFractions,
+  simCountyFractions, simNatPctsRef,
 }: {
   geoData:            any;
   natPcts:            Record<SePartyId, number>;
@@ -539,6 +539,7 @@ function SeBubbleLayer({
   blankMode?:         boolean;
   projectedCounties?: Set<SeCountyId>;
   simCountyFractions?: Partial<Record<SeCountyId, number>>;
+  simNatPctsRef?:     React.MutableRefObject<Record<SePartyId, number> | null>;
 }) {
   const map        = useMap();
   const bubblesRef = useRef<BubbleEntry[]>([]);
@@ -565,7 +566,8 @@ function SeBubbleLayer({
       const countyId = SE_GEOID_TO_ID[geoId];
       if (!countyId) return;
       if (declaredCounties && !declaredCounties.has(countyId)) return;
-      if (blankMode && !(projectedCounties?.has(countyId))) return;
+      // In blank mode without active simulation, only show bubbles for projected counties
+      if (!declaredCounties && blankMode && !(projectedCounties?.has(countyId))) return;
       const bounds = (layer as any).getBounds?.();
       if (!bounds?.isValid()) return;
       const center = bounds.getCenter();
@@ -587,7 +589,7 @@ function SeBubbleLayer({
       marker.on('mousemove', (e: L.LeafletMouseEvent) => {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
-        const cur       = calcCountyVotes(natPctsRef.current, countyId, countyOverridesRef.current?.[countyId]);
+        const cur       = calcCountyVotes(simNatPctsRef?.current ?? natPctsRef.current, countyId, countyOverridesRef.current?.[countyId]);
         const fraction  = simFracRef.current[countyId] ?? 1;
         const cntVotes  = SE_GRAND_TOTAL_VOTES * (SE_COUNTY_WEIGHTS[countyId] ?? 0) / SE_TOTAL_COUNTY_WEIGHT;
         const parties   = (Object.entries(cur) as [SePartyId, number][])
@@ -723,7 +725,8 @@ function SeMapView({
       const draft    = countyDraftRef2.current;
       const hasDraft = draft?.countyId === countyId;
 
-      if (blankModeRef.current) {
+      // In blank mode with no active simulation, only show tooltip for projected/draft counties
+      if (blankModeRef.current && !declaredRef.current) {
         const hasOverride = !!countyOverridesRef.current[countyId] && Object.keys(countyOverridesRef.current[countyId]!).length > 0;
         if (!hasOverride && !hasDraft) { setTooltip(null); return; }
       }
@@ -784,11 +787,12 @@ function SeMapView({
         )}
         {geoData && bubbleMap && (
           <SeBubbleLayer
-            geoData={geoData} natPcts={natPcts} containerRef={containerRef}
+            geoData={geoData} natPcts={simNatPcts ?? natPcts} containerRef={containerRef}
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
             declaredCounties={declaredCounties} countyOverrides={countyOverrides}
             countyOverridesRef={countyOverridesRef} blankMode={blankMode}
             projectedCounties={projectedCounties} simCountyFractions={simCountyFractions}
+            simNatPctsRef={simNatPctsRef2}
           />
         )}
       </MapContainer>
@@ -1764,7 +1768,7 @@ export default function SwedenApp() {
       {/* ── Scoreboard ─────────────────────────────────────────────────────── */}
       {scoreboardVisible && (
         <SeScoreboard
-          natPcts={displayPcts}
+          natPcts={simNatPcts ?? displayPcts}
           simSeats={simSeats}
           isBaseline={preset==='baseline'}
           is2026={preset!=='baseline'}
