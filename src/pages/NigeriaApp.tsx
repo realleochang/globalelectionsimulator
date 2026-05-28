@@ -413,11 +413,13 @@ function NgScoreboard({ nationalVotes, nationalPcts, stateCounts, winStatus, abo
                 </div>
                 <span className="text-[8.5px] font-sans text-ink-3 mt-1.5 leading-none truncate max-w-full">{cand?.lastName ?? ''}</span>
                 <span className="text-[8px] font-mono font-bold uppercase tracking-[0.10em] leading-none mt-0.5 text-ink-3">{p.id}</span>
-                {/* Vote total */}
+                {/* % first, then full raw vote count */}
                 <span className="text-[13px] font-display font-black leading-none tabular-nums mt-1" style={{ color: p.color }}>
-                  {votes > 0 ? (votes >= 1_000_000 ? `${(votes/1_000_000).toFixed(2)}M` : fmtVotes(votes)) : '—'}
+                  {pct !== undefined ? `${pct.toFixed(1)}%` : '—'}
                 </span>
-                <span className="text-[9.5px] font-sans text-ink-3 leading-none mt-0.5">{pct !== undefined ? `${pct.toFixed(1)}%` : '—'}</span>
+                <span className="text-[9px] font-mono text-ink-3 leading-none mt-0.5 tabular-nums">
+                  {votes > 0 ? votes.toLocaleString() : '—'}
+                </span>
                 {/* State wins + threshold */}
                 {activePreset && (
                   <div className="flex items-center gap-1.5 mt-1">

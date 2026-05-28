@@ -71,9 +71,9 @@ const ES_VOTE_RAW_2023: Record<EsPartyId, number> = {
 };
 const ES_GRAND_TOTAL_VOTES = 24_474_836;
 
-// 2026 polling — PP well ahead, PSOE declining, Sumar fragmented
+// 2026 polling — May 2026
 const ES_VOTE_PCT_2026: Record<EsPartyId, number> = {
-  PP: 36.0, PSOE: 28.5, VOX: 13.0, SUMAR: 9.0,
+  PP: 32.0, PSOE: 29.0, VOX: 18.5, SUMAR: 6.0,
   ERC: 1.5, JUNTS: 1.8, EH_BILDU: 1.4, PNV: 1.1, CC: 0.65, BNG: 0.60, UPN: 0.20,
 };
 
