@@ -424,7 +424,11 @@ function SeScoreboard({
   const topParty    = bySeats[0] ?? null;
   const indivWinner = topParty && (seats[topParty] ?? 0) >= SE_MAJORITY ? topParty : null;
 
-  const otherPct = Math.max(0, 100 - pctTotal);
+  // Bloc seat totals — drive C placement
+  const leftBlocSeats  = SE_LEFT_BLOC_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
+  const rightBlocSeats = SE_RIGHT_BLOC_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
+  // C follows the larger bloc (sits to its right). If left is larger: [Left][C][Right]; else [Left][Right][C]
+  const cAfterRight = rightBlocSeats >= leftBlocSeats;
 
   const makeTile = (id: SePartyId, inGroup = false) => {
     const s        = seats[id] ?? 0;
@@ -440,8 +444,12 @@ function SeScoreboard({
     );
   };
 
+  // Within each bloc, sort by decreasing seats
+  const sortedBloc = (ids: SePartyId[]) =>
+    ids.filter(id => visible.includes(id)).sort((a, b) => (seats[b] ?? 0) - (seats[a] ?? 0));
+
   const renderBloc = (ids: SePartyId[], label: string) => {
-    const shown = ids.filter(id => visible.includes(id));
+    const shown = sortedBloc(ids);
     if (shown.length === 0) return null;
     return (
       <div className="ni-group">
@@ -453,6 +461,8 @@ function SeScoreboard({
     );
   };
 
+  const cTile = visible.includes('C') ? makeTile('C') : null;
+
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
@@ -461,40 +471,15 @@ function SeScoreboard({
           {/* Left Bloc: V + MP + S */}
           {renderBloc(SE_LEFT_BLOC_IDS, 'Vänster')}
 
-          {/* Centre: C standalone */}
-          {visible.includes('C') && makeTile('C')}
+          {/* C between blocs when left is larger */}
+          {!cAfterRight && cTile}
 
           {/* Right Bloc: L + KD + M + SD */}
           {renderBloc(SE_RIGHT_BLOC_IDS, 'Tidö')}
 
-          {/* Others tile */}
-          {otherPct >= 0.05 && (
-            <div className="cand-col" style={{
-              '--cand-color': '#888888', '--cand-color-alpha': 'rgba(136,136,136,0.13)',
-              borderColor: 'rgba(136,136,136,0.22)', opacity: 0.65,
-            } as React.CSSProperties}>
-              <div style={{ position: 'relative' }}>
-                <div className="cand-circle-frame" style={{ background: 'rgba(136,136,136,0.12)', border: '1.5px solid rgba(136,136,136,0.25)' }}>
-                  <span className="cand-initials" style={{ color: '#888', fontSize: 13 }}>···</span>
-                </div>
-              </div>
-              <span className="cand-leader-name" style={{ color: '#999' }}>Minor</span>
-              <span className="cand-party-abbrev" style={{ color: '#888' }}>Others</span>
-              <span className="cand-seats" style={{ color: '#999' }}>—</span>
-              <span className="cand-party-name" style={{ color: '#888' }}>Sub-threshold (below 4%)</span>
-              <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
-                <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: 'rgba(136,136,136,0.48)', letterSpacing: '0.10em', textTransform: 'uppercase' }}>VOTES</span>
-                <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: '#888' }}>{otherPct.toFixed(1)}%</span>
-              </div>
-              <div style={{ width: '100%', display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
-                <span className="cand-votes-full"    style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(136,136,136,0.65)' }}>{Math.round(otherPct / 100 * SE_GRAND_TOTAL_VOTES * scale).toLocaleString()}</span>
-                <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: 'rgba(136,136,136,0.65)' }}>{fmtN(Math.round(otherPct / 100 * SE_GRAND_TOTAL_VOTES * scale))}</span>
-              </div>
-              <div className="cand-bar-track" style={{ width: '100%', height: 3, borderRadius: 2, background: 'var(--bar-track)' }}>
-                <div className="cand-bar-fill" style={{ height: '100%', borderRadius: 2, background: '#888', width: `${Math.min(otherPct / 40 * 100, 100)}%` }} />
-              </div>
-            </div>
-          )}
+          {/* C after right bloc when right is larger (default: 2022 baseline) */}
+          {cAfterRight && cTile}
+
         </div>
       </div>
     </div>
