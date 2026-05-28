@@ -686,13 +686,15 @@ function SeMapView({
     }
     if (!countyId) return { fillColor: darkRef.current ? '#374151' : '#E5E7EB', fillOpacity: 0.5, weight: 0.4, color: border, opacity: 1 };
 
-    if (blankModeRef.current) {
+    // Simulation data takes priority — check before blank-mode grey
+    const simFrac    = simFracRef2.current[countyId];
+    const hasSimData = simFrac !== undefined && simFrac > 0;
+
+    if (blankModeRef.current && !hasSimData) {
       const hasOverride = !!countyOverridesRef.current[countyId] && Object.keys(countyOverridesRef.current[countyId]!).length > 0;
       if (!hasOverride) return { fillColor: darkRef.current ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: isSel ? 2 : 0.4, color: isSel ? '#c8a020' : border, opacity: 1 };
     }
 
-    const simFrac     = simFracRef2.current[countyId];
-    const hasSimData  = simFrac !== undefined && simFrac > 0;
     const isDeclared  = !declaredRef.current || declaredRef.current.has(countyId);
     if (!isDeclared && !hasSimData) return { fillColor: darkRef.current ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: 0.4, color: border, opacity: 1 };
 
@@ -1549,37 +1551,24 @@ export default function SwedenApp() {
     if (preset !== 'blank') return zero;
     const weighted: Partial<Record<SePartyId,number>> = {};
     let totalW = 0;
-    const draftCId = countyDraft?.countyId;
-    // Projected counties (skip the one currently being drafted — draft supersedes it)
+    // Only committed (projected) counties contribute — draft is live-only until button click
     for (const cId of projectedCounties) {
-      if (cId === draftCId) continue;
       const cv   = calcCountyVotes(natPcts, cId, countyOverrides[cId]);
       const rPct = (countyReportingPct[cId]??100)/100;
       const w    = (SE_COUNTY_WEIGHTS[cId]??0) * rPct;
       for (const p of SE_PARTIES) weighted[p.id] = (weighted[p.id]??0) + (cv[p.id]??0) * w;
       totalW += w;
     }
-    // Live draft preview (always included while panel is open)
-    if (countyDraft) {
-      const cv   = calcCountyVotes(natPcts, countyDraft.countyId, countyDraft.pcts);
-      const rPct = countyDraft.rptPct / 100;
-      const w    = (SE_COUNTY_WEIGHTS[countyDraft.countyId]??0) * rPct;
-      for (const p of SE_PARTIES) weighted[p.id] = (weighted[p.id]??0) + (cv[p.id]??0) * w;
-      totalW += w;
-    }
     if (totalW === 0) return zero;
     return Object.fromEntries(SE_PARTIES.map(p=>[p.id,(weighted[p.id]??0)/totalW])) as Record<SePartyId,number>;
-  }, [preset, projectedCounties, countyOverrides, countyReportingPct, natPcts, countyDraft]);
+  }, [preset, projectedCounties, countyOverrides, countyReportingPct, natPcts]);
 
   const blankVoteScale = useMemo(() => {
     if (preset !== 'blank') return 1;
-    const draftCId = countyDraft?.countyId;
     const projW = [...projectedCounties]
-      .filter(cId => cId !== draftCId)
       .reduce((s,cId) => s + (SE_COUNTY_WEIGHTS[cId]??0) * ((countyReportingPct[cId]??100)/100), 0);
-    const draftW = countyDraft ? (SE_COUNTY_WEIGHTS[countyDraft.countyId]??0) * (countyDraft.rptPct/100) : 0;
-    return Math.min(1, (projW + draftW) / SE_TOTAL_COUNTY_WEIGHT);
-  }, [preset, projectedCounties, countyReportingPct, countyDraft]);
+    return Math.min(1, projW / SE_TOTAL_COUNTY_WEIGHT);
+  }, [preset, projectedCounties, countyReportingPct]);
 
   const displayPcts = preset === 'blank' ? blankDisplayPcts : natPcts;
 
@@ -1739,7 +1728,7 @@ export default function SwedenApp() {
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
 
           <button onClick={() => openRight('sim')}       className={rightPanel==='sim'      ?btnActive:btnMuted}>▶ Simulation</button>
-          <button onClick={() => openLeft('parties')}    className={leftPanel==='parties'   ?btnActive:btnMuted}>Parties</button>
+          <button onClick={() => !simRunning && openLeft('parties')} disabled={simRunning} className={`${leftPanel==='parties'?btnActive:btnMuted}${simRunning?' opacity-40 cursor-not-allowed':''}`}>Parties</button>
           <button onClick={() => setScoreboardVisible(v=>!v)} className={scoreboardVisible  ?btnActive:btnMuted}>Scoreboard</button>
           <button onClick={() => openLeft('breakdown')}  className={leftPanel==='breakdown' ?btnActive:btnMuted}>Breakdown</button>
           <button onClick={() => openRight('coalition')} className={rightPanel==='coalition'?btnActive:btnMuted}>Coalition</button>
