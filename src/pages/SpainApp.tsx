@@ -1388,6 +1388,100 @@ function EsBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
   );
 }
 
+// ── Distributions panel ───────────────────────────────────────────────────────
+// Left popup: per-province D'Hondt seat allocation for every party.
+function EsDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting, dark }: {
+  natPcts: Record<EsPartyId,number>;
+  provOverrides: Partial<Record<EsProvId, Partial<Record<EsPartyId, number>>>>;
+  is2026?: boolean;
+  onClose:()=>void; exiting?:boolean; dark?:boolean;
+}) {
+  const ink2 = dark?'rgba(255,255,255,0.55)':'rgba(0,0,0,0.5)';
+  const ink3 = dark?'rgba(255,255,255,0.38)':'rgba(0,0,0,0.4)';
+  const cardBg = dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.025)';
+  const trackBg = dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)';
+
+  // party display name honouring the 2026/2027 rebrand (Sumar → Un Paso al Frente)
+  const dispName = (id:EsPartyId) => {
+    const p = ES_PARTY_MAP[id];
+    return is2026 && p.name2026 ? p.name2026 : p.name;
+  };
+
+  // Per-province seat allocations + national totals, computed from the current scenario.
+  const { rows, natTotals, totalSeats } = useMemo(() => {
+    const rows = ES_PROVINCES.map(prov => {
+      const votes = calcProvVotes(natPcts, prov.id, provOverrides[prov.id]);
+      const seats = calcDHondtProv(votes, prov.seats);
+      const alloc = (Object.entries(seats) as [EsPartyId,number][])
+        .filter(([,s]) => (s??0) > 0)
+        .sort((a,b) => b[1]-a[1]);
+      return { prov, alloc };
+    });
+    const natTotals: Partial<Record<EsPartyId,number>> = {};
+    let totalSeats = 0;
+    for (const { alloc } of rows)
+      for (const [id,s] of alloc) { natTotals[id] = (natTotals[id]??0)+s; totalSeats += s; }
+    return { rows, natTotals, totalSeats };
+  }, [natPcts, provOverrides]);
+
+  const natSorted = (Object.entries(natTotals) as [EsPartyId,number][])
+    .filter(([,s]) => s>0).sort((a,b) => b[1]-a[1]);
+
+  return (
+    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting?'panel-exit-left':'panel-slide-left'}`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h2 className="text-[13px] font-bold text-ink leading-none">Seat Distribution</h2>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">D'Hondt allocation · {ES_PROVINCES.length} provinces · {totalSeats} seats</div>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+
+      {/* National total stacked bar */}
+      <div className="px-3.5 py-2.5 border-b border-default shrink-0">
+        <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.14em] mb-1.5" style={{color:ink3}}>National total</div>
+        <div className="flex w-full h-2.5 rounded-full overflow-hidden" style={{background:trackBg}}>
+          {natSorted.map(([id,s]) => (
+            <div key={id} title={`${dispName(id)} ${s}`} style={{width:`${s/Math.max(1,totalSeats)*100}%`,background:partyColor(id)}}/>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1.5">
+          {natSorted.map(([id,s]) => (
+            <span key={id} className="inline-flex items-center gap-1 text-[9px] font-mono" style={{color:ink2}}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{background:partyColor(id)}}/>
+              {dispName(id)}<b className="text-ink">{s}</b>
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2">
+        {rows.map(({ prov, alloc }) => (
+          <div key={prov.id} style={{background:cardBg,borderRadius:5,padding:'6px 8px'}}>
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10.5px] font-semibold text-ink truncate">{prov.name}</span>
+              <span className="text-[8.5px] font-mono shrink-0 ml-2" style={{color:ink3}}>{prov.seats} {prov.seats===1?'seat':'seats'}</span>
+            </div>
+            <div className="flex w-full h-2 rounded-full overflow-hidden" style={{background:trackBg}}>
+              {alloc.map(([id,s]) => (
+                <div key={id} title={`${dispName(id)} ${s}`} style={{width:`${s/prov.seats*100}%`,background:partyColor(id)}}/>
+              ))}
+            </div>
+            <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
+              {alloc.map(([id,s]) => (
+                <span key={id} className="inline-flex items-center gap-0.5 text-[8.5px] font-mono" style={{color:ink2}}>
+                  <span className="w-1.5 h-1.5 rounded-full" style={{background:partyColor(id)}}/>
+                  {dispName(id)}<b className="text-ink">{s}</b>
+                </span>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </aside>
+  );
+}
+
 // ── Tutorial panel ────────────────────────────────────────────────────────────
 function EsTutorialPanel({ onClose, exiting, dark }: { onClose:()=>void; exiting?:boolean; dark?:boolean }) {
   const H2=({c}:{c:string})=><div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-4 mb-1.5 first:mt-0">{c}</div>;
@@ -1543,14 +1637,14 @@ export default function SpainApp() {
   const [scoreboardVisible,setScoreboardVisible] = useState(true);
   const [hiddenParties,setHiddenParties]       = useState<Set<EsPartyId>>(new Set());
 
-  const [leftPanel, setLeftPanel]   = useState<'parties'|'parli'|'breakdown'|null>(null);
+  const [leftPanel, setLeftPanel]   = useState<'parties'|'parli'|'breakdown'|'distributions'|null>(null);
   const [rightPanel,setRightPanel]  = useState<'sim'|'tutorial'|'coalition'|null>(null);
   const [exitLeft,  setExitLeft]    = useState<string|null>(null);
   const [exitRight, setExitRight]   = useState<string|null>(null);
   const exitTimerL = useRef<ReturnType<typeof setTimeout>|null>(null);
   const exitTimerR = useRef<ReturnType<typeof setTimeout>|null>(null);
 
-  const openLeft=useCallback((panel:'parties'|'parli'|'breakdown')=>{
+  const openLeft=useCallback((panel:'parties'|'parli'|'breakdown'|'distributions')=>{
     if(leftPanel===panel){ setExitLeft(panel); setLeftPanel(null); exitTimerL.current=setTimeout(()=>setExitLeft(null),280); }
     else { if(leftPanel){setExitLeft(leftPanel);exitTimerL.current=setTimeout(()=>setExitLeft(null),280);} setLeftPanel(panel); }
   },[leftPanel]);
@@ -1654,6 +1748,7 @@ export default function SpainApp() {
   const showProv      = !!selectedProv && rightPanel!=='sim' && !simRunning;
   const showParli     = leftPanel==='parli'     || exitLeft==='parli';
   const showBreakdown = leftPanel==='breakdown'  || exitLeft==='breakdown';
+  const showDistrib   = leftPanel==='distributions' || exitLeft==='distributions';
   const showTutorial  = rightPanel==='tutorial' || exitRight==='tutorial';
   const showCoalition = rightPanel==='coalition'|| exitRight==='coalition';
 
@@ -1680,6 +1775,7 @@ export default function SpainApp() {
           <button onClick={()=>!simRunning&&openLeft('parties')} disabled={simRunning} className={`${leftPanel==='parties'?btnActive:btnMuted}${simRunning?' opacity-40 cursor-not-allowed':''}`}>Parties</button>
           <button onClick={()=>setScoreboardVisible(v=>!v)} className={scoreboardVisible?btnActive:btnMuted}>Scoreboard</button>
           <button onClick={()=>openLeft('breakdown')}  className={leftPanel==='breakdown' ?btnActive:btnMuted}>Breakdown</button>
+          <button onClick={()=>openLeft('distributions')} className={leftPanel==='distributions'?btnActive:btnMuted}>Distributions</button>
           <button onClick={()=>openRight('coalition')} className={rightPanel==='coalition'?btnActive:btnMuted}>Coalition</button>
           <button onClick={()=>openLeft('parli')}      className={leftPanel==='parli'     ?btnActive:btnMuted}>Parliament</button>
           <button onClick={()=>setBubbleMap(v=>!v)}    className={bubbleMap?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Bubble Map</button>
@@ -1709,6 +1805,7 @@ export default function SpainApp() {
         {leftPanel==='parties'&&<EsPartiesPanel hiddenParties={hiddenParties} onToggle={id=>setHiddenParties(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;})} onClose={()=>openLeft('parties')} dark={dark}/>}
         {showParli    &&<EsParliamentPanel seats={displaySeats} onClose={()=>openLeft('parli')}    exiting={exitLeft==='parli'}    dark={dark}/>}
         {showBreakdown&&<EsBreakdownPanel  seats={displaySeats} natPcts={displayPcts} isBaseline={preset==='baseline'} onClose={()=>openLeft('breakdown')} exiting={exitLeft==='breakdown'} dark={dark}/>}
+        {showDistrib  &&<EsDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} is2026={preset!=='baseline'} onClose={()=>openLeft('distributions')} exiting={exitLeft==='distributions'} dark={dark}/>}
 
         {/* MAP */}
         <div className="relative flex-1 min-w-0 min-h-0">
