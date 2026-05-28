@@ -424,11 +424,8 @@ function SeScoreboard({
   const topParty    = bySeats[0] ?? null;
   const indivWinner = topParty && (seats[topParty] ?? 0) >= SE_MAJORITY ? topParty : null;
 
-  // Bloc seat totals — drive C placement
-  const leftBlocSeats  = SE_LEFT_BLOC_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
-  const rightBlocSeats = SE_RIGHT_BLOC_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
-  // C follows the larger bloc (sits to its right). If left is larger: [Left][C][Right]; else [Left][Right][C]
-  const cAfterRight = rightBlocSeats >= leftBlocSeats;
+  // C always sits after the Right Bloc — sorted by seat count: Left > Right >> C
+  const cAfterRight = true;
 
   const makeTile = (id: SePartyId, inGroup = false) => {
     const s        = seats[id] ?? 0;
