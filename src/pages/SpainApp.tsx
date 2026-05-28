@@ -1428,7 +1428,7 @@ function EsDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting
     .filter(([,s]) => s>0).sort((a,b) => b[1]-a[1]);
 
   return (
-    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting?'panel-exit-left':'panel-slide-left'}`}>
+    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Seat Distribution</h2>
@@ -1637,18 +1637,18 @@ export default function SpainApp() {
   const [scoreboardVisible,setScoreboardVisible] = useState(true);
   const [hiddenParties,setHiddenParties]       = useState<Set<EsPartyId>>(new Set());
 
-  const [leftPanel, setLeftPanel]   = useState<'parties'|'parli'|'breakdown'|'distributions'|null>(null);
-  const [rightPanel,setRightPanel]  = useState<'sim'|'tutorial'|'coalition'|null>(null);
+  const [leftPanel, setLeftPanel]   = useState<'parties'|'parli'|'breakdown'|null>(null);
+  const [rightPanel,setRightPanel]  = useState<'sim'|'tutorial'|'coalition'|'distributions'|null>(null);
   const [exitLeft,  setExitLeft]    = useState<string|null>(null);
   const [exitRight, setExitRight]   = useState<string|null>(null);
   const exitTimerL = useRef<ReturnType<typeof setTimeout>|null>(null);
   const exitTimerR = useRef<ReturnType<typeof setTimeout>|null>(null);
 
-  const openLeft=useCallback((panel:'parties'|'parli'|'breakdown'|'distributions')=>{
+  const openLeft=useCallback((panel:'parties'|'parli'|'breakdown')=>{
     if(leftPanel===panel){ setExitLeft(panel); setLeftPanel(null); exitTimerL.current=setTimeout(()=>setExitLeft(null),280); }
     else { if(leftPanel){setExitLeft(leftPanel);exitTimerL.current=setTimeout(()=>setExitLeft(null),280);} setLeftPanel(panel); }
   },[leftPanel]);
-  const openRight=useCallback((panel:'sim'|'tutorial'|'coalition')=>{
+  const openRight=useCallback((panel:'sim'|'tutorial'|'coalition'|'distributions')=>{
     if(rightPanel===panel){ setExitRight(panel); setRightPanel(null); exitTimerR.current=setTimeout(()=>setExitRight(null),280); }
     else { if(rightPanel){setExitRight(rightPanel);exitTimerR.current=setTimeout(()=>setExitRight(null),280);} if(panel==='sim') setSelectedProv(null); setRightPanel(panel); }
   },[rightPanel]);
@@ -1748,7 +1748,7 @@ export default function SpainApp() {
   const showProv      = !!selectedProv && rightPanel!=='sim' && !simRunning;
   const showParli     = leftPanel==='parli'     || exitLeft==='parli';
   const showBreakdown = leftPanel==='breakdown'  || exitLeft==='breakdown';
-  const showDistrib   = leftPanel==='distributions' || exitLeft==='distributions';
+  const showDistrib   = rightPanel==='distributions' || exitRight==='distributions';
   const showTutorial  = rightPanel==='tutorial' || exitRight==='tutorial';
   const showCoalition = rightPanel==='coalition'|| exitRight==='coalition';
 
@@ -1775,7 +1775,7 @@ export default function SpainApp() {
           <button onClick={()=>!simRunning&&openLeft('parties')} disabled={simRunning} className={`${leftPanel==='parties'?btnActive:btnMuted}${simRunning?' opacity-40 cursor-not-allowed':''}`}>Parties</button>
           <button onClick={()=>setScoreboardVisible(v=>!v)} className={scoreboardVisible?btnActive:btnMuted}>Scoreboard</button>
           <button onClick={()=>openLeft('breakdown')}  className={leftPanel==='breakdown' ?btnActive:btnMuted}>Breakdown</button>
-          <button onClick={()=>openLeft('distributions')} className={leftPanel==='distributions'?btnActive:btnMuted}>Distributions</button>
+          <button onClick={()=>openRight('distributions')} className={rightPanel==='distributions'?btnActive:btnMuted}>Distributions</button>
           <button onClick={()=>openRight('coalition')} className={rightPanel==='coalition'?btnActive:btnMuted}>Coalition</button>
           <button onClick={()=>openLeft('parli')}      className={leftPanel==='parli'     ?btnActive:btnMuted}>Parliament</button>
           <button onClick={()=>setBubbleMap(v=>!v)}    className={bubbleMap?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Bubble Map</button>
@@ -1805,7 +1805,6 @@ export default function SpainApp() {
         {leftPanel==='parties'&&<EsPartiesPanel hiddenParties={hiddenParties} onToggle={id=>setHiddenParties(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;})} onClose={()=>openLeft('parties')} dark={dark}/>}
         {showParli    &&<EsParliamentPanel seats={displaySeats} onClose={()=>openLeft('parli')}    exiting={exitLeft==='parli'}    dark={dark}/>}
         {showBreakdown&&<EsBreakdownPanel  seats={displaySeats} natPcts={displayPcts} isBaseline={preset==='baseline'} onClose={()=>openLeft('breakdown')} exiting={exitLeft==='breakdown'} dark={dark}/>}
-        {showDistrib  &&<EsDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} is2026={preset!=='baseline'} onClose={()=>openLeft('distributions')} exiting={exitLeft==='distributions'} dark={dark}/>}
 
         {/* MAP */}
         <div className="relative flex-1 min-w-0 min-h-0">
@@ -1901,6 +1900,7 @@ export default function SpainApp() {
             hiddenParties={hiddenParties} dark={dark}/>
         )}
 
+        {showDistrib  &&<EsDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} is2026={preset!=='baseline'} onClose={()=>openRight('distributions')} exiting={exitRight==='distributions'} dark={dark}/>}
         {showTutorial &&<EsTutorialPanel  onClose={()=>openRight('tutorial')}  exiting={exitRight==='tutorial'}  dark={dark}/>}
         {showCoalition&&<EsCoalitionPanel seats={displaySeats} onClose={()=>openRight('coalition')} exiting={exitRight==='coalition'} dark={dark}/>}
       </div>
