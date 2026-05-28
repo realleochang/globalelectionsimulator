@@ -56,6 +56,18 @@ const SE_VOTE_RAW_2022: Record<SePartyId, number> = {
   S: 1_906_474, SD: 1_285_782, M: 1_197_898, V: 422_908,
   C:   420_415, KD:   334_614, MP:  318_255, L: 295_622,
 };
+// Overseas votes are included in the official 6,270,383 total but are attributed
+// to voters' last-registered Swedish municipality (overwhelmingly Stockholm).
+// We track them separately so they can be displayed as a Europe bubble.
+const SE_OVERSEAS_VOTES_RAW_2022: Record<SePartyId, number> = {
+  S: 19_000, SD: 5_900, M: 10_500, V: 9_200,
+  C:  7_200, KD:  2_000, MP:  4_000, L:  5_200,
+};
+const SE_OVERSEAS_VOTES_TOTAL = Object.values(SE_OVERSEAS_VOTES_RAW_2022).reduce((s, v) => s + v, 0);
+const SE_OVERSEAS_PCT_2022 = Object.fromEntries(
+  SE_PARTIES.map(p => [p.id, (SE_OVERSEAS_VOTES_RAW_2022[p.id] ?? 0) / SE_OVERSEAS_VOTES_TOTAL * 100]),
+) as Record<SePartyId, number>;
+
 const SE_GRAND_TOTAL_VOTES = 6_270_383;
 
 // 2026 polling scenario — based on Demoskop/Novus polling averages 2025
@@ -118,6 +130,137 @@ function calcSainteLague(
   return seats;
 }
 
+// ── 29 constituencies — fixed seats (2022 allocation) + 2022 vote data ───────
+// Stockholm is split into city (kommu) and county (läns); Skåne into 4;
+// Västra Götaland into 5. All other counties = 1 constituency each.
+// Fixed seats sum to 310; 39 adjustment seats make total 349.
+type SeConst = {
+  id: string; name: string; fixedSeats: number; weight: number;
+  v2022: Partial<Record<SePartyId, number>>;
+};
+const SE_CONSTITUENCIES: SeConst[] = [
+  // ── Stockholm ──────────────────────────────────────────────────────────────
+  { id:'STHLM_CITY',   name:'Stockholm City',      fixedSeats:31, weight:10.1,
+    v2022:{S:29.7,SD:12.0,M:21.5,V:11.0,C:9.3,KD:2.4,MP:9.4,L:4.7} },
+  { id:'STHLM_COUNTY', name:'Stockholm County',    fixedSeats:42, weight:13.4,
+    v2022:{S:26.6,SD:17.3,M:23.5,V:6.8,C:6.9,KD:4.8,MP:5.6,L:8.5} },
+  // ── Single-county constituencies ──────────────────────────────────────────
+  { id:'SEC',  name:'Uppsala',        fixedSeats:13, weight:4.0,
+    v2022:{S:29.6,SD:18.5,M:18.6,V:8.0,C:7.4,KD:6.0,MP:6.8,L:5.1} },
+  { id:'SED',  name:'Södermanland',   fixedSeats: 9, weight:3.0,
+    v2022:{S:33.4,SD:23.3,M:19.5,V:5.3,C:6.0,KD:4.8,MP:4.1,L:3.6} },
+  { id:'SEE',  name:'Östergötland',   fixedSeats:14, weight:4.5,
+    v2022:{S:30.9,SD:21.5,M:20.1,V:5.7,C:6.6,KD:6.0,MP:4.7,L:4.5} },
+  { id:'SEF',  name:'Jönköping',      fixedSeats:11, weight:3.5,
+    v2022:{S:29.4,SD:23.6,M:19.0,V:4.0,C:7.6,KD:9.4,MP:3.3,L:3.7} },
+  { id:'SEG',  name:'Kronoberg',      fixedSeats: 6, weight:1.9,
+    v2022:{S:31.4,SD:24.0,M:19.8,V:5.1,C:6.1,KD:6.9,MP:3.5,L:3.2} },
+  { id:'SEH',  name:'Kalmar',         fixedSeats: 8, weight:2.5,
+    v2022:{S:32.2,SD:24.8,M:18.0,V:4.7,C:6.6,KD:7.1,MP:3.4,L:3.2} },
+  { id:'SEI',  name:'Gotland',        fixedSeats: 2, weight:0.7,
+    v2022:{S:35.2,SD:15.9,M:17.1,V:6.5,C:11.9,KD:4.0,MP:6.6,L:2.9} },
+  { id:'SEK',  name:'Blekinge',       fixedSeats: 5, weight:1.7,
+    v2022:{S:31.5,SD:28.9,M:18.1,V:4.5,C:4.9,KD:5.6,MP:2.9,L:3.6} },
+  // ── Skåne (4 constituencies) ──────────────────────────────────────────────
+  { id:'SEM_MALMO', name:'Malmö',         fixedSeats: 9, weight:3.0,
+    v2022:{S:30.5,SD:20.1,M:18.5,V:9.5,C:5.7,KD:3.0,MP:8.0,L:4.7} },
+  { id:'SEM_NE',    name:'Skåne NE',      fixedSeats: 5, weight:1.6,
+    v2022:{S:28.5,SD:28.0,M:18.0,V:5.5,C:6.0,KD:6.5,MP:3.5,L:4.0} },
+  { id:'SEM_S',     name:'Skåne Södra',   fixedSeats: 6, weight:2.0,
+    v2022:{S:27.5,SD:26.0,M:19.5,V:6.0,C:6.5,KD:4.5,MP:4.5,L:5.5} },
+  { id:'SEM_W',     name:'Skåne Västra',  fixedSeats:17, weight:5.4,
+    v2022:{S:24.5,SD:25.0,M:21.5,V:6.0,C:5.5,KD:6.0,MP:4.5,L:7.0} },
+  // ── Halland ────────────────────────────────────────────────────────────────
+  { id:'SEN',  name:'Halland',        fixedSeats: 9, weight:3.0,
+    v2022:{S:28.6,SD:22.8,M:22.7,V:4.1,C:7.1,KD:6.1,MP:3.6,L:4.9} },
+  // ── Västra Götaland (5 constituencies) ──────────────────────────────────────
+  { id:'SEO_GBG',  name:'Göteborg',       fixedSeats:15, weight:5.0,
+    v2022:{S:32.0,SD:16.5,M:17.5,V:11.0,C:6.5,KD:3.0,MP:7.5,L:6.0} },
+  { id:'SEO_BOH',  name:'Bohuslän',       fixedSeats: 9, weight:2.8,
+    v2022:{S:28.5,SD:22.5,M:20.5,V:5.5,C:8.0,KD:4.0,MP:4.5,L:6.5} },
+  { id:'SEO_SKAR', name:'Skaraborg',      fixedSeats: 8, weight:2.5,
+    v2022:{S:30.0,SD:24.5,M:19.0,V:4.0,C:7.5,KD:6.5,MP:3.5,L:5.0} },
+  { id:'SEO_N',    name:'VG Norra',       fixedSeats: 9, weight:2.9,
+    v2022:{S:30.0,SD:25.0,M:17.5,V:6.0,C:6.0,KD:5.5,MP:4.5,L:5.5} },
+  { id:'SEO_S',    name:'VG Södra',       fixedSeats:10, weight:3.3,
+    v2022:{S:29.0,SD:22.5,M:20.0,V:7.0,C:6.5,KD:4.0,MP:5.0,L:6.0} },
+  // ── Northern/central constituencies ─────────────────────────────────────────
+  { id:'SES',  name:'Värmland',       fixedSeats: 9, weight:2.8,
+    v2022:{S:35.0,SD:23.0,M:17.2,V:5.1,C:6.4,KD:5.9,MP:3.7,L:3.8} },
+  { id:'SET',  name:'Örebro',         fixedSeats:10, weight:3.2,
+    v2022:{S:33.8,SD:22.5,M:17.0,V:6.2,C:6.4,KD:5.4,MP:4.1,L:4.6} },
+  { id:'SEU',  name:'Västmanland',    fixedSeats: 8, weight:2.7,
+    v2022:{S:32.4,SD:24.0,M:19.4,V:6.2,C:5.5,KD:5.1,MP:3.2,L:4.2} },
+  { id:'SEW',  name:'Dalarna',        fixedSeats: 9, weight:2.8,
+    v2022:{S:32.1,SD:26.1,M:16.7,V:5.4,C:6.6,KD:6.1,MP:3.9,L:3.1} },
+  { id:'SEX',  name:'Gävleborg',      fixedSeats: 9, weight:2.8,
+    v2022:{S:35.2,SD:24.4,M:16.4,V:6.0,C:6.3,KD:5.2,MP:3.5,L:3.0} },
+  { id:'SEY',  name:'Västernorrland', fixedSeats: 7, weight:2.4,
+    v2022:{S:39.9,SD:20.9,M:14.1,V:5.8,C:7.5,KD:5.5,MP:3.5,L:2.8} },
+  { id:'SEZ',  name:'Jämtland',       fixedSeats: 4, weight:1.3,
+    v2022:{S:36.5,SD:20.4,M:15.0,V:5.7,C:9.3,KD:5.5,MP:5.1,L:2.7} },
+  { id:'SEAC', name:'Västerbotten',   fixedSeats: 8, weight:2.7,
+    v2022:{S:41.2,SD:14.6,M:14.3,V:8.6,C:7.9,KD:4.8,MP:5.5,L:3.2} },
+  { id:'SEBD', name:'Norrbotten',     fixedSeats: 8, weight:2.5,
+    v2022:{S:42.1,SD:20.5,M:13.7,V:7.1,C:5.3,KD:5.2,MP:3.5,L:2.6} },
+];
+// Verify: SE_CONSTITUENCIES.reduce((s,c) => s+c.fixedSeats, 0) === 310
+
+// ── Two-tier Modified Sainte-Laguë (the actual Swedish method) ────────────────
+// Step 1: allocate 310 fixed constituency seats within each of the 29 constituencies
+// Step 2: compute national proportional for 349 seats; adjustment seats bridge the gap
+// In the standard (no-overshoot) case, result equals a single national 349-seat
+// Sainte-Laguë, but we run the full two-tier to be faithful to the actual system.
+function calcTwoTierSeats(
+  natPcts: Partial<Record<SePartyId, number>>,
+  threshold = 4.0,
+): Partial<Record<SePartyId, number>> {
+  // National qualifying parties
+  const qualifying = (Object.entries(natPcts) as [SePartyId, number][])
+    .filter(([, v]) => (v ?? 0) >= threshold)
+    .map(([id]) => id as SePartyId);
+  if (qualifying.length === 0) return {};
+
+  // Step 1 — constituency seats
+  const constTotals: Partial<Record<SePartyId, number>> = {};
+  for (const c of SE_CONSTITUENCIES) {
+    // Proportional swing from 2022 constituency base
+    const raw: Partial<Record<SePartyId, number>> = {};
+    let total = 0;
+    for (const id of qualifying) {
+      const newNat = natPcts[id] ?? 0;
+      const oldNat = SE_VOTE_PCT_2022[id] ?? 0;
+      const base   = c.v2022[id] ?? 0;
+      raw[id] = newNat === 0 ? 0 : oldNat === 0 ? newNat : base * (newNat / oldNat);
+      total  += raw[id]!;
+    }
+    if (total === 0) continue;
+    // Normalise to 100
+    const norm: Partial<Record<SePartyId, number>> = {};
+    for (const id of qualifying) norm[id] = ((raw[id] ?? 0) / total) * 100;
+    // Allocate fixed seats (no per-constituency threshold — national threshold already applied)
+    const cs = calcSainteLague(norm, c.fixedSeats, 0);
+    for (const id of qualifying) constTotals[id] = (constTotals[id] ?? 0) + (cs[id] ?? 0);
+  }
+
+  // Step 2 — national proportional (349 seats); this IS the final allocation
+  const natSeats = calcSainteLague(natPcts, SE_TOTAL_SEATS, threshold);
+
+  // Step 3 — overshoot check (very rare in Sweden's system)
+  let overshoot = false;
+  for (const id of qualifying) {
+    if ((constTotals[id] ?? 0) > (natSeats[id] ?? 0)) { overshoot = true; break; }
+  }
+  if (!overshoot) return natSeats;
+
+  // Overshoot: party keeps its constituency seats; total Riksdag expands beyond 349
+  const result: Partial<Record<SePartyId, number>> = { ...natSeats };
+  for (const id of qualifying) {
+    result[id] = Math.max(constTotals[id] ?? 0, natSeats[id] ?? 0);
+  }
+  return result;
+}
+
 // County electorate weights (% of national eligible voters, 2022)
 const SE_COUNTY_WEIGHTS: Record<SeCountyId, number> = {
   SEAB: 23.5, SEAC:  2.7, SEBD:  2.5, SEC:   4.0, SED:   3.0,
@@ -148,7 +291,7 @@ function calcPartialSeats(
   if (totalW === 0) return {};
   const norm: Partial<Record<SePartyId, number>> = {};
   for (const p of SE_PARTIES) norm[p.id] = (weighted[p.id] ?? 0) / totalW;
-  return calcSainteLague(norm);
+  return calcTwoTierSeats(norm);
 }
 
 // 2022 county-level results — derived from official Valmyndigheten constituency data
@@ -408,7 +551,7 @@ function SeScoreboard({
     return () => el.removeEventListener('wheel', handler);
   }, []);
 
-  const seats = useMemo(() => simSeats ?? calcSainteLague(natPcts), [simSeats, natPcts]);
+  const seats = useMemo(() => simSeats ?? calcTwoTierSeats(natPcts), [simSeats, natPcts]);
 
   const pctTotal = Object.values(natPcts).reduce((s, v) => s + (v ?? 0), 0);
   const scale    = reportedVoteScale ?? 1;
@@ -642,6 +785,99 @@ function SeBubbleLayer({
   return null;
 }
 
+// ── Overseas bubble (lat/lng in Northern Europe, visible at zoom 5) ───────────
+function SeOverseasBubble({
+  natPcts, containerRef, setTooltip, dark,
+}: {
+  natPcts:      Record<SePartyId, number>;
+  containerRef: React.RefObject<HTMLDivElement | null>;
+  setTooltip:   (t: CountyTooltipState) => void;
+  dark:         boolean;
+}) {
+  const map         = useMap();
+  const markerRef   = useRef<L.CircleMarker | null>(null);
+  const labelRef    = useRef<L.Marker | null>(null);
+  const baseRadRef  = useRef(14);
+
+  useEffect(() => {
+    markerRef.current?.remove();
+    labelRef.current?.remove();
+
+    // Project overseas vote pcts using same proportional swing as counties
+    const pv: Partial<Record<SePartyId, number>> = {};
+    let total = 0;
+    for (const p of SE_PARTIES) {
+      const newNat = natPcts[p.id] ?? 0;
+      const oldNat = SE_VOTE_PCT_2022[p.id] ?? 0;
+      pv[p.id] = oldNat === 0 ? 0 : SE_OVERSEAS_PCT_2022[p.id] * (newNat / oldNat);
+      total += pv[p.id]!;
+    }
+    if (total > 0) for (const p of SE_PARTIES) pv[p.id] = ((pv[p.id] ?? 0) / total) * 100;
+
+    const sorted = (Object.entries(pv) as [SePartyId, number][]).sort(([, a], [, b]) => b - a);
+    const [winId, winPct] = sorted[0];
+    const margin   = winPct - (sorted[1]?.[1] ?? 0);
+    const baseRad  = 12 + Math.min(margin / 10, 1) * 18;
+    baseRadRef.current = baseRad;
+    const color    = partyColor(winId as SePartyId);
+    const scale    = zoomScale(map.getZoom());
+
+    // Circle marker at Hamburg area — always visible from Sweden at zoom 5
+    const latlng: L.LatLngExpression = [53.6, 10.0];
+    const marker = L.circleMarker(latlng, {
+      radius: baseRad * scale, color, fillColor: color,
+      fillOpacity: 0.65, weight: 2, opacity: 0.9,
+      dashArray: '4,3',
+    }).addTo(map);
+
+    // Small plane-icon label
+    const icon = L.divIcon({
+      className: '',
+      html: `<span style="font-size:11px;line-height:1;display:block;text-align:center;margin-top:-3px;">✈</span>`,
+      iconSize: [14, 14], iconAnchor: [7, 7],
+    });
+    const label = L.marker(latlng, { icon, interactive: false }).addTo(map);
+
+    const rawScaled = Object.fromEntries(
+      SE_PARTIES.map(p => [p.id, Math.round((pv[p.id] ?? 0) / 100 * SE_OVERSEAS_VOTES_TOTAL)])
+    ) as Record<SePartyId, number>;
+
+    marker.on('mousemove', (e: L.LeafletMouseEvent) => {
+      const rect = containerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const parties = sorted.filter(([, v]) => v > 0).slice(0, 8).map(([id, pct]) => ({
+        id: id as SePartyId, pct, rawVotes: rawScaled[id as SePartyId] ?? 0,
+      }));
+      setTooltip({
+        x: e.originalEvent.clientX - rect.left,
+        y: e.originalEvent.clientY - rect.top,
+        name: 'Overseas Votes (utlandsröster)',
+        parties,
+        leader: winId as SePartyId,
+        reportingPct: 100,
+      });
+    });
+    marker.on('mouseout', () => setTooltip(null));
+
+    markerRef.current = marker;
+    labelRef.current  = label;
+
+    return () => { marker.remove(); label.remove(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [map, natPcts]);
+
+  useEffect(() => {
+    const onZoom = () => {
+      if (!markerRef.current) return;
+      markerRef.current.setRadius(baseRadRef.current * zoomScale(map.getZoom()));
+    };
+    map.on('zoomend', onZoom);
+    return () => { map.off('zoomend', onZoom); };
+  }, [map]);
+
+  return null;
+}
+
 // ── Map view ──────────────────────────────────────────────────────────────────
 type SeCountyDraft = { countyId: SeCountyId; pcts: Record<SePartyId, number>; rptPct: number };
 
@@ -815,6 +1051,14 @@ function SeMapView({
             countyOverridesRef={countyOverridesRef} blankMode={blankMode}
             projectedCounties={projectedCounties} simCountyFractions={simCountyFractions}
             simNatPctsRef={simNatPctsRef2}
+          />
+        )}
+        {bubbleMap && (
+          <SeOverseasBubble
+            natPcts={simNatPcts ?? natPcts}
+            containerRef={containerRef}
+            setTooltip={setTooltip}
+            dark={dark}
           />
         )}
       </MapContainer>
@@ -1731,7 +1975,7 @@ export default function SwedenApp() {
         setSimProgress(Object.keys(fracSnap).length);
         setSimSeats(calcPartialSeats(simNatPctsRef.current, fracSnap));
         if (Object.values(fracSnap).every(f=>(f??0)>=0.999) && Object.keys(fracSnap).length >= totalCnts) {
-          setSimSeats(calcSainteLague(simNatPctsRef.current));
+          setSimSeats(calcTwoTierSeats(simNatPctsRef.current));
           setSimRunning(false);
         }
       }, ev.t));
@@ -1739,7 +1983,7 @@ export default function SwedenApp() {
     simTimersRef.current = timers;
   }
 
-  const displaySeats = useMemo(() => simSeats ?? calcSainteLague(displayPcts), [simSeats, displayPcts]);
+  const displaySeats = useMemo(() => simSeats ?? calcTwoTierSeats(displayPcts), [simSeats, displayPcts]);
 
   // Weighted average of only the counties that have reported so far — drives live scoreboard pcts/votes
   const simPartialPcts = useMemo<Record<SePartyId,number> | null>(() => {
