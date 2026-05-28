@@ -1570,7 +1570,23 @@ export default function SwedenApp() {
     return Math.min(1, projW / SE_TOTAL_COUNTY_WEIGHT);
   }, [preset, projectedCounties, countyReportingPct]);
 
-  const displayPcts = preset === 'blank' ? blankDisplayPcts : natPcts;
+  // For 2022/2026 modes: if any counties are overridden, reflect them in the national display
+  const overrideDisplayPcts = useMemo<Record<SePartyId,number>>(() => {
+    const hasAny = Object.values(countyOverrides).some(o => o && Object.keys(o).length > 0);
+    if (!hasAny) return natPcts;
+    const weighted: Partial<Record<SePartyId,number>> = {};
+    let totalW = 0;
+    for (const c of SE_COUNTIES) {
+      const cv = calcCountyVotes(natPcts, c.id, countyOverrides[c.id]);
+      const w  = SE_COUNTY_WEIGHTS[c.id] ?? 0;
+      for (const p of SE_PARTIES) weighted[p.id] = (weighted[p.id]??0) + (cv[p.id]??0) * w;
+      totalW += w;
+    }
+    if (totalW === 0) return natPcts;
+    return Object.fromEntries(SE_PARTIES.map(p=>[p.id,(weighted[p.id]??0)/totalW])) as Record<SePartyId,number>;
+  }, [natPcts, countyOverrides]);
+
+  const displayPcts = preset === 'blank' ? blankDisplayPcts : overrideDisplayPcts;
 
   // ── UI state ───────────────────────────────────────────────────────────────
   const [selectedCounty, setSelectedCounty] = useState<SeCountyId|null>(null);
