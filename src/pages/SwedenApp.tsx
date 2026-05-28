@@ -26,19 +26,19 @@ const SE_PARTIES: SeParty[] = [
   { id: 'S',  name: 'S',  fullName: 'Social Democrats',    color: '#ED1B34', seats2022: 107,
     leader: 'Magdalena Andersson', wikiTitle: 'Magdalena_Andersson' },
   { id: 'SD', name: 'SD', fullName: 'Sweden Democrats',    color: '#EDB820', seats2022:  73,
-    leader: 'Jimmie Åkesson',      wikiTitle: 'Jimmie_%C3%85kesson' },
+    leader: 'Jimmie Åkesson',      wikiTitle: 'Jimmie_Åkesson' },
   { id: 'M',  name: 'M',  fullName: 'Moderate Party',      color: '#1B4F8A', seats2022:  68,
     leader: 'Ulf Kristersson',     wikiTitle: 'Ulf_Kristersson' },
   { id: 'V',  name: 'V',  fullName: 'Left Party',          color: '#C8101E', seats2022:  24,
     leader: 'Nooshi Dadgostar',    wikiTitle: 'Nooshi_Dadgostar' },
   { id: 'C',  name: 'C',  fullName: 'Centre Party',        color: '#009A44', seats2022:  24,
-    leader: 'Annie Lööf',          wikiTitle: 'Annie_L%C3%B6%C3%B6f',
+    leader: 'Annie Lööf',          wikiTitle: 'Annie_Lööf',
     leader2026: 'Muharrem Demirok', wikiTitle2026: 'Muharrem_Demirok' },
   { id: 'KD', name: 'KD', fullName: 'Christian Democrats', color: '#283593', seats2022:  19,
     leader: 'Ebba Busch',          wikiTitle: 'Ebba_Busch' },
   { id: 'MP', name: 'MP', fullName: 'Green Party',         color: '#53A330', seats2022:  18,
-    leader: 'Märta Stenevi',       wikiTitle: 'M%C3%A4rta_Stenevi',
-    leader2026: 'Daniel Helldén',  wikiTitle2026: 'Daniel_Helld%C3%A9n' },
+    leader: 'Märta Stenevi',       wikiTitle: 'Märta_Stenevi',
+    leader2026: 'Daniel Helldén',  wikiTitle2026: 'Daniel_Helldén' },
   { id: 'L',  name: 'L',  fullName: 'Liberals',            color: '#5BA4CF', seats2022:  16,
     leader: 'Johan Pehrson',       wikiTitle: 'Johan_Pehrson' },
 ];
@@ -419,18 +419,10 @@ function SeScoreboard({
     [seats, natPcts],
   );
 
-  // Bloc seat totals for leader/winner indicators
-  const leftSeats  = SE_LEFT_BLOC_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
-  const rightSeats = SE_RIGHT_BLOC_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
-  const leftWins   = leftSeats  >= SE_MAJORITY;
-  const rightWins  = rightSeats >= SE_MAJORITY;
-  const leftLeads  = leftSeats > 0 && leftSeats >= rightSeats;
-
-  // Per-tile leader/winner: only the top individual party (within the bloc context)
-  const bySeats = [...visible].sort((a, b) => (seats[b] ?? 0) - (seats[a] ?? 0));
-  const topParty = bySeats[0] ?? null;
-  // Individual winner only if no bloc has majority (avoids double crown)
-  const indivWinner = !leftWins && !rightWins && topParty && (seats[topParty] ?? 0) >= SE_MAJORITY ? topParty : null;
+  // Per-tile leader/winner indicators
+  const bySeats     = [...visible].sort((a, b) => (seats[b] ?? 0) - (seats[a] ?? 0));
+  const topParty    = bySeats[0] ?? null;
+  const indivWinner = topParty && (seats[topParty] ?? 0) >= SE_MAJORITY ? topParty : null;
 
   const otherPct = Math.max(0, 100 - pctTotal);
 
@@ -448,61 +440,14 @@ function SeScoreboard({
     );
   };
 
-  const leftColor  = SE_PARTY_MAP['S'].color;   // red — dominant left party
-  const rightColor = SE_PARTY_MAP['M'].color;   // blue — dominant right party
-
-  const renderBloc = (
-    ids: SePartyId[], label: string,
-    blocSeats: number, wins: boolean, leads: boolean, accentColor: string,
-  ) => {
+  const renderBloc = (ids: SePartyId[], label: string) => {
     const shown = ids.filter(id => visible.includes(id));
     if (shown.length === 0) return null;
     return (
-      <div className="ni-group" style={{
-        position: 'relative',
-        overflow: wins ? 'hidden' : undefined,
-        borderColor: leads ? accentColor : undefined,
-        boxShadow: wins
-          ? `0 0 0 1.5px ${accentColor}, 0 3px 12px rgba(0,0,0,0.09)`
-          : leads ? `0 0 0 1px ${accentColor}` : undefined,
-      }}>
-        {wins && (
-          <div style={{
-            position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2,
-            background: 'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.26) 50%, transparent 70%)',
-            animation: 'shimmerSweep 2.2s ease-in-out infinite',
-          }} />
-        )}
-        <span className="ni-group-label" style={{ position: 'relative' }}>
-          {label}
-          {wins && (
-            <span style={{ position: 'absolute', top: -6, right: -10 }}>
-              <svg width="13" height="13" viewBox="0 0 17 17" fill="none">
-                <circle cx="8.5" cy="8.5" r="8.5" fill={accentColor}/>
-                <path d="M4.5 8.5l2.8 2.8L12.5 5.5" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-            </span>
-          )}
-          {!wins && leads && (
-            <span style={{ position: 'absolute', top: -5, right: -9 }}>
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                <circle cx="5" cy="5" r="4.5" stroke={accentColor} strokeWidth="1.2" fill="none"/>
-                <text x="5" y="8" textAnchor="middle" fontSize="6.5" fill={accentColor} fontFamily="monospace" fontWeight="700">{blocSeats}</text>
-              </svg>
-            </span>
-          )}
-        </span>
+      <div className="ni-group">
+        <span className="ni-group-label">{label}</span>
         <div className="ni-group-tiles">
           {shown.map(id => makeTile(id, true))}
-        </div>
-        {/* Bloc seat total badge */}
-        <div style={{
-          position: 'absolute', bottom: 4, left: '50%', transform: 'translateX(-50%)',
-          fontSize: 7, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700,
-          color: accentColor, letterSpacing: '0.04em', whiteSpace: 'nowrap',
-          opacity: 0.75,
-        }}>
-          {blocSeats} seats
         </div>
       </div>
     );
@@ -514,13 +459,13 @@ function SeScoreboard({
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
 
           {/* Left Bloc: V + MP + S */}
-          {renderBloc(SE_LEFT_BLOC_IDS, 'Vänster', leftSeats, leftWins, leftLeads, leftColor)}
+          {renderBloc(SE_LEFT_BLOC_IDS, 'Vänster')}
 
           {/* Centre: C standalone */}
           {visible.includes('C') && makeTile('C')}
 
           {/* Right Bloc: L + KD + M + SD */}
-          {renderBloc(SE_RIGHT_BLOC_IDS, 'Tidö', rightSeats, rightWins, !leftLeads && rightSeats > 0, rightColor)}
+          {renderBloc(SE_RIGHT_BLOC_IDS, 'Tidö')}
 
           {/* Others tile */}
           {otherPct >= 0.05 && (
