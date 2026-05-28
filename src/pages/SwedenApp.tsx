@@ -1719,6 +1719,32 @@ export default function SwedenApp() {
 
   const displaySeats = useMemo(() => simSeats ?? calcSainteLague(displayPcts), [simSeats, displayPcts]);
 
+  // Weighted average of only the counties that have reported so far — drives live scoreboard pcts/votes
+  const simPartialPcts = useMemo<Record<SePartyId,number> | null>(() => {
+    if (!simNatPcts) return null;
+    const entries = Object.entries(simCountyFractions) as [SeCountyId, number][];
+    if (entries.length === 0) return null;
+    const weighted: Partial<Record<SePartyId,number>> = {};
+    let totalW = 0;
+    for (const [cId, frac] of entries) {
+      if (!frac) continue;
+      const w  = (SE_COUNTY_WEIGHTS[cId] ?? 0) * frac;
+      const cv = calcCountyVotes(simNatPcts, cId);
+      for (const p of SE_PARTIES) weighted[p.id] = (weighted[p.id] ?? 0) + (cv[p.id] ?? 0) * w;
+      totalW += w;
+    }
+    if (totalW === 0) return null;
+    return Object.fromEntries(SE_PARTIES.map(p => [p.id, (weighted[p.id] ?? 0) / totalW])) as Record<SePartyId,number>;
+  }, [simNatPcts, simCountyFractions]);
+
+  // Fraction of total national votes that have been counted so far
+  const simVoteScale = useMemo(() => {
+    if (!simNatPcts) return undefined;
+    const reportedW = (Object.entries(simCountyFractions) as [SeCountyId, number][])
+      .reduce((s, [cId, frac]) => s + (SE_COUNTY_WEIGHTS[cId as SeCountyId] ?? 0) * (frac ?? 0), 0);
+    return Math.min(1, reportedW / SE_TOTAL_COUNTY_WEIGHT);
+  }, [simNatPcts, simCountyFractions]);
+
   // ── Derived display state ──────────────────────────────────────────────────
   const showCounty     = !!selectedCounty && rightPanel !== 'sim' && !simRunning;
   const showParli      = leftPanel === 'parli'     || exitLeft === 'parli';
@@ -1768,12 +1794,12 @@ export default function SwedenApp() {
       {/* ── Scoreboard ─────────────────────────────────────────────────────── */}
       {scoreboardVisible && (
         <SeScoreboard
-          natPcts={simNatPcts ?? displayPcts}
+          natPcts={simPartialPcts ?? (simNatPcts ?? displayPcts)}
           simSeats={simSeats}
-          isBaseline={preset==='baseline'}
-          is2026={preset!=='baseline'}
+          isBaseline={preset==='baseline' && !simNatPcts}
+          is2026={preset!=='baseline' || !!simNatPcts}
           dark={dark}
-          reportedVoteScale={preset==='blank' ? blankVoteScale : undefined}
+          reportedVoteScale={simNatPcts != null ? simVoteScale : (preset==='blank' ? blankVoteScale : undefined)}
         />
       )}
 
