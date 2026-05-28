@@ -11,6 +11,7 @@ import { GlobeLogo } from './HomePage';
 // ── Parties ───────────────────────────────────────────────────────────────────
 const NG_PARTIES = [
   { id: 'APC',  name: 'APC',  fullName: 'All Progressives Congress',   color: '#0EA5E9' },
+  { id: 'NDC',  name: 'NDC',  fullName: 'New Democratic Congress',     color: '#B91C1C' },
   { id: 'PDP',  name: 'PDP',  fullName: "People's Democratic Party",   color: '#166534' },
   { id: 'LP',   name: 'LP',   fullName: 'Labour Party',                color: '#991B1B' },
   { id: 'NNPP', name: 'NNPP', fullName: 'New Nigeria Peoples Party',   color: '#4ADE80' },
@@ -18,9 +19,13 @@ const NG_PARTIES = [
 ] as const;
 const NG_PARTY_MAP = Object.fromEntries(NG_PARTIES.map(p => [p.id, p])) as Record<string, typeof NG_PARTIES[number]>;
 
+// Parties that contest the 2027 election (Obi on NDC, no Atiku/Kwankwaso)
+const NG_PARTIES_2027 = ['APC', 'NDC', 'OTH'] as const;
+
 // ── Candidates ────────────────────────────────────────────────────────────────
 type LeaderInfo = { lastName: string; fullName: string; wikiTitle?: string; localImage?: string; scale?: number; transformOrigin?: string; objectPosition?: string; initials?: string };
 
+// 2023 baseline candidates (historical)
 const NG_CANDIDATES: Record<string, LeaderInfo> = {
   APC:  { lastName: 'Tinubu',    fullName: 'Bola Tinubu',         wikiTitle: 'Bola Tinubu',          objectPosition: '50% 10%' },
   PDP:  { lastName: 'Atiku',     fullName: 'Atiku Abubakar',      wikiTitle: 'Atiku Abubakar',       objectPosition: '50% 10%' },
@@ -29,8 +34,12 @@ const NG_CANDIDATES: Record<string, LeaderInfo> = {
   OTH:  { lastName: 'Others',    fullName: 'Others',               initials: 'OTH' },
 };
 
-// 2027 scenario candidates
-const NG_CANDIDATES_2027: Partial<Record<string, LeaderInfo>> = {};
+// 2027 candidates: Tinubu (APC) vs Obi (NDC) + Others
+const NG_CANDIDATES_2027: Partial<Record<string, LeaderInfo>> = {
+  APC: { lastName: 'Tinubu',    fullName: 'Bola Tinubu',   wikiTitle: 'Bola Tinubu',  objectPosition: '50% 10%' },
+  NDC: { lastName: 'Peter Obi', fullName: 'Peter Obi',     wikiTitle: 'Peter Obi',    objectPosition: '50% 12%' },
+  OTH: { lastName: 'Others',    fullName: 'Others',         initials: 'OTH' },
+};
 
 function NgCandidatePhoto({ partyId, candidate, size = 52 }: { partyId: string; candidate?: LeaderInfo; size?: number }) {
   const color = NG_PARTY_MAP[partyId]?.color ?? '#888';
@@ -295,49 +304,57 @@ const NG_STATE_DATA = buildStateData();
 // Expected: APC ~8.79M · PDP ~6.98M · LP ~6.10M · NNPP ~1.50M
 // These approximate figures are calibrated to INEC official national totals.
 
-// ── 2027 polling scenario (approximate, based on likely shifts) ───────────────
-// APC: Tinubu incumbent, North-South coalition, ~37% nationally
-// PDP: Atiku likely candidate again, ~27%
-// LP: Peter Obi still strong, ~28% (some APC-to-LP switchers)
-// NNPP: Kwankwaso ~6%
+// ── 2027 polling scenario ─────────────────────────────────────────────────────
+// Two candidates: Tinubu (APC, Yoruba/Muslim incumbent) vs Peter Obi (NDC, Igbo/Catholic).
+// No Atiku (PDP) — his North-East/North-West base feeds into OTH (residual PDP + minor parties).
+// No Kwankwaso (NNPP) — Kano's massive NNPP vote collapses into OTH.
+// NDC = Obi keeps the LP 2023 base (South-East, South-South Christians, urban youth) and
+// gains former southern PDP voters. APC holds the Muslim North + South-West.
+// OTH absorbs PDP-without-Atiku and NNPP-without-Kwankwaso.
 const DATA_2027: Record<string, Record<string, number>> = {
-  AB: {APC:0.050,PDP:0.080,LP:0.830,NNPP:0.010,OTH:0.030},
-  AD: {APC:0.285,PDP:0.430,LP:0.240,NNPP:0.025,OTH:0.020},
-  AK: {APC:0.120,PDP:0.280,LP:0.560,NNPP:0.020,OTH:0.020},
-  AN: {APC:0.020,PDP:0.040,LP:0.920,NNPP:0.010,OTH:0.010},
-  BA: {APC:0.370,PDP:0.370,LP:0.190,NNPP:0.040,OTH:0.030},
-  BY: {APC:0.130,PDP:0.560,LP:0.270,NNPP:0.020,OTH:0.020},
-  BE: {APC:0.220,PDP:0.280,LP:0.460,NNPP:0.020,OTH:0.020},
-  BO: {APC:0.680,PDP:0.200,LP:0.080,NNPP:0.025,OTH:0.015},
-  CR: {APC:0.180,PDP:0.340,LP:0.430,NNPP:0.025,OTH:0.025},
-  DE: {APC:0.070,PDP:0.150,LP:0.740,NNPP:0.020,OTH:0.020},
-  EB: {APC:0.050,PDP:0.080,LP:0.840,NNPP:0.015,OTH:0.015},
-  ED: {APC:0.130,PDP:0.200,LP:0.630,NNPP:0.020,OTH:0.020},
-  EK: {APC:0.500,PDP:0.280,LP:0.180,NNPP:0.020,OTH:0.020},
-  EN: {APC:0.025,PDP:0.055,LP:0.890,NNPP:0.015,OTH:0.015},
-  FC: {APC:0.240,PDP:0.190,LP:0.520,NNPP:0.025,OTH:0.025},
-  GO: {APC:0.550,PDP:0.290,LP:0.110,NNPP:0.030,OTH:0.020},
-  IM: {APC:0.200,PDP:0.130,LP:0.620,NNPP:0.025,OTH:0.025},
-  JI: {APC:0.380,PDP:0.400,LP:0.150,NNPP:0.050,OTH:0.020},
-  KD: {APC:0.340,PDP:0.270,LP:0.320,NNPP:0.050,OTH:0.020},
-  KN: {APC:0.280,PDP:0.200,LP:0.200,NNPP:0.300,OTH:0.020},
-  KT: {APC:0.600,PDP:0.270,LP:0.090,NNPP:0.025,OTH:0.015},
-  KE: {APC:0.550,PDP:0.320,LP:0.090,NNPP:0.025,OTH:0.015},
-  KO: {APC:0.600,PDP:0.240,LP:0.120,NNPP:0.020,OTH:0.020},
-  KW: {APC:0.470,PDP:0.330,LP:0.160,NNPP:0.020,OTH:0.020},
-  LA: {APC:0.390,PDP:0.090,LP:0.470,NNPP:0.025,OTH:0.025},
-  NA: {APC:0.430,PDP:0.340,LP:0.190,NNPP:0.020,OTH:0.020},
-  NI: {APC:0.490,PDP:0.340,LP:0.130,NNPP:0.020,OTH:0.020},
-  OG: {APC:0.290,PDP:0.330,LP:0.340,NNPP:0.020,OTH:0.020},
-  ON: {APC:0.430,PDP:0.230,LP:0.300,NNPP:0.020,OTH:0.020},
-  OS: {APC:0.300,PDP:0.380,LP:0.280,NNPP:0.020,OTH:0.020},
-  OY: {APC:0.280,PDP:0.380,LP:0.300,NNPP:0.020,OTH:0.020},
-  PL: {APC:0.250,PDP:0.270,LP:0.440,NNPP:0.020,OTH:0.020},
-  RI: {APC:0.280,PDP:0.260,LP:0.420,NNPP:0.020,OTH:0.020},
-  SO: {APC:0.350,PDP:0.490,LP:0.110,NNPP:0.030,OTH:0.020},
-  TA: {APC:0.240,PDP:0.350,LP:0.370,NNPP:0.020,OTH:0.020},
-  YO: {APC:0.640,PDP:0.230,LP:0.090,NNPP:0.025,OTH:0.015},
-  ZA: {APC:0.490,PDP:0.360,LP:0.110,NNPP:0.025,OTH:0.015},
+  // ── South-East — NDC dominant (Igbo/Catholic heartland, Obi's home region) ──
+  AB: {APC:0.07, NDC:0.83, OTH:0.10},
+  AN: {APC:0.04, NDC:0.92, OTH:0.04},  // Anambra — Obi's home state
+  EB: {APC:0.12, NDC:0.78, OTH:0.10},
+  EN: {APC:0.07, NDC:0.86, OTH:0.07},
+  IM: {APC:0.14, NDC:0.75, OTH:0.11},
+  // ── South-South — NDC strong (Christian majority, gains former PDP southern vote) ─
+  AK: {APC:0.28, NDC:0.58, OTH:0.14},
+  BY: {APC:0.35, NDC:0.42, OTH:0.23},  // Former PDP stronghold splits
+  CR: {APC:0.30, NDC:0.50, OTH:0.20},
+  DE: {APC:0.18, NDC:0.68, OTH:0.14},
+  ED: {APC:0.26, NDC:0.58, OTH:0.16},
+  RI: {APC:0.38, NDC:0.44, OTH:0.18},  // Complex — APC machine strong
+  // ── South-West — APC (Tinubu/Yoruba base, Muslim-friendly) ──────────────────
+  EK: {APC:0.55, NDC:0.28, OTH:0.17},
+  LA: {APC:0.54, NDC:0.36, OTH:0.10},  // Lagos — Tinubu home but Obi strong with youth
+  OG: {APC:0.50, NDC:0.30, OTH:0.20},
+  ON: {APC:0.48, NDC:0.32, OTH:0.20},
+  OS: {APC:0.42, NDC:0.34, OTH:0.24},
+  OY: {APC:0.44, NDC:0.33, OTH:0.23},
+  // ── North-Central — mixed; Christian states (Benue/Plateau/FCT) lean NDC ───
+  BE: {APC:0.36, NDC:0.44, OTH:0.20},  // Predominantly Christian
+  FC: {APC:0.32, NDC:0.46, OTH:0.22},  // Obi won FCT outright in 2023
+  KO: {APC:0.58, NDC:0.22, OTH:0.20},
+  KW: {APC:0.54, NDC:0.24, OTH:0.22},
+  NA: {APC:0.50, NDC:0.28, OTH:0.22},
+  NI: {APC:0.56, NDC:0.18, OTH:0.26},
+  PL: {APC:0.34, NDC:0.42, OTH:0.24},  // Christian — leans NDC
+  // ── North-East — APC dominant; Adamawa/Taraba PDP legacy → big OTH ─────────
+  AD: {APC:0.38, NDC:0.18, OTH:0.44},  // Atiku's home — massive PDP residual → OTH
+  BA: {APC:0.46, NDC:0.12, OTH:0.42},
+  BO: {APC:0.66, NDC:0.10, OTH:0.24},
+  GO: {APC:0.55, NDC:0.12, OTH:0.33},
+  TA: {APC:0.36, NDC:0.26, OTH:0.38},  // More Christian — NDC some traction
+  YO: {APC:0.64, NDC:0.10, OTH:0.26},
+  // ── North-West — APC dominant; Kano's NNPP base collapses → huge OTH ───────
+  JI: {APC:0.52, NDC:0.08, OTH:0.40},
+  KD: {APC:0.48, NDC:0.20, OTH:0.32},  // More diverse, some Christian LP-switchers
+  KN: {APC:0.38, NDC:0.08, OTH:0.54},  // Kwankwaso's NNPP legacy → OTH dominates
+  KT: {APC:0.60, NDC:0.09, OTH:0.31},
+  KE: {APC:0.56, NDC:0.08, OTH:0.36},
+  SO: {APC:0.52, NDC:0.08, OTH:0.40},
+  ZA: {APC:0.50, NDC:0.08, OTH:0.42},
 };
 
 // ── Scoreboard ────────────────────────────────────────────────────────────────
@@ -354,7 +371,9 @@ function NgScoreboard({ nationalVotes, nationalPcts, stateCounts, winStatus, abo
   }, []);
 
   const sortedParties = useMemo(() => {
-    const nonOth = [...NG_PARTIES].filter(p => p.id !== 'OTH');
+    // Only show parties that actually have votes in the current view (keeps scoreboard clean
+    // when switching between 2023 — APC/PDP/LP/NNPP — and 2027 — APC/NDC).
+    const nonOth = [...NG_PARTIES].filter(p => p.id !== 'OTH' && (nationalVotes[p.id] ?? 0) > 0);
     nonOth.sort((a, b) => (nationalVotes[b.id] ?? 0) - (nationalVotes[a.id] ?? 0));
     return [...nonOth, NG_PARTIES.find(p => p.id === 'OTH')!];
   }, [nationalVotes]);
@@ -458,7 +477,7 @@ function NgStatePanel({ id, name_en, zone, results, results2024, validVotes, act
     if (!results) {
       if (activePreset === 'blank') {
         const pcts: Record<string, number> = {};
-        for (const p of NG_PARTIES) pcts[p.id] = 0;   // start empty — player must touch a slider (no premapping)
+        for (const pid of NG_PARTIES_2027) pcts[pid] = 0;   // 2027 parties only; start at 0 — player must touch a slider
         setSliderPcts(pcts); setProjected(false);
       } else setSliderPcts({});
       return;
@@ -1063,14 +1082,16 @@ function NgBreakdownDrawer({ stateData, currentResults, activePreset, exiting, o
               <p className="text-[8.5px] font-mono text-ink-3 leading-relaxed mb-1">
                 Candidates need ≥25% in at least {NG_THRESHOLD_STATES} of {NG_TOTAL_UNITS} states to win outright. Otherwise a runoff is held.
               </p>
-              {NG_PARTIES.filter(p => p.id !== 'OTH').map(p => {
+              {NG_PARTIES.filter(p => p.id !== 'OTH' && thresholdData[p.id]).map(p => {
                 const td = thresholdData[p.id] ?? { above: [], below: [] };
+                if (td.above.length === 0 && td.below.length === 0) return null;
                 const meetsAll = td.above.length >= NG_THRESHOLD_STATES;
+                const cand = NG_CANDIDATES_2027[p.id] ?? NG_CANDIDATES[p.id];
                 return (
                   <div key={p.id}>
                     <div className="flex items-center gap-2 mb-1.5">
                       <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{background:p.color}}/>
-                      <span className="text-[10px] font-semibold text-ink flex-1">{NG_CANDIDATES[p.id]?.fullName ?? p.name}</span>
+                      <span className="text-[10px] font-semibold text-ink flex-1">{cand?.fullName ?? p.name}</span>
                       <span className={`text-[9px] font-mono font-bold px-1.5 py-0.5 rounded ${meetsAll?'text-emerald-700 bg-emerald-100':'text-amber-700 bg-amber-50'}`}>
                         {td.above.length}/{NG_TOTAL_UNITS} {meetsAll?'✓ qualifies':'⚠ short'}
                       </span>
@@ -1201,7 +1222,7 @@ function randNormalNg(): number {
 }
 
 function generateNgResult(state: NgStateData2, targetPcts: Record<string,number>, national2027: Record<string,number>): Record<string,number> {
-  const base: Record<string,number> = DATA_2027[state.id]?{...DATA_2027[state.id]}:{APC:0.37,PDP:0.29,LP:0.25,NNPP:0.06,OTH:0.03};
+  const base: Record<string,number> = DATA_2027[state.id]?{...DATA_2027[state.id]}:{APC:0.42,NDC:0.34,OTH:0.24};
   for(const[pid,tp]of Object.entries(targetPcts)){ const swing=tp/100-(national2027[pid]??0); base[pid]=Math.max(0,(base[pid]??0)+swing); }
   const total=Object.values(base).reduce((s,v)=>s+v,0);
   if(total<=0)return{...state.results2024};
@@ -1221,12 +1242,12 @@ function NgSimulationPanel({ exiting=false, stateData, onApplyResults, onUpdateS
   setSimRunning:(v:boolean)=>void; setSimProgress:(v:number)=>void; stopSim:()=>void;
 }) {
   const [duration, setDuration] = useState<60000|120000|300000|600000>(120000);
-  const [natPcts, setNatPcts]   = useState<Record<string,string>>({APC:'37',PDP:'28',LP:'26',NNPP:'6',OTH:'3'});
+  const [natPcts, setNatPcts]   = useState<Record<string,string>>({APC:'42',NDC:'34',OTH:'24'});
 
   const national2027Avg = useMemo(()=>{
     let tV=0;const sums:Record<string,number>={};
     for(const s of stateData){const d=DATA_2027[s.id]??{APC:0.37,PDP:0.29,LP:0.25,NNPP:0.06,OTH:0.03};for(const[p,f]of Object.entries(d))sums[p]=(sums[p]??0)+f*s.validVotes;tV+=s.validVotes;}
-    if(tV===0)return{APC:0.37,PDP:0.29,LP:0.25,NNPP:0.06,OTH:0.03};
+    if(tV===0)return{APC:0.42,NDC:0.34,OTH:0.24};
     const avg:Record<string,number>={};for(const[p,v]of Object.entries(sums))avg[p]=v/tV;return avg;
   },[stateData]);
 
@@ -1275,7 +1296,7 @@ function NgSimulationPanel({ exiting=false, stateData, onApplyResults, onUpdateS
         <section>
           <p className="eyebrow mb-2">National vote share targets</p>
           <div className="space-y-1.5">
-            {NG_PARTIES.filter(p=>p.id!=='OTH').map(p=>(
+            {NG_PARTIES.filter(p=>NG_PARTIES_2027.includes(p.id as typeof NG_PARTIES_2027[number])&&p.id!=='OTH').map(p=>(
               <div key={p.id} className="flex items-center gap-1.5">
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background:p.color}}/>
                 <span className="text-[9.5px] font-mono text-ink-2 w-14 shrink-0">{p.id}</span>
@@ -1352,11 +1373,10 @@ function NgTutorialPanel({ onClose, exiting }: { onClose:()=>void; exiting:boole
         <Note>If no candidate satisfies both conditions, a <strong>runoff</strong> is held between the top two. The slider panel shows a <strong>≥25%</strong> badge when a party clears the threshold in a state.</Note>
         <H2>2023 Election</H2>
         <P><strong>Bola Tinubu (APC)</strong> won — 8.79M votes (36.6%), clearing 25% in 30+ states. Peter Obi (LP) swept the South-East. NNPP's Kwankwaso won Kano state outright.</P>
-        <H2>The Parties</H2>
-        <P><strong style={{color:'#00802B'}}>APC</strong> — President Tinubu's ruling party. Dominant in the North-West, North-East, South-West.</P>
-        <P><strong style={{color:'#CC0000'}}>PDP</strong> — Main opposition, ruled 1999–2015. Atiku Abubakar. Strong in North-East and parts of North-West.</P>
-        <P><strong style={{color:'#C8A020'}}>LP</strong> — Labour Party. Peter Obi's "Obidient" movement. Swept the South-East, competitive in South-South and urban North.</P>
-        <P><strong style={{color:'#6B21A8'}}>NNPP</strong> — Kwankwaso's party. Won Kano (Nigeria's most populous state) with ~60%.</P>
+        <H2>2027 Candidates</H2>
+        <P><strong style={{color:'#0EA5E9'}}>APC — Bola Tinubu</strong> — Incumbent president. Yoruba Muslim from Lagos. Dominant in the Muslim North and South-West.</P>
+        <P><strong style={{color:'#B91C1C'}}>NDC — Peter Obi</strong> — Igbo Catholic from Anambra. Moved from Labour Party to New Democratic Congress. Sweeps the South-East, competitive across the Christian South and urban youth vote.</P>
+        <P><strong style={{color:'#666666'}}>OTH — Others</strong> — Absorbs residual PDP voters (no Atiku candidacy), NNPP voters in Kano (no Kwankwaso), and minor parties.</P>
         <H2>Other Tools</H2>
         <div className="space-y-1 text-[10px] text-ink-2 leading-relaxed">
           <div><Tag>Mandate</Tag> Zone breakdown + 25% threshold compliance per candidate.</div>
