@@ -70,3 +70,66 @@ If i provide you a geojson, use it (same format and borders and stuff as the tem
 For the official data results for the last election baseline, try to source that official information from online. If you really cannot, source GitHub, if you still cant find, pause the thing and tell me "Find me the results for the last election." 
 
 Remember, you can always add features, but never delete a single line of code unless you have to for the new sim.
+
+EXTREMELY INFORMATION MUST GO THROUGH AND CONFIRM BEFORE COMPLETION ********** 1) double check that the candidates are up
+to date for each of the 2022 baseline, and (2026 polling blank map and simulation bundle) 2) for the blank map constituency sliders, the player has to at least touch a
+slider to make the project result button
+clickable! % reporting slider goes on the
+top! 3) make sure the % reporting slider is
+actually useful and it actually adjusts
+the raw votes on the results dashboard and
+tooltip etc... !!(wen the project result
+button is clicked) 4) The project result
+button can be reclicked to update a result
+(before a click, any change in numbers of
+sliders doesnt change anything else) 5) Let
+the sliders be simply and clean and easy
+to se in the dark mode! 6) show raw vote in
+the sliders as well as well as the
+tooltips (hover over result previews). 7)
+for the simulation, dont allow prevew
+results to be shown when adjusting its
+sliders. dont premap the results! before
+the run simulation button is clicked,
+nothing changes! for the simulation, give
+time options for simulation length. 8)
+always report each constituency in 5 random
+sized batches, reporting (counties and
+batches) all in a bell curve timed style!
+on the tooltips, show the % reporting and
+the current raw vote number. on the
+dashboard show current updated ever
+changing values! 9) for the buttons above
+that open popups from left or right, if one
+is on same side as another, close the one
+exisitng with a simulation and then open
+the new one! 1) for the parliament chart
+make sure the seats are not clunked
+together and that they are in a confortable
+normal semicircle type parliament view!.
+parties should always be sorted from by
+ideology! 11) always add a breakdown button
+that shows many cool stats of the results,
+any cool stats that a nerd will LOVE!
+
+For ALL Code: ***Always code 500 lines and then wait for me
+to say continue to continue, to save token
+limit! ***
+
+Simulations scenerios must always be realistic and based on an understanding of candidate strengths in areas and political views!
+For election baselines raw votes results data make sure all data is accurate to the CORE, no hallucinations either accurate or say you cant find data!
+Make sure ALL candidates have photos!
+
+
+for the blank map sliders for constituencies, make sure the sliders raw vote numbers shownr eflects the % reporting (taking that into account), and the tooltip automatically constantly updates to show reflect the sliders data, and the dashboard does the same! also make sure the tooltip previews show the actually raw vote value, not a simplified (eg 50K) make the simulation options 1 minute, 2 minutes, 5 minutes, and 10 minutes choices!   make the simulation options 1 minute, 2 minutes, 5 minutes, and 10 minutes choices! for the live simulation make sure results live populate the map and you can hover over to see %reported and current
+results!
+
+on the blank map, only allow results to be reflected is to click the button make projection or update projection, clicking it is what sends the signal with updated info! make sure that the map is populated
+with results for the simulation live playing! the map is should not be completely blank in the live simulation. when the simulation plays, lock the parties button. when the live results populate the map, you should be able to hover over cosntituencies to view the current live count! also, the bubble map SHOULD work for ALL of them
+
+
+CHECK THE CODE FOR ALL OF THIS, DONT SAY ITS DONE WHEN SOMETHING STILL DOESNT WORK
+
+
+IF YOU COPY THE CODE ON THE PART OF HOW EVERY THE STUFF GOES ON I DONT THINK THE SAME PROBLEM SHALL KEEP ARISING WITH REPEATED ERRORS ON DIFFERENT GAMES. YOU ARE SMARTER THAN THIS!
+**********

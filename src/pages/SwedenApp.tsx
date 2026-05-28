@@ -33,14 +33,15 @@ const SE_PARTIES: SeParty[] = [
     leader: 'Nooshi Dadgostar',    wikiTitle: 'Nooshi_Dadgostar' },
   { id: 'C',  name: 'C',  fullName: 'Centre Party',        color: '#009A44', seats2022:  24,
     leader: 'Annie Lööf',          wikiTitle: 'Annie_Lööf',
-    leader2026: 'Muharrem Demirok', wikiTitle2026: 'Muharrem_Demirok' },
+    leader2026: 'Elisabeth Thand Ringqvist', wikiTitle2026: 'Elisabeth_Thand_Ringqvist' },
   { id: 'KD', name: 'KD', fullName: 'Christian Democrats', color: '#283593', seats2022:  19,
     leader: 'Ebba Busch',          wikiTitle: 'Ebba_Busch' },
   { id: 'MP', name: 'MP', fullName: 'Green Party',         color: '#53A330', seats2022:  18,
     leader: 'Märta Stenevi',       wikiTitle: 'Märta_Stenevi',
-    leader2026: 'Daniel Helldén',  wikiTitle2026: 'Daniel_Helldén' },
+    leader2026: 'Amanda Lind',     wikiTitle2026: 'Amanda_Lind' },
   { id: 'L',  name: 'L',  fullName: 'Liberals',            color: '#5BA4CF', seats2022:  16,
-    leader: 'Johan Pehrson',       wikiTitle: 'Johan_Pehrson' },
+    leader: 'Johan Pehrson',       wikiTitle: 'Johan_Pehrson',
+    leader2026: 'Simona Mohamsson', wikiTitle2026: 'Simona_Mohamsson' },
 ];
 
 const SE_PARTY_MAP = Object.fromEntries(SE_PARTIES.map(p => [p.id, p])) as Record<SePartyId, SeParty>;
