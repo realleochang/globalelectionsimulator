@@ -787,7 +787,7 @@ function SeBubbleLayer({
 
 // ── Overseas bubble (lat/lng in Northern Europe, visible at zoom 5) ───────────
 function SeOverseasBubble({
-  natPcts, containerRef, setTooltip, dark,
+  natPcts, containerRef, setTooltip,
 }: {
   natPcts:      Record<SePartyId, number>;
   containerRef: React.RefObject<HTMLDivElement | null>;

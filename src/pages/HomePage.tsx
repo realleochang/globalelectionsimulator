@@ -139,7 +139,18 @@ export const COUNTRIES = [
     ],
   },
   {
-    id: 'new-zealand', path: '/new-zealand', name: 'New Zealand', flag: '🇳🇿', demonym: 'New Zealand', mapColor: '#00247D',
+    id: 'nigeria', path: '/nigeria', name: 'Nigeria', flag: '🇳🇬', demonym: 'Nigerian', mapColor: '#008751',
+    flagSrc: 'nigeria-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'Presidential Election', subtitle: 'Federal Republic — 36 States + FCT',
+    lat: 9.082, lng: 8.6753,
+    accent: 'linear-gradient(90deg,#008751,#FFFFFF,#008751)',
+    parties: [
+      { color: '#991B1B', abbr: 'LP'   }, { color: '#166534', abbr: 'PDP'  },
+      { color: '#4ADE80', abbr: 'NNPP' }, { color: '#0EA5E9', abbr: 'APC'  },
+    ],
+  },
+  {
+    id: 'new-zealand', path: '/new-zealand', name: 'New Zealand', flag: '🇳🇿', demonym: 'New Zealand', mapColor: '#00247D', locked: true as const,
     flagSrc: 'new-zealand-flag.png', flagStyle: {} as React.CSSProperties,
     electionType: 'General Election', subtitle: 'MMP Parliament',
     lat: -41, lng: 174,
@@ -151,7 +162,7 @@ export const COUNTRIES = [
     ],
   },
   {
-    id: 'spain', path: '/spain', name: 'Spain', flag: '🇪🇸', demonym: 'Spanish', mapColor: '#AA151B',
+    id: 'spain', path: '/spain', name: 'Spain', flag: '🇪🇸', demonym: 'Spanish', mapColor: '#AA151B', locked: true as const,
     flagSrc: 'spain-flag.png', flagStyle: {} as React.CSSProperties,
     electionType: 'General Election', subtitle: 'Congreso de los Diputados',
     lat: 40, lng: -3.5,
@@ -162,6 +173,42 @@ export const COUNTRIES = [
       { color: '#F4B400', abbr: 'ERC'  },
     ],
   },
+  {
+    id: 'poland', path: '/poland', name: 'Poland', flag: '🇵🇱', demonym: 'Polish', mapColor: '#DC143C', locked: true as const,
+    flagSrc: 'poland-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'Parliamentary Election', subtitle: 'Sejm Rzeczypospolitej Polskiej',
+    lat: 52, lng: 19.4,
+    accent: 'linear-gradient(90deg,#FFFFFF,#DC143C,#FFFFFF)',
+    parties: [
+      { color: '#003087', abbr: 'PiS'    }, { color: '#F05A28', abbr: 'KO'     },
+      { color: '#2E7D32', abbr: 'TD'     }, { color: '#C0392B', abbr: 'Lewica' },
+      { color: '#1B1464', abbr: 'Konf'   },
+    ],
+  },
+  {
+    id: 'japan', path: '/japan', name: 'Japan', flag: '🇯🇵', demonym: 'Japanese', mapColor: '#C62828', locked: true as const,
+    flagSrc: 'japan-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'General Election', subtitle: '衆議院 — 465 seats',
+    lat: 36.5, lng: 136,
+    accent: 'linear-gradient(90deg,#C62828,white,#C62828)',
+    parties: [
+      { color: '#B71C1C', abbr: 'JCP'   }, { color: '#AD1457', abbr: 'Reiwa' },
+      { color: '#1565C0', abbr: 'CDP'   }, { color: '#E65100', abbr: 'DPP'   },
+      { color: '#F57F17', abbr: 'KOM'   }, { color: '#00897B', abbr: 'Ishin' },
+      { color: '#C62828', abbr: 'LDP'   },
+    ],
+  },
+  {
+    id: 'india', path: '/india', name: 'India', flag: '🇮🇳', demonym: 'Indian', mapColor: '#FF6B1A', locked: true as const,
+    flagSrc: 'india-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'General Election', subtitle: 'Lok Sabha — 543 seats',
+    lat: 20.5937, lng: 78.9629,
+    accent: 'linear-gradient(90deg,#FF6B1A,#FFFFFF,#1464C8)',
+    parties: [
+      { color: '#1464C8', abbr: 'INDIA' }, { color: '#777777', abbr: 'OTH' },
+      { color: '#FF6B1A', abbr: 'NDA'   },
+    ],
+  },
 ];
 
 export type Country = typeof COUNTRIES[0];
@@ -169,20 +216,23 @@ export type Country = typeof COUNTRIES[0];
 const ISO_TO_COLOR: Record<string, string> = {
   'GB': '#C8102E', 'FR': '#002395', 'CA': '#D52B1E', 'US': '#002868',
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
-  'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7', 'ES': '#AA151B', 'NZ': '#00247D',
+  'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7',
+  'PL': '#DC143C', 'IN': '#FF6B1A', 'JP': '#C62828', 'NG': '#008751',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
-  'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden', 'ES': 'spain', 'NZ': 'new-zealand',
+  'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden',
+  'PL': 'poland', 'NG': 'nigeria',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
 const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
-  '710': 'ZA', '642': 'RO', '752': 'SE', '724': 'ES', '554': 'NZ',
+  '710': 'ZA', '642': 'RO', '752': 'SE',
+  '566': 'NG',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -728,7 +778,7 @@ export function CountryCard({ country }: { country: Country }) {
         {locked && (
           <div className="absolute top-2.5 right-2.5 px-2 py-1 rounded-full text-[7.5px] font-mono font-black uppercase tracking-[0.14em] text-white"
             style={{ background: 'rgba(250,166,26,0.92)', boxShadow: '0 2px 8px rgba(0,0,0,0.30)' }}>
-            Release Imminent
+            Releasing Today
           </div>
         )}
       </div>
@@ -745,7 +795,7 @@ export function CountryCard({ country }: { country: Country }) {
         <div className="flex-1 h-px hp-card-divider" />
         {locked ? (
           <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em]" style={{ color: '#FAA61A' }}>
-            Coming Soon
+            Releasing Today
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-gold group-hover:text-gold-deep transition-colors">
