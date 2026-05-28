@@ -624,7 +624,7 @@ type SeCountyDraft = { countyId: SeCountyId; pcts: Record<SePartyId, number>; rp
 function SeMapView({
   natPcts, selectedCounty, onSelect, dark, bubbleMap,
   declaredCounties, countyOverrides, blankMode, projectedCounties, simCountyFractions,
-  countyDraft,
+  countyDraft, simNatPcts,
 }: {
   natPcts:             Record<SePartyId, number>;
   selectedCounty:      SeCountyId | null;
@@ -637,6 +637,7 @@ function SeMapView({
   projectedCounties?:  Set<SeCountyId>;
   simCountyFractions?: Partial<Record<SeCountyId, number>>;
   countyDraft?:        SeCountyDraft | null;
+  simNatPcts?:         Record<SePartyId, number> | null;
 }) {
   const containerRef       = useRef<HTMLDivElement>(null);
   const layerRef           = useRef<L.GeoJSON | null>(null);
@@ -654,6 +655,7 @@ function SeMapView({
   const projectedRef       = useRef(projectedCounties ?? new Set<SeCountyId>());
   const simFracRef2        = useRef(simCountyFractions ?? {});
   const countyDraftRef2    = useRef<SeCountyDraft | null>(countyDraft ?? null);
+  const simNatPctsRef2     = useRef<Record<SePartyId, number> | null>(simNatPcts ?? null);
 
   useEffect(() => { natPctsRef.current         = natPcts;               }, [natPcts]);
   useEffect(() => { selectedRef.current        = selectedCounty;        }, [selectedCounty]);
@@ -666,6 +668,7 @@ function SeMapView({
   useEffect(() => { projectedRef.current       = projectedCounties ?? new Set(); }, [projectedCounties]);
   useEffect(() => { simFracRef2.current        = simCountyFractions ?? {}; }, [simCountyFractions]);
   useEffect(() => { countyDraftRef2.current    = countyDraft ?? null;       }, [countyDraft]);
+  useEffect(() => { simNatPctsRef2.current     = simNatPcts ?? null;        }, [simNatPcts]);
 
   useEffect(() => {
     fetch(`${import.meta.env.BASE_URL}sweden-counties.geojson`)
@@ -688,16 +691,21 @@ function SeMapView({
       if (!hasOverride) return { fillColor: darkRef.current ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: isSel ? 2 : 0.4, color: isSel ? '#c8a020' : border, opacity: 1 };
     }
 
-    const isDeclared = !declaredRef.current || declaredRef.current.has(countyId);
-    if (!isDeclared) return { fillColor: darkRef.current ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: 0.4, color: border, opacity: 1 };
+    const simFrac     = simFracRef2.current[countyId];
+    const hasSimData  = simFrac !== undefined && simFrac > 0;
+    const isDeclared  = !declaredRef.current || declaredRef.current.has(countyId);
+    if (!isDeclared && !hasSimData) return { fillColor: darkRef.current ? '#1f2937' : '#d1d5db', fillOpacity: 0.7, weight: 0.4, color: border, opacity: 1 };
 
-    const fill = getCountyFill(natPctsRef.current, countyId, darkRef.current, countyOverridesRef.current?.[countyId]);
-    return { fillColor: fill, fillOpacity: 0.78, weight: isSel ? 2 : 0.4, color: isSel ? '#c8a020' : border, opacity: 1 };
+    const effectiveNatPcts = simNatPctsRef2.current ?? natPctsRef.current;
+    const fill = getCountyFill(effectiveNatPcts, countyId, darkRef.current, countyOverridesRef.current?.[countyId]);
+    // Partially-reported counties render slightly dimmer
+    const opacity = isDeclared ? 0.78 : Math.max(0.35, 0.78 * (simFrac ?? 1));
+    return { fillColor: fill, fillOpacity: opacity, weight: isSel ? 2 : 0.4, color: isSel ? '#c8a020' : border, opacity: 1 };
   }, []);
 
   useEffect(() => {
     layerRef.current?.setStyle((f: any) => getStyle(f));
-  }, [natPcts, selectedCounty, dark, bubbleMap, declaredCounties, countyOverrides, blankMode, projectedCounties, getStyle]);
+  }, [natPcts, selectedCounty, dark, bubbleMap, declaredCounties, countyOverrides, blankMode, projectedCounties, simCountyFractions, simNatPcts, getStyle]);
 
   const onEachFeature = useCallback((feature: any, layer: L.Layer) => {
     const geoId    = feature?.properties?.id ?? '';
@@ -720,13 +728,15 @@ function SeMapView({
       if (!rect) return;
 
       // Draft overrides committed data for the open county
-      const overrideToUse = hasDraft ? draft!.pcts : countyOverridesRef.current?.[countyId];
+      const overrideToUse   = hasDraft ? draft!.pcts : countyOverridesRef.current?.[countyId];
       const fraction = hasDraft
         ? draft!.rptPct / 100
         : simFracRef2.current[countyId] ?? (declaredRef.current?.has(countyId) ? 1 : undefined);
 
+      // During simulation use the sim's national percentages for county projections
+      const effectiveNatPcts = simNatPctsRef2.current ?? natPctsRef.current;
       const cntVotes = SE_GRAND_TOTAL_VOTES * (SE_COUNTY_WEIGHTS[countyId] ?? 0) / SE_TOTAL_COUNTY_WEIGHT;
-      const pv       = calcCountyVotes(natPctsRef.current, countyId, overrideToUse);
+      const pv       = calcCountyVotes(effectiveNatPcts, countyId, overrideToUse);
       const parties  = (Object.entries(pv) as [SePartyId, number][])
         .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 6)
         .map(([id, pct]) => ({
@@ -1523,7 +1533,7 @@ export default function SwedenApp() {
     setSimSeats(undefined); setDeclaredCounties(undefined);
     setCountyOverrides({}); setProjectedCounties(new Set());
     setCountyReportingPct({}); setSimCountyFractions({});
-    setCountyDraft(null);
+    setCountyDraft(null); setSimNatPcts(null);
     stopSim();
   }
 
@@ -1624,7 +1634,8 @@ export default function SwedenApp() {
   const [simDraftPcts,       setSimDraftPcts]       = useState<Record<SePartyId,number>>(() => ({...SE_VOTE_PCT_2026}));
   const [simDraftLocks,      setSimDraftLocks]       = useState<Set<SePartyId>>(new Set());
   const [, setSimDraftTouched]     = useState(false);
-  const [simDuration,        setSimDuration]         = useState<8000|15000|30000>(15000);
+  const [simDuration,        setSimDuration]         = useState<60000|120000|300000|600000>(120000);
+  const [simNatPcts,         setSimNatPcts]          = useState<Record<SePartyId,number>|null>(null);
   const [simSeats,           setSimSeats]            = useState<Partial<Record<SePartyId,number>>|undefined>();
   const [simProgress,        setSimProgress]         = useState(0);
   const [simRunning,         setSimRunning]          = useState(false);
@@ -1648,6 +1659,7 @@ export default function SwedenApp() {
     stopSim();
     setSimDraftTouched(false);
     simNatPctsRef.current = { ...simDraftPcts };
+    setSimNatPcts({ ...simDraftPcts });
 
     const PARTS     = 5;
     const totalCnts = SE_COUNTIES.length;
@@ -1775,6 +1787,7 @@ export default function SwedenApp() {
             projectedCounties={projectedCounties}
             simCountyFractions={simCountyFractions}
             countyDraft={preset==='blank' ? countyDraft : null}
+            simNatPcts={simNatPcts}
           />
           {(preset==='blank'||simRunning||simSeats!=null) && (
             <SeReportingWidget
@@ -1802,7 +1815,7 @@ export default function SwedenApp() {
             <div className="px-3.5 pt-2.5 pb-2 border-b border-default shrink-0">
               <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 mb-1.5">Simulation speed</div>
               <div className="flex gap-1.5">
-                {([['Fast','8s',8000],['Normal','15s',15000],['Slow','30s',30000]] as const).map(([label,sub,ms])=>(
+                {([['1 min','60s',60000],['2 min','2m',120000],['5 min','5m',300000],['10 min','10m',600000]] as const).map(([label,sub,ms])=>(
                   <button key={ms} onClick={()=>setSimDuration(ms)}
                     className={`flex-1 py-1 rounded-[4px] border text-[9px] font-mono font-bold transition-colors ${simDuration===ms?'bg-blue-600 text-white border-blue-600':'border-default text-ink-3 hover:bg-hover'}`}>
                     {label}<div className="text-[7px] opacity-70">{sub}</div>
@@ -1851,7 +1864,7 @@ export default function SwedenApp() {
                 {simRunning ? `${simProgress}/${SE_COUNTIES.length} reporting…` : '▶ Run Simulation'}
               </button>
               {(simSeats||declaredCounties) && (
-                <button onClick={()=>{stopSim();setSimSeats(undefined);setDeclaredCounties(undefined);setSimProgress(0);setSimCountyFractions({});}}
+                <button onClick={()=>{stopSim();setSimSeats(undefined);setDeclaredCounties(undefined);setSimProgress(0);setSimCountyFractions({});setSimNatPcts(null);}}
                   className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
                   Reset
                 </button>
