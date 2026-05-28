@@ -139,6 +139,18 @@ export const COUNTRIES = [
     ],
   },
   {
+    id: 'new-zealand', path: '/new-zealand', name: 'New Zealand', flag: '🇳🇿', demonym: 'New Zealand', mapColor: '#00247D',
+    flagSrc: 'new-zealand-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'General Election', subtitle: 'MMP Parliament',
+    lat: -41, lng: 174,
+    accent: 'linear-gradient(90deg,#00247D,#CC142B,#00247D)',
+    parties: [
+      { color: '#00529F', abbr: 'NAT' }, { color: '#D82A20', abbr: 'LAB' },
+      { color: '#098137', abbr: 'GRN' }, { color: '#FFCC00', abbr: 'ACT' },
+      { color: '#C0392B', abbr: 'TPM' },
+    ],
+  },
+  {
     id: 'spain', path: '/spain', name: 'Spain', flag: '🇪🇸', demonym: 'Spanish', mapColor: '#AA151B',
     flagSrc: 'spain-flag.png', flagStyle: {} as React.CSSProperties,
     electionType: 'General Election', subtitle: 'Congreso de los Diputados',
@@ -157,20 +169,20 @@ export type Country = typeof COUNTRIES[0];
 const ISO_TO_COLOR: Record<string, string> = {
   'GB': '#C8102E', 'FR': '#002395', 'CA': '#D52B1E', 'US': '#002868',
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
-  'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7', 'ES': '#AA151B',
+  'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7', 'ES': '#AA151B', 'NZ': '#00247D',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
-  'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden', 'ES': 'spain',
+  'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden', 'ES': 'spain', 'NZ': 'new-zealand',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
 const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
-  '710': 'ZA', '642': 'RO', '752': 'SE', '724': 'ES',
+  '710': 'ZA', '642': 'RO', '752': 'SE', '724': 'ES', '554': 'NZ',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
