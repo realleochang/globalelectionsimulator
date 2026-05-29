@@ -203,14 +203,13 @@ export const COUNTRIES = [
     ],
   },
   {
-    id: 'turkey', path: '/turkey', name: 'Turkey', flag: '🇹🇷', demonym: 'Turkish', mapColor: '#E30A17',
+    id: 'turkey', path: '/turkey', name: 'Türkiye', flag: '🇹🇷', demonym: 'Turkish', mapColor: '#E30A17',
     flagSrc: 'turkey-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'Presidential Election', subtitle: 'Presidential Complex',
+    electionType: 'Presidential Election', subtitle: 'Cumhurbaşkanlığı Külliyesi',
     lat: 39, lng: 35,
     accent: 'linear-gradient(90deg,#E30A17,#FFFFFF,#E30A17)',
     parties: [
-      { color: '#E30A17', abbr: 'CHP' }, { color: '#8E44AD', abbr: 'MEM' },
-      { color: '#F37021', abbr: 'AKP' }, { color: '#1AA0A0', abbr: 'ATA' },
+      { color: '#E30A17', abbr: 'CHP' }, { color: '#F37021', abbr: 'AKP' },
     ],
   },
 ];

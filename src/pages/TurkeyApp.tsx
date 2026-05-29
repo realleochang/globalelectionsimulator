@@ -441,7 +441,7 @@ function Tr2028Scoreboard({ deptResults, election, allPartyIds, picks, onPick, p
 
 // ── Real-world coordinates for each overseas territory ────────────────────────
 const OVERSEAS_COORDS: Record<string, [number, number]> = {
-  'ZZ':  [ 35.30,   31.00],  // Abroad + customs gates — Mediterranean label area
+  'ZZ':  [ 50.50,   10.50],  // Abroad + customs gates — placed over central Europe
 };
 
 const SHORT_NOM: Record<string, string> = {
@@ -866,7 +866,7 @@ function TurkeyMapView({
       )}
 
       <div className="absolute bottom-7 left-1/2 -translate-x-1/2 text-[9.5px] text-ink-3 select-none z-[1000] font-mono bg-white/80 backdrop-blur-sm px-2.5 py-0.5 rounded-full pointer-events-none whitespace-nowrap">
-        🌍 Abroad &amp; customs votes shown over the Mediterranean
+        🌍 Abroad &amp; customs votes shown over central Europe
       </div>
       <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono">
         Scroll to zoom · Drag to pan · Click to open
@@ -1489,7 +1489,7 @@ function simulateTurkeyR2WithTarget(
 }
 
 // ── Turkey Simulation Panel ───────────────────────────────────────────────────
-type SimState = 'idle' | 'r1_running' | 'r2_input' | 'r2_running';
+type SimState = 'idle' | 'r1_running' | 'r1_winner' | 'r2_input' | 'r2_running';
 
 interface TrSimPanelProps {
   enabledIds: string[];
@@ -1548,6 +1548,7 @@ function TrSimulationPanel({
   const isRunning = simState === 'r1_running' || simState === 'r2_running';
   const phaseColor = simState === 'r2_running' ? '#7C3AED' : '#2563EB';
   const phaseLabel = simState === 'r2_running' ? 'Round 2' : 'Round 1';
+  const r1WinnerInfo = simState === 'r1_winner' && top2.length > 0 ? getCandInfo(top2[0].id) : null;
 
   const handleRunR1 = () => {
     if (!r1Valid || isRunning) return;
@@ -1563,6 +1564,8 @@ function TrSimulationPanel({
 
   const headerSubtitle = simState === 'r2_input' || simState === 'r2_running'
     ? 'Round 2 · 2028'
+    : simState === 'r1_winner'
+    ? '🏆 Round 1 Winner'
     : '2028 Election Night';
 
   return (
@@ -1585,6 +1588,20 @@ function TrSimulationPanel({
         <div className="tutorial-note rounded-[5px] px-2.5 py-2 text-[9px] font-mono leading-relaxed">
           <span className="font-bold">Realistic scenarios only.</span> This is a serious election simulator using real province-level data and swing modelling. Absurd inputs (e.g. a fringe candidate at 99%) will produce meaningless projections — garbage in, garbage out.
         </div>
+
+        {/* ── R1 OUTRIGHT WINNER ── */}
+        {simState === 'r1_winner' && r1WinnerInfo && (
+          <div className="rounded-[8px] border-2 border-yellow-400 bg-yellow-50 px-3 py-3 space-y-2 text-center">
+            <div className="text-[9px] font-mono font-bold uppercase tracking-[0.18em] text-yellow-700">Round 1 — Outright Winner</div>
+            <div className="text-[13px] font-bold text-ink leading-tight">{r1WinnerInfo.name}</div>
+            <div className="text-[10.5px] font-mono font-bold tabular-nums" style={{ color: r1WinnerInfo.color }}>
+              {top2[0] ? top2[0].pct.toFixed(1) : '—'}% · Majority secured
+            </div>
+            <div className="text-[9px] text-ink-2 leading-relaxed">
+              Candidate exceeded 50% of valid votes in Round 1 — no runoff needed. Election is decided.
+            </div>
+          </div>
+        )}
 
         {/* ── R2 INPUT view ── */}
         {(simState === 'r2_input' || simState === 'r2_running') && (
@@ -1769,6 +1786,12 @@ function TrSimulationPanel({
           <button onClick={handleRunR2} disabled={!r2Valid}
             className="w-full h-9 rounded-[5px] text-[12px] font-mono font-bold uppercase tracking-wide transition-colors shadow-sm bg-[#7C3AED] text-white hover:bg-[#6d28d9] disabled:opacity-40 disabled:cursor-not-allowed">
             ▶  Run Round 2
+          </button>
+        )}
+        {simState === 'r1_winner' && (
+          <button onClick={onStop}
+            className="w-full h-9 rounded-[5px] text-[12px] font-mono font-bold uppercase tracking-wide transition-colors shadow-sm bg-[#374151] text-white hover:bg-[#1f2937]">
+            ↩  Reset
           </button>
         )}
       </div>
@@ -2577,11 +2600,16 @@ export default function TurkeyApp() {
       }, r1Times[i]));
     }
 
-    // After R1 finishes, pause then show R2 input
+    // After R1 finishes: if the leader has an absolute majority (>50%), declare
+    // them the outright winner — no runoff. Otherwise proceed to R2 input.
     timers.push(setTimeout(() => {
-      setR2AwaitCandidates(top2Ids);
-      setR2AwaitR1Pcts(top2Pcts);
-      setSimState('r2_input');
+      if (top2Pcts[0] > 50) {
+        setSimState('r1_winner');
+      } else {
+        setR2AwaitCandidates(top2Ids);
+        setR2AwaitR1Pcts(top2Pcts);
+        setSimState('r2_input');
+      }
       setShowSimPanel(true);
     }, totalMs + 2000));
 
