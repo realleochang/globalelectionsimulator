@@ -162,7 +162,7 @@ export const COUNTRIES = [
   {
     id: 'poland', path: '/poland', name: 'Poland', flag: '🇵🇱', demonym: 'Polish', mapColor: '#DC143C',
     flagSrc: 'poland-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'Parliamentary Election', subtitle: 'Sejm Rzeczypospolitej Polskiej',
+    electionType: 'Parliamentary Election', subtitle: 'Sejm',
     lat: 52, lng: 19.4,
     accent: 'linear-gradient(90deg,#FFFFFF,#DC143C,#FFFFFF)',
     parties: [
