@@ -11,6 +11,8 @@ const fs     = require('fs');
 const path   = require('path');
 const topo   = require('topojson-server');
 const client = require('topojson-client');
+const pclip  = require('polygon-clipping');
+const simp   = require('topojson-simplify');
 
 // ─── Constituency meta ────────────────────────────────────────────────────────
 const CONST_META = {
@@ -67,7 +69,8 @@ const NAME_MAP = {
   'legnicki':1,'lubański':1,'lubiński':1,'lwówecki':1,
   'polkowicki':1,'zgorzelecki':1,'złotoryjski':1,
   // C2 Wałbrzych
-  'Wałbrzych':2,'dzierżoniowski':2,'kłodzki':2,'świdnicki':2,'wałbrzyski':2,'ząbkowicki':2,
+  // 'świdnicki' handled in DISAMBIG (Świdnica DL → C2 vs Świdnik Lub. → C6)
+  'Wałbrzych':2,'dzierżoniowski':2,'kłodzki':2,'wałbrzyski':2,'ząbkowicki':2,
   // C3 Wrocław
   'Wrocław':3,'milicki':3,'oleśnicki':3,'oławski':3,'strzeliński':3,
   'trzebnicki':3,'wołowski':3,'wrocławski':3,
@@ -119,11 +122,12 @@ const NAME_MAP = {
   // C19 Warszawa I
   'Warszawa':19,
   // C20 Warszawa II
-  'legionowski':20,'nowodworski':20,'otwocki':20,'piaseczyński':20,
+  // 'nowodworski' handled in DISAMBIG (Nowy Dwór Maz. → C20 vs Nowy Dwór Gdański → C25)
+  'legionowski':20,'otwocki':20,'piaseczyński':20,
   'pruszkowski':20,'wołomiński':20,'warszawski zachodni':20,
-  // C21 Opole (whole voivodeship)
+  // C21 Opole (whole voivodeship) — 'opolski' handled in DISAMBIG (Opole → C21 vs Opole Lub. → C6)
   'Opole':21,'głubczycki':21,'kędzierzyńsko-kozielski':21,'kluczborski':21,
-  'krapkowicki':21,'namysłowski':21,'nyski':21,'oleski':21,'opolski':21,
+  'krapkowicki':21,'namysłowski':21,'nyski':21,'oleski':21,
   'prudnicki':21,'strzelecki':21,
   // C22 Krosno
   'Krosno':22,'Przemyśl':22,'bieszczadzki':22,'brzozowski':22,'jarosławski':22,
@@ -197,6 +201,8 @@ const DISAMBIG = [
   ['krośnieński',  19.0,   8, 22],        // Lubuskie(lon≈15.1)→C8 vs Podkarpackie(lon≈21.7)→C22
   ['ostrowski',    52.2,  36, 18, 'lat'], // Wlkp.(lat≈51.7)→C36 vs Maz.(lat≈52.8)→C18
   ['opolski',      20.0,  21,  6],        // Opole(lon≈17.9)→C21 vs Opole Lub.(lon≈21.9)→C6
+  ['świdnicki',    19.0,   2,  6],        // Świdnica DL(lon≈16.5)→C2 vs Świdnik Lub.(lon≈22.7)→C6
+  ['nowodworski',  53.3,  20, 25, 'lat'], // Nowy Dwór Maz.(lat≈52.4)→C20 vs N.D.Gdański(lat≈54.2)→C25
 ];
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -239,8 +245,8 @@ function fetchUrl(url) {
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
 async function main() {
-  console.log('Downloading powiaty-min.geojson…');
-  const raw = await fetchUrl('https://raw.githubusercontent.com/ppatrzyk/polska-geojson/master/powiaty/powiaty-min.geojson');
+  console.log('Downloading powiaty-medium.geojson…');
+  const raw = await fetchUrl('https://raw.githubusercontent.com/ppatrzyk/polska-geojson/master/powiaty/powiaty-medium.geojson');
   const src = JSON.parse(raw);
   console.log(`Loaded ${src.features.length} powiat features.`);
 
@@ -254,32 +260,171 @@ async function main() {
   }
   if (unmatched.length) console.warn('⚠  Unmatched:', unmatched.join(', '));
 
-  // Build topology — TopoJSON shares arc segments between adjacent powiats
-  const topology = topo.topology({ powiaty: src });
-
-  // Dissolve: for each constituency, merge all powiats sharing the same _const value.
-  // topojson-client.merge() removes all internal arcs between features with the same key.
+  // Dissolve each constituency with a proper polygon UNION (polygon-clipping). Unlike
+  // topojson merge, this produces topologically valid, self-intersection-free geometry:
+  // cities/enclaves dissolve cleanly and pinch points become separate multi-polygon parts
+  // instead of bow-tie crossings — so no destructive "unkink" cuts (straight-line slices)
+  // are needed. Full powiat detail is preserved (borders follow the real boundaries).
   const outFeatures = Object.entries(CONST_META).map(([nr, meta]) => {
-    const id       = +nr;
-    const matching = topology.objects.powiaty.geometries.filter(g => g.properties._const === id);
-    if (!matching.length) { console.warn(`⚠  C${nr} has no powiats`); return null; }
-
-    // Create a sub-collection topology object
-    const subTopo  = { ...topology, objects: { sub: { type: 'GeometryCollection', geometries: matching } } };
-    const merged   = client.merge(subTopo, matching);
-
+    const id      = +nr;
+    const members = src.features.filter(f => f.properties._const === id);
+    if (!members.length) { console.warn(`⚠  C${nr} has no powiats`); return null; }
+    const geoms = members.map(f => f.geometry.coordinates);   // Polygon or MultiPolygon coords
+    let merged;
+    try { merged = pclip.union(geoms[0], ...geoms.slice(1)); }
+    catch (e) { console.warn(`⚠  union failed C${nr}: ${e.message}`); return null; }
     return {
       type:       'Feature',
       properties: { id: String(nr), nr: id, name: meta.name, seats: meta.seats },
-      geometry:   merged,
+      geometry:   { type: 'MultiPolygon', coordinates: merged },
     };
   }).filter(Boolean);
 
+  // Round to 6 decimals (~0.1 m) for a little compactness — full detail otherwise kept.
   const geojson = { type: 'FeatureCollection', features: outFeatures };
+  const round6 = a => { if (typeof a[0] === 'number') { a[0] = Math.round(a[0] * 1e6) / 1e6; a[1] = Math.round(a[1] * 1e6) / 1e6; } else a.forEach(round6); };
+  geojson.features.forEach(f => f.geometry && round6(f.geometry.coordinates));
+
+  // Sanitize: simplification can leave rings unclosed (first≠last) or degenerate,
+  // which Leaflet renders as stray white wedges/triangles. Re-close every ring and
+  // drop rings with fewer than 4 distinct points.
+  let closed = 0, dropped = 0;
+  const fixRing = r => {
+    if (r.length < 4) { dropped++; return null; }
+    const a = r[0], b = r[r.length - 1];
+    if (a[0] !== b[0] || a[1] !== b[1]) { r.push([a[0], a[1]]); closed++; }
+    return r.length >= 4 ? r : (dropped++, null);
+  };
+  for (const f of geojson.features) {
+    const g = f.geometry;
+    if (g.type === 'Polygon') {
+      g.coordinates = g.coordinates.map(fixRing).filter(Boolean);
+    } else if (g.type === 'MultiPolygon') {
+      g.coordinates = g.coordinates
+        .map(poly => poly.map(fixRing).filter(Boolean))
+        .filter(poly => poly.length > 0);
+    }
+  }
+  console.log(`Sanitized rings: re-closed ${closed}, dropped ${dropped} degenerate.`);
+
+  // Drop spurious "gap" holes: an interior ring whose centre lies inside no OTHER
+  // constituency is an artifact (a collapsed city enclave belonging to this same
+  // constituency) and would render as a stray white patch. Real enclaves (the hole is
+  // filled by a different constituency) are kept.
+  const ringCentre = r => { let x = 0, y = 0; for (const p of r) { x += p[0]; y += p[1]; } return [x / r.length, y / r.length]; };
+  const pip = (pt, ring) => { let inside = false; for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) { const xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1]; if (((yi > pt[1]) !== (yj > pt[1])) && (pt[0] < (xj - xi) * (pt[1] - yi) / (yj - yi) + xi)) inside = !inside; } return inside; };
+  const outerCovers = (f, pt) => { const g = f.geometry; const polys = g.type === 'Polygon' ? [g.coordinates] : g.coordinates; for (const poly of polys) { if (pip(pt, poly[0]) && !poly.slice(1).some(h => pip(pt, h))) return true; } return false; };
+  const dropGapHoles = (poly, self, counter) => {
+    if (poly.length <= 1) return poly;
+    const kept = [poly[0]];
+    for (let h = 1; h < poly.length; h++) {
+      const c = ringCentre(poly[h]);
+      const isEnclave = geojson.features.some(o => o.properties.id !== self.properties.id && outerCovers(o, c));
+      if (isEnclave) kept.push(poly[h]); else counter.n++;
+    }
+    return kept;
+  };
+
+  // Unkink: remove self-intersections (bow-tie rings) that render as glitched borders.
+  // At each crossing, split the ring into the two sub-loops and keep the larger-area one
+  // (the kink is always the small loop). Repeat until the ring is simple.
+  const segCross = (a, b, c, d) => {
+    const o = (p, q, r) => (r[1] - p[1]) * (q[0] - p[0]) - (q[1] - p[1]) * (r[0] - p[0]);
+    const d1 = o(c, d, a), d2 = o(c, d, b), d3 = o(a, b, c), d4 = o(a, b, d);
+    if (((d1 > 0 && d2 < 0) || (d1 < 0 && d2 > 0)) && ((d3 > 0 && d4 < 0) || (d3 < 0 && d4 > 0))) {
+      const den = (b[0] - a[0]) * (d[1] - c[1]) - (b[1] - a[1]) * (d[0] - c[0]);
+      if (den === 0) return null;
+      const t = ((c[0] - a[0]) * (d[1] - c[1]) - (c[1] - a[1]) * (d[0] - c[0])) / den;
+      return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])];
+    }
+    return null;
+  };
+  const area = pts => { let s = 0; for (let i = 0, n = pts.length; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; s += a[0] * b[1] - b[0] * a[1]; } return Math.abs(s / 2); };
+  const unkink = ring => {
+    let pts = ring.slice(0, ring.length - 1);          // open
+    for (let guard = 0; guard < 500; guard++) {
+      const n = pts.length; let hit = null;
+      for (let i = 0; i < n && !hit; i++) {
+        for (let j = i + 2; j < n; j++) {
+          if (i === 0 && j === n - 1) continue;
+          const ip = segCross(pts[i], pts[(i + 1) % n], pts[j], pts[(j + 1) % n]);
+          if (ip) { hit = { i, j, ip }; break; }
+        }
+      }
+      if (!hit) break;
+      const loopA = [hit.ip, ...pts.slice(hit.i + 1, hit.j + 1)];
+      const loopB = [...pts.slice(0, hit.i + 1), hit.ip, ...pts.slice(hit.j + 1)];
+      pts = area(loopB) >= area(loopA) ? loopB : loopA;
+    }
+    pts.push([pts[0][0], pts[0][1]]);                  // close
+    return pts;
+  };
+  let unkinked = 0;
+  const ringSelfIntersects = r => { const n = r.length - 1; for (let i = 0; i < n; i++) for (let j = i + 2; j < n; j++) { if (i === 0 && j === n - 1) continue; if (segCross(r[i], r[i + 1], r[j], r[j + 1])) return true; } return false; };
+  for (const f of geojson.features) {
+    const g = f.geometry;
+    const fix = poly => poly.map(r => { if (ringSelfIntersects(r)) { unkinked++; return unkink(r); } return r; });
+    if (g.type === 'Polygon') g.coordinates = fix(g.coordinates);
+    else if (g.type === 'MultiPolygon') g.coordinates = g.coordinates.map(fix);
+  }
+  console.log(`Unkinked ${unkinked} self-intersecting rings.`);
+
+  // Now drop spurious gap-holes — computed on the FINAL (unkinked) outer rings so enclave
+  // coverage is accurate. An interior ring covered by no other constituency is an artifact
+  // (collapsed city enclave) and gets filled; real enclaves are kept.
+  const gapCounter = { n: 0 };
+  for (const f of geojson.features) {
+    const g = f.geometry;
+    if (g.type === 'Polygon') g.coordinates = dropGapHoles(g.coordinates, f, gapCounter);
+    else if (g.type === 'MultiPolygon') g.coordinates = g.coordinates.map(poly => dropGapHoles(poly, f, gapCounter));
+  }
+  console.log(`Filled ${gapCounter.n} spurious gap-holes (kept real enclaves).`);
+
+  // Final cleanup: rounding/simplify/unkink can leave duplicate consecutive points,
+  // collinear points and "spike" needles (ring goes out to a vertex and straight back) —
+  // Leaflet renders these as thin white triangles/slivers. Remove them, drop degenerate
+  // rings, and canonicalise winding (outer CCW, holes CW per RFC 7946).
+  const signedArea = pts => { let s = 0; for (let i = 0, n = pts.length; i < n; i++) { const a = pts[i], b = pts[(i + 1) % n]; s += a[0] * b[1] - b[0] * a[1]; } return s / 2; };
+  let removedPts = 0;
+  const cleanRing = (ring, wantCCW) => {
+    let pts = ring.slice(0, ring.length - 1);                 // open
+    // dedupe consecutive identical points
+    pts = pts.filter((p, i) => { const q = pts[(i - 1 + pts.length) % pts.length]; return !(p[0] === q[0] && p[1] === q[1]); });
+    // iteratively drop collinear / needle vertices (zero-area triangle with neighbours)
+    let changed = true;
+    while (changed && pts.length > 3) {
+      changed = false;
+      const out = [];
+      const n = pts.length;
+      for (let i = 0; i < n; i++) {
+        const prev = pts[(i - 1 + n) % n], cur = pts[i], next = pts[(i + 1) % n];
+        const cross = (cur[0] - prev[0]) * (next[1] - prev[1]) - (cur[1] - prev[1]) * (next[0] - prev[0]);
+        if (Math.abs(cross) < 1e-11) { changed = true; removedPts++; continue; }   // collinear or needle → drop
+        out.push(cur);
+      }
+      pts = out;
+    }
+    if (pts.length < 3) return null;
+    // canonical winding
+    const ccw = signedArea(pts) > 0;
+    if (ccw !== wantCCW) pts.reverse();
+    pts.push([pts[0][0], pts[0][1]]);                         // close
+    return pts;
+  };
+  const cleanPoly = poly => poly.map((r, ri) => cleanRing(r, ri === 0)).filter(Boolean);
+  for (const f of geojson.features) {
+    const g = f.geometry;
+    if (g.type === 'Polygon') g.coordinates = cleanPoly(g.coordinates);
+    else if (g.type === 'MultiPolygon') g.coordinates = g.coordinates.map(cleanPoly).filter(p => p.length > 0);
+  }
+  console.log(`Cleanup: removed ${removedPts} duplicate/collinear/spike vertices, fixed winding.`);
+
   const outPath = path.join(__dirname, 'public', 'poland-constituencies.geojson');
   fs.writeFileSync(outPath, JSON.stringify(geojson));
   const kb = (fs.statSync(outPath).size / 1024).toFixed(1);
-  console.log(`✓  Wrote ${outFeatures.length} dissolved constituencies → ${outPath} (${kb} KB)`);
+  let pts = 0; const w = a => { if (typeof a[0] === 'number') pts++; else a.forEach(w); };
+  geojson.features.forEach(f => f.geometry && w(f.geometry.coordinates));
+  console.log(`✓  Wrote ${geojson.features.length} dissolved constituencies → ${outPath} (${kb} KB, ${pts} points)`);
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

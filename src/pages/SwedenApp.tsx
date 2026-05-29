@@ -1167,7 +1167,7 @@ function SeParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
     <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit-left' : 'panel-slide-left'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">Riksdag Hemicycle</h2>
+          <h2 className="text-[13px] font-bold text-ink leading-none">Riksdag — Parliamentary Composition</h2>
           <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeats} seats · majority {SE_MAJORITY} · sorted by ideology</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -1735,7 +1735,7 @@ function SeTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <H2 c="Simulation" />
         <P c="Set your national vote shares in the Simulation panel, pick a speed, then click Run. Each county reports in 5 random-sized batches on a bell-curve schedule." />
         <H2 c="Parliament View" />
-        <P c="Shows 349 seats in a hemicycle sorted left→right by ideology: V · MP · S · C · L · KD · M · SD." />
+        <P c="Shows 349 seats in a semicircle sorted left→right by ideology: V · MP · S · C · L · KD · M · SD." />
       </div>
     </aside>
   );

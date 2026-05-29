@@ -1344,7 +1344,7 @@ function InTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting: b
         <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
           <div><Tag>Swing</Tag> Apply national vote shift to all states at once.</div>
           <div><Tag>Breakdown</Tag> Region breakdown, closest states, vote vs seat distortion.</div>
-          <div><Tag>Parliament</Tag> 543-seat hemicycle, ordered by ideology (left → right).</div>
+          <div><Tag>Parliament</Tag> 543-seat semicircle, ordered by ideology (left → right).</div>
           <div><Tag>Bubble Map</Tag> Circles sized by raw vote margin (winner − runner-up).</div>
           <div><Tag>Multi-select</Tag> Adjust multiple states simultaneously.</div>
         </div>

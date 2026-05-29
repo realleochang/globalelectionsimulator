@@ -2142,7 +2142,7 @@ function CaTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting: b
         <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
           <div><Tag>Swing</Tag> Apply a uniform national shift to all ridings at once.</div>
           <div><Tag>Breakdown</Tag> Province-by-province seat and vote breakdown.</div>
-          <div><Tag>Parliament</Tag> Hemicycle view of all 343 seats arranged by party.</div>
+          <div><Tag>Parliament</Tag> Parliamentary composition of all 343 seats arranged by party.</div>
           <div><Tag>Bubble Map</Tag> Replace the map with circles sized by voter turnout.</div>
         </div>
 

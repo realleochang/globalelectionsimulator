@@ -81,7 +81,7 @@ function UKTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: 
         <H2>Other Tools</H2>
         <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
           <div><Tag>Breakdown</Tag> Seats by region — South East, Midlands, Scotland, etc.</div>
-          <div><Tag>Parliament</Tag> Hemicycle view of all 650 seats arranged by party.</div>
+          <div><Tag>Parliament</Tag> Parliamentary composition of all 650 seats arranged by party.</div>
           <div><Tag>Bubble Map</Tag> Replace the choropleth with circles sized by raw vote margin.</div>
         </div>
 

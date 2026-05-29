@@ -1104,7 +1104,7 @@ function NlParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
     <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit-left' : 'panel-slide-left'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">House of Representatives Hemicycle</h2>
+          <h2 className="text-[13px] font-bold text-ink leading-none">House of Representatives — Parliamentary Composition</h2>
           <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeats} seats · majority {NL_MAJORITY}</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -1247,7 +1247,7 @@ function NlTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <P>Click <strong>▶ Simulation</strong> to open the panel. Use sliders to set your predicted national vote shares, then click <strong>Run Simulation</strong>. Provinces will declare one by one (in random order) with partial seat counts updating live.</P>
 
         <H2>Parliament</H2>
-        <P>Click <strong>Parliament</strong> to open the hemicycle — seats arranged left→right by ideology, coloured by party.</P>
+        <P>Click <strong>Parliament</strong> to open the parliamentary composition — seats arranged left→right by ideology, coloured by party.</P>
       </div>
     </aside>
   );

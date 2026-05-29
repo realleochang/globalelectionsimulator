@@ -1444,7 +1444,7 @@ function TutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: bo
 
         {/* ── Parliament ── */}
         <H2>Parliament View</H2>
-        <P>Click <Tag>Parliament</Tag> to open a hemicycle visualisation arranged left → right by ideology. Seats are coloured by party; the legend below shows each party's count.</P>
+        <P>Click <Tag>Parliament</Tag> to open a parliamentary-composition view arranged left → right by ideology. Seats are coloured by party; the legend below shows each party's count.</P>
 
         {/* ── Bubble map ── */}
         <H2>Bubble Map</H2>
@@ -1513,7 +1513,7 @@ function ParliamentPanel({ seats: totalSeatsMap, onClose, exiting, dark }: {
     <aside className={`w-80 shrink-0 bg-white border-r border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit-left' : 'panel-slide-left'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">Bundestag Hemicycle</h2>
+          <h2 className="text-[13px] font-bold text-ink leading-none">Bundestag — Parliamentary Composition</h2>
           <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeats} seats · majority {MAJORITY}</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>

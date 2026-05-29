@@ -1753,7 +1753,7 @@ function SaTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <P>In Blank Map and Simulation modes a widget in the bottom-left corner tracks how many of the <strong>9 provinces</strong> have been declared and what share of the total 2024 vote they represent.</P>
 
         <H2>Parliament</H2>
-        <P>The <strong>Parliament</strong> button opens the National Assembly hemicycle — 400 seats across 12 arcs, coloured by party in left-to-right ideological order.</P>
+        <P>The <strong>Parliament</strong> button opens the National Assembly composition — 400 seats across 12 arcs, coloured by party in left-to-right ideological order.</P>
 
         <H2>Breakdown</H2>
         <P>The <strong>Breakdown</strong> panel shows the national seat bar and a province-by-province results table: winner, margin, and top challengers for each of the 9 provinces.</P>

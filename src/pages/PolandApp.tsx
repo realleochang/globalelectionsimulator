@@ -8,7 +8,7 @@ import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import { GlobeLogo } from './HomePage';
 
 // ── Party types ───────────────────────────────────────────────────────────────
-type PlPartyId = 'PIS' | 'KO' | 'TD' | 'LEWICA' | 'KONF';
+type PlPartyId = 'PIS' | 'KO' | 'TD' | 'LEWICA' | 'RAZEM' | 'KONF' | 'KKP' | 'MN';
 
 type PlParty = {
   id:             PlPartyId;
@@ -22,23 +22,40 @@ type PlParty = {
   wikiTitle2026?: string;
   // 5 = single-party threshold; 8 = coalition threshold
   threshold:      5 | 8;
+  // Recognised national-minority committee: exempt from the national threshold
+  exempt?:        boolean;
+  // Landlocked regional party: contests only these constituencies (empty/undefined = national)
+  home?:          PlConstId[];
 };
 
-// Ideology order left → right for parliament hemicycle
-const PL_LR_ORDER: PlPartyId[] = ['LEWICA','KO','TD','KONF','PIS'];
+// Ideology order left → right for parliament view (MN: centrist regional minority).
+// KWiN (KONF) and Braun's KKP sit to the RIGHT of PiS as the hard/far right.
+const PL_LR_ORDER: PlPartyId[] = ['RAZEM','LEWICA','KO','MN','TD','PIS','KONF','KKP'];
 
 const PL_PARTIES: PlParty[] = [
   { id:'PIS',    name:'PiS',      fullName:'Prawo i Sprawiedliwość',       color:'#003087', seats2023:194, threshold:5,
     leader:'Jarosław Kaczyński',          wikiTitle:'Jarosław_Kaczyński' },
   { id:'KO',     name:'KO',       fullName:'Koalicja Obywatelska',         color:'#F05A28', seats2023:157, threshold:8,
     leader:'Donald Tusk',                 wikiTitle:'Donald_Tusk' },
-  { id:'TD',     name:'Trzecia Droga', fullName:'Trzecia Droga (PSL+PL2050)', color:'#2E7D32', seats2023:65,  threshold:8,
+  { id:'TD',     name:'TD',       fullName:'Trzecia Droga (PSL+PL2050)', color:'#2E7D32', seats2023:65,  threshold:8,
     leader:'Władysław Kosiniak-Kamysz',   wikiTitle:'Władysław_Kosiniak-Kamysz',
     leader2026:'Szymon Hołownia',         wikiTitle2026:'Szymon_Hołownia' },
-  { id:'LEWICA', name:'Lewica',   fullName:'Lewica',                       color:'#C0392B', seats2023:26,  threshold:8,
+  { id:'LEWICA', name:'Lewica',   fullName:'Nowa Lewica',                  color:'#C0392B', seats2023:26,  threshold:5,
     leader:'Włodzimierz Czarzasty',       wikiTitle:'Włodzimierz_Czarzasty' },
+  // Partia Razem — left the Lewica coalition in 2024 to run independently. Inside Lewica
+  // in 2023, so 0 seats in baseline; appears only in 2026/blank/sim scenarios.
+  { id:'RAZEM',  name:'Razem',    fullName:'Partia Razem',                 color:'#C0207A', seats2023:0,   threshold:5,
+    leader:'Adrian Zandberg',             wikiTitle:'Adrian_Zandberg' },
   { id:'KONF',   name:'Konfederacja', fullName:'Konfederacja WiN',         color:'#1B1464', seats2023:18,  threshold:5,
     leader:'Sławomir Mentzen',            wikiTitle:'Sławomir_Mentzen' },
+  // Konfederacja Korony Polskiej — Grzegorz Braun's far-right splinter. Did not contest
+  // 2023 separately, so 0 seats in baseline; appears only in 2026/blank/sim scenarios.
+  { id:'KKP',    name:'KKP',      fullName:'Konfederacja Korony Polskiej',  color:'#B8860B', seats2023:0,   threshold:5,
+    leader:'Grzegorz Braun',              wikiTitle:'Grzegorz_Braun' },
+  // National-minority committee — threshold-exempt, landlocked to Opole (okręg 21). 0 seats in 2023.
+  { id:'MN',     name:'MN',       fullName:'Mniejszość Niemiecka',         color:'#C9A227', seats2023:0,   threshold:5,
+    exempt:true, home:['C21'],
+    leader:'Ryszard Galla',               wikiTitle:'Ryszard_Galla' },
 ];
 
 const PL_PARTY_MAP = Object.fromEntries(PL_PARTIES.map(p=>[p.id,p])) as Record<PlPartyId,PlParty>;
@@ -47,14 +64,15 @@ const PL_MAJORITY    = 231;
 
 // 2023 official results — source: PKW (Państwowa Komisja Wyborcza), 15 Oct 2023
 const PL_VOTE_PCT_2023: Record<PlPartyId, number> = {
-  PIS: 35.38, KO: 30.70, TD: 14.40, LEWICA: 8.61, KONF: 7.16,
+  PIS: 35.38, KO: 30.70, TD: 14.40, LEWICA: 8.61, RAZEM: 0, KONF: 7.16, KKP: 0, MN: 0.12,
 };
 const PL_VOTE_RAW_2023: Record<PlPartyId, number> = {
-  PIS: 7_640_854, KO: 6_629_402, TD: 3_110_670, LEWICA: 1_859_018, KONF: 1_547_364,
+  PIS: 7_640_854, KO: 6_629_402, TD: 3_110_670, LEWICA: 1_859_018, RAZEM: 0, KONF: 1_547_364, KKP: 0, MN: 25_778,
 };
-// 2026 polling — KO governing, PiS holding, Konfederacja rising
+// 2026 polling — KO surging ahead of PiS; Konfederacja (KWiN) strong, Braun's KKP over
+// threshold; Nowa Lewica clears 5% but Razem and Trzecia Droga fall short.
 const PL_VOTE_PCT_2026: Record<PlPartyId, number> = {
-  PIS: 35.0, KO: 29.0, TD: 10.0, LEWICA: 8.0, KONF: 12.0,
+  PIS: 25.3, KO: 34.3, TD: 6.0, LEWICA: 6.6, RAZEM: 4.0, KONF: 13.1, KKP: 8.0, MN: 0.12,
 };
 
 // ── Constituency types ────────────────────────────────────────────────────────
@@ -135,7 +153,7 @@ const PL_CONSTITUENCIES: PlConst[] = [
   { id:'C20', nr:20, name:'Warszawa II',         seats:12, total2023:  730_744,
     raw2023:{PIS:231_905, KO:257_470, TD:110_086, LEWICA: 51_556, KONF: 51_573} },
   { id:'C21', nr:21, name:'Opole',               seats:12, total2023:  479_968,
-    raw2023:{PIS:150_022, KO:161_241, TD: 61_155, LEWICA: 34_763, KONF: 31_150} },
+    raw2023:{PIS:150_022, KO:161_241, TD: 61_155, LEWICA: 34_763, KONF: 31_150, MN: 25_778} },
   { id:'C22', nr:22, name:'Krosno',              seats:11, total2023:  441_996,
     raw2023:{PIS:241_790, KO: 70_054, TD: 60_938, LEWICA: 19_750, KONF: 38_080} },
   { id:'C23', nr:23, name:'Rzeszów',             seats:15, total2023:  673_776,
@@ -152,11 +170,11 @@ const PL_CONSTITUENCIES: PlConst[] = [
     raw2023:{PIS:117_756, KO: 94_313, TD: 47_698, LEWICA: 30_497, KONF: 21_256} },
   { id:'C29', nr:29, name:'Katowice I',          seats: 9, total2023:  387_408,
     raw2023:{PIS:116_827, KO:139_711, TD: 51_681, LEWICA: 35_673, KONF: 26_934} },
-  { id:'C30', nr:30, name:'Rybnik',              seats: 9, total2023:  381_598,
+  { id:'C30', nr:30, name:'Bielsko-Biała II',    seats: 9, total2023:  381_598,
     raw2023:{PIS:145_230, KO:114_404, TD: 47_525, LEWICA: 26_117, KONF: 30_527} },
   { id:'C31', nr:31, name:'Katowice II',         seats:12, total2023:  526_167,
     raw2023:{PIS:162_458, KO:193_596, TD: 69_825, LEWICA: 44_509, KONF: 35_240} },
-  { id:'C32', nr:32, name:'Sosnowiec',           seats: 9, total2023:  377_959,
+  { id:'C32', nr:32, name:'Katowice III',        seats: 9, total2023:  377_959,
     raw2023:{PIS:112_389, KO:114_519, TD: 37_221, LEWICA: 81_646, KONF: 21_512} },
   { id:'C33', nr:33, name:'Kielce',              seats:16, total2023:  659_132,
     raw2023:{PIS:310_266, KO:137_941, TD: 90_975, LEWICA: 45_048, KONF: 43_197} },
@@ -180,6 +198,12 @@ const PL_CONSTITUENCIES: PlConst[] = [
 
 const PL_CONST_MAP = Object.fromEntries(PL_CONSTITUENCIES.map(c=>[c.id,c])) as Record<PlConstId,PlConst>;
 const PL_GRAND_TOTAL_VALID = PL_CONSTITUENCIES.reduce((s,c)=>s+c.total2023, 0); // 21,596,674
+
+// Landlock: a regional party (home set) contests only its home constituencies.
+function plContests(id: PlPartyId, constId: PlConstId): boolean {
+  const home = PL_PARTY_MAP[id]?.home;
+  return !home || home.length === 0 || home.includes(constId);
+}
 
 // Pre-compute v2023 percentages from raw votes for swing math
 const PL_PCT_BY_CONST: Record<PlConstId, Record<PlPartyId, number>> = (() => {
@@ -206,6 +230,8 @@ function calcDHondtConst(
   const qualifying = (Object.entries(votes) as [PlPartyId,number][])
     .filter(([id,v]) => {
       if ((v??0)<=0) return false;
+      // National minorities (MN) are exempt from the national threshold.
+      if (PL_PARTY_MAP[id]?.exempt) return true;
       const thresh = PL_PARTY_MAP[id]?.threshold ?? 5;
       return (natPcts[id]??0) >= thresh;
     });
@@ -231,7 +257,8 @@ function calcConstVotes(
   if (override && Object.keys(override).length>0) {
     const raw: Record<PlPartyId,number> = {} as Record<PlPartyId,number>;
     let total=0;
-    for (const p of PL_PARTIES) { raw[p.id]=Math.max(0,override[p.id]??0); total+=raw[p.id]; }
+    // Landlock: regional parties get 0 outside their home constituencies.
+    for (const p of PL_PARTIES) { raw[p.id]=plContests(p.id,constId)?Math.max(0,override[p.id]??0):0; total+=raw[p.id]; }
     if (total===0) return raw;
     for (const p of PL_PARTIES) raw[p.id]=(raw[p.id]/total)*100;
     return raw;
@@ -243,7 +270,12 @@ function calcConstVotes(
     const newNat = natPcts[p.id]??0;
     const oldNat = PL_VOTE_PCT_2023[p.id]??0;
     const basePct = base[p.id]??0;
-    raw[p.id] = basePct===0 ? 0 : oldNat===0 ? basePct : basePct*(newNat/oldNat);
+    // Landlocked regional parties stay 0 outside home; otherwise proportional swing.
+    // New party with no 2023 base (basePct 0 & oldNat 0): apply its national share uniformly.
+    raw[p.id] = !plContests(p.id,constId) ? 0
+      : basePct===0 ? (oldNat===0 ? newNat : 0)
+      : oldNat===0 ? basePct
+      : basePct*(newNat/oldNat);
     total+=raw[p.id];
   }
   if (total===0) return raw;
@@ -314,6 +346,7 @@ function hexToRgba(hex:string,alpha:number):string{
 }
 function partyColor(id:PlPartyId):string{return PL_PARTY_MAP[id]?.color??'#888';}
 
+// Choropleth fill: winning party's colour, shaded by margin (bigger lead = more intense).
 function getConstFill(natPcts:Record<PlPartyId,number>,constId:PlConstId,dark:boolean,override?:Partial<Record<PlPartyId,number>>):string{
   const pv=calcConstVotes(natPcts,constId,override);
   const sorted=(Object.entries(pv) as [PlPartyId,number][]).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
@@ -322,6 +355,13 @@ function getConstFill(natPcts:Record<PlPartyId,number>,constId:PlConstId,dark:bo
   const c=hsl(partyColor(winner));c.l=dark?0.55-Math.min(margin/20,1)*0.29:0.82-Math.min(margin/20,1)*0.46;
   return c.formatHex();
 }
+
+// Manual marker nudge [dLng, dLat] for constituencies whose centroid overlaps a neighbour.
+// Warszawa II (C20) wraps around Warszawa I (C19), so its centroid sits over the city —
+// shift its bubble / seat dots west into the suburban ring.
+const PL_MARKER_OFFSET: Partial<Record<PlConstId, [number, number]>> = {
+  C20: [-0.55, 0],
+};
 
 // ── Tooltip state ─────────────────────────────────────────────────────────────
 type PlTooltipState={
@@ -374,7 +414,7 @@ function PlScoreboardTile({
       <span className="cand-party-name" title={party.fullName}>{party.fullName}</span>
       <div style={{width:'100%',display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:1}}>
         <span style={{fontSize:6,fontFamily:'"JetBrains Mono",monospace',fontWeight:600,color:hexToRgba(color,0.48),letterSpacing:'0.10em',textTransform:'uppercase'}}>
-          {PL_PARTY_MAP[partyId].threshold}% thr
+          {PL_PARTY_MAP[partyId].exempt?'exempt':`${PL_PARTY_MAP[partyId].threshold}% thr`}
         </span>
         <span style={{fontSize:11,fontFamily:'"JetBrains Mono",monospace',fontWeight:700,color}}>{pct.toFixed(1)}%</span>
       </div>
@@ -391,12 +431,8 @@ function PlScoreboardTile({
   );
 }
 
-// ── Scoreboard blocs ──────────────────────────────────────────────────────────
-// Coalition government: KO + TD + Lewica (Tusk majority)
-// Opposition: PiS (right), Konfederacja (far-right)
-const PL_GOVT_IDS:  PlPartyId[] = ['KO','TD','LEWICA'];
-const PL_OPP_IDS:   PlPartyId[] = ['PIS'];
-const PL_FARR_IDS:  PlPartyId[] = ['KONF'];
+// ── Scoreboard ────────────────────────────────────────────────────────────────
+// Poland has no fixed blocs in this sim — parties are shown individually.
 
 function PlScoreboard({
   natPcts,simSeats,isBaseline,is2026,dark,reportedVoteScale,
@@ -415,51 +451,34 @@ function PlScoreboard({
   const pctTotal=Object.values(natPcts).reduce((s,v)=>s+(v??0),0);
   const scale=reportedVoteScale??1;
 
-  const govtSeats=PL_GOVT_IDS.reduce((s,id)=>s+(seats[id]??0),0);
-  const oppSeats =PL_OPP_IDS.reduce((s,id)=>s+(seats[id]??0),0);
-  const farrSeats=PL_FARR_IDS.reduce((s,id)=>s+(seats[id]??0),0);
+  // No fixed blocs in Poland — show individual parties. Highlight the plurality
+  // winner (or a single-party majority, which is rare).
+  const leadingId=useMemo(()=>{
+    let best:PlPartyId|null=null;let bestS=-1;
+    for(const id of PL_LR_ORDER){const s=seats[id]??0;if(s>bestS){bestS=s;best=id;}}
+    return bestS>0?best:null;
+  },[seats]);
+  const leaderHasMajority=leadingId!=null&&(seats[leadingId]??0)>=PL_MAJORITY;
 
-  const govtMajority=govtSeats>=PL_MAJORITY;
-  const oppMajority =oppSeats>=PL_MAJORITY;
-  const maxGroup=Math.max(govtSeats,oppSeats,farrSeats);
-  const govtLeading=maxGroup>0&&govtSeats===maxGroup;
-  const oppLeading =maxGroup>0&&oppSeats===maxGroup;
-
-  const visible=useMemo(()=>PL_LR_ORDER.filter(id=>(seats[id]??0)>0||(natPcts[id]??0)>=0.5),[seats,natPcts]);
+  // Cards sorted by seat size (desc); tie-break on vote share.
+  const visible=useMemo(()=>PL_LR_ORDER.filter(id=>(seats[id]??0)>0||(natPcts[id]??0)>=0.5)
+    .sort((a,b)=>((seats[b]??0)-(seats[a]??0))||((natPcts[b]??0)-(natPcts[a]??0))),[seats,natPcts]);
 
   const makeTile=(id:PlPartyId)=>{
     const s=seats[id]??0;
     const pct=pctTotal>0?(natPcts[id]??0)/pctTotal*100:0;
     const rawVotes=isBaseline?Math.round((PL_VOTE_RAW_2023[id]??0)*scale):Math.round((natPcts[id]??0)/100*PL_GRAND_TOTAL_VALID*scale);
-    const inGovt=PL_GOVT_IDS.includes(id);const inOpp=PL_OPP_IDS.includes(id);
-    const isWinner=inGovt?govtMajority:inOpp?oppMajority:false;
-    const isLeader=inGovt?(govtLeading&&!govtMajority):inOpp?(oppLeading&&!oppMajority):false;
+    const isWinner=id===leadingId&&leaderHasMajority;
+    const isLeader=id===leadingId&&!leaderHasMajority;
     return<PlScoreboardTile key={id} partyId={id} seats={s} pct={pct} rawVotes={rawVotes}
       isLeader={isLeader} isWinner={isWinner} is2026={is2026} dark={dark}/>;
-  };
-
-  const sortBloc=(ids:PlPartyId[])=>ids.filter(id=>visible.includes(id)).sort((a,b)=>(seats[b]??0)-(seats[a]??0));
-  const renderBloc=(ids:PlPartyId[],label:string,isLeading:boolean,isMajority:boolean)=>{
-    const shown=sortBloc(ids);if(shown.length===0)return null;
-    const accent=partyColor(shown[0]);
-    const groupStyle:React.CSSProperties=isMajority?{borderColor:hexToRgba(accent,0.72),background:hexToRgba(accent,0.08)}
-      :isLeading?{borderColor:hexToRgba(accent,0.42),background:hexToRgba(accent,0.04)}:{};
-    const labelStyle:React.CSSProperties=(isMajority||isLeading)?{color:hexToRgba(accent,0.85)}:{};
-    return(
-      <div className="ni-group" style={groupStyle}>
-        <span className="ni-group-label" style={labelStyle}>{label}</span>
-        <div className="ni-group-tiles">{shown.map(id=>makeTile(id))}</div>
-      </div>
-    );
   };
 
   return(
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
-          {renderBloc(PL_GOVT_IDS,'Koalicja rządząca',govtLeading&&!govtMajority,govtMajority)}
-          {renderBloc(PL_FARR_IDS,'Konfederacja',false,false)}
-          {renderBloc(PL_OPP_IDS,'PiS (opozycja)',oppLeading&&!oppMajority,oppMajority)}
+          {visible.map(id=>makeTile(id))}
         </div>
       </div>
     </div>
@@ -523,15 +542,17 @@ function PlBubbleLayer({
       if(declaredConsts&&!declaredConsts.has(constId))return;
       if(!declaredConsts&&blankMode&&!(projectedConsts?.has(constId)))return;
       const bounds=(layer as any).getBounds?.();if(!bounds?.isValid())return;
-      const center=bounds.getCenter();
+      const c0=bounds.getCenter();
+      const off=PL_MARKER_OFFSET[constId];
+      const center=off?L.latLng(c0.lat+off[1],c0.lng+off[0]):c0;
       const pv=calcConstVotes(natPcts,constId,constOverrides?.[constId]);
       const sorted=(Object.entries(pv) as [PlPartyId,number][]).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
       if(sorted.length===0)return;
       const[winId,winPct]=sorted[0];
-      const margin=winPct-(sorted[1]?.[1]??0);
       const c=PL_CONST_MAP[constId];
-      const seatBonus=Math.min((c?.seats??1)/20*8,8);
-      const baseRadius=10+Math.min(margin/10,1)*20+seatBonus;
+      // Radius reflects the RAW vote margin (winner − runner-up), not total turnout.
+      const rawMargin=(winPct-(sorted[1]?.[1]??0))/100*(c?.total2023??0);
+      const baseRadius=Math.min(30,4+0.038*Math.sqrt(Math.max(0,rawMargin)));
       const color=partyColor(winId);
 
       const marker=L.circleMarker(center,{
@@ -563,17 +584,107 @@ function PlBubbleLayer({
   return null;
 }
 
+// ── Seat-distribution dots overlay ────────────────────────────────────────────
+// Renders one small coloured dot per seat in each constituency, grouped by party
+// (ideology order), clustered at the constituency centroid. Re-laid-out on zoom.
+function PlSeatDotsLayer({
+  geoData,natPcts,containerRef,setTooltip,onSelect,natPctsRef,
+  declaredConsts,constOverrides,constOverridesRef,blankMode,projectedConsts,
+  simConstFractions,simNatPctsRef,
+}:{
+  geoData:any;natPcts:Record<PlPartyId,number>;
+  containerRef:React.RefObject<HTMLDivElement|null>;
+  setTooltip:(t:PlTooltipState)=>void;onSelect:(id:PlConstId)=>void;
+  natPctsRef:React.MutableRefObject<Record<PlPartyId,number>>;
+  declaredConsts?:Set<PlConstId>;
+  constOverrides?:Partial<Record<PlConstId,Partial<Record<PlPartyId,number>>>>;
+  constOverridesRef:React.MutableRefObject<Partial<Record<PlConstId,Partial<Record<PlPartyId,number>>>>>;
+  blankMode?:boolean;projectedConsts?:Set<PlConstId>;
+  simConstFractions?:Partial<Record<PlConstId,number>>;
+  simNatPctsRef?:React.MutableRefObject<Record<PlPartyId,number>|null>;
+}) {
+  const map=useMap();
+  const dotsRef=useRef<L.CircleMarker[]>([]);
+  const simFracRef=useRef(simConstFractions??{});
+  useEffect(()=>{simFracRef.current=simConstFractions??{};},[simConstFractions]);
+
+  useEffect(()=>{
+    const layout=()=>{
+      for(const m of dotsRef.current)m.remove();
+      dotsRef.current=[];
+      const z=map.getZoom();
+      const dotR=Math.max(1.8,Math.min(5,(z-4)/(9-4)*4+1.8));
+      const gap=dotR*2.3;
+      L.geoJSON(geoData).eachLayer((layer:L.Layer)=>{
+        const path=layer as any;
+        const geoId:string=path.feature?.properties?.id??path.feature?.properties?.nr??'';
+        const constId=PL_GEOID_TO_ID[String(geoId)];
+        if(!constId)return;
+        if(declaredConsts&&!declaredConsts.has(constId))return;
+        if(!declaredConsts&&blankMode&&!(projectedConsts?.has(constId)))return;
+        const bounds=(layer as any).getBounds?.();if(!bounds?.isValid())return;
+        const c0=bounds.getCenter();
+        const off=PL_MARKER_OFFSET[constId];
+        const center=off?L.latLng(c0.lat+off[1],c0.lng+off[0]):c0;
+        const c=PL_CONST_MAP[constId];
+        const pv=calcConstVotes(natPcts,constId,constOverrides?.[constId]);
+        const alloc=calcDHondtConst(pv,c?.seats??0,natPcts);
+        // flat list of seat colours, grouped by party in ideology order
+        const colors:string[]=[];
+        for(const id of PL_LR_ORDER){const n=alloc[id]??0;for(let i=0;i<n;i++)colors.push(partyColor(id));}
+        if(colors.length===0)return;
+        const N=colors.length;
+        const cols=Math.ceil(Math.sqrt(N));
+        const rows=Math.ceil(N/cols);
+        const cpt=map.latLngToContainerPoint(center);
+        for(let i=0;i<N;i++){
+          const r=Math.floor(i/cols), col=i%cols;
+          const rowCount=(r===rows-1)?(N-r*cols):cols; // center last (partial) row
+          const dx=(col-(rowCount-1)/2)*gap;
+          const dy=(r-(rows-1)/2)*gap;
+          const latlng=map.containerPointToLatLng(L.point(cpt.x+dx,cpt.y+dy));
+          const m=L.circleMarker(latlng,{radius:dotR,color:'#0b0b0d',weight:0.5,opacity:0.55,
+            fillColor:colors[i],fillOpacity:0.95}).addTo(map);
+          m.on('click',()=>{setTooltip(null);onSelect(constId);});
+          m.on('mousemove',(e:L.LeafletMouseEvent)=>{
+            const rect=containerRef.current?.getBoundingClientRect();if(!rect)return;
+            const cur=calcConstVotes(simNatPctsRef?.current??natPctsRef.current,constId,constOverridesRef.current?.[constId]);
+            const fraction=simFracRef.current[constId]??1;
+            const cVotes=c?.total2023??0;
+            const simNat=simNatPctsRef?.current??natPctsRef.current;
+            const projSeats=calcDHondtConst(cur,c?.seats??0,simNat);
+            const parties=(Object.entries(cur) as [PlPartyId,number][])
+              .filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,6)
+              .map(([id,pct])=>({id:id as PlPartyId,pct,rawVotes:Math.round(pct/100*cVotes*fraction),projSeats:projSeats[id as PlPartyId]??0}));
+            setTooltip({x:e.originalEvent.clientX-rect.left,y:e.originalEvent.clientY-rect.top,
+              name:c?.name??geoId,nr:c?.nr??0,seats:c?.seats??0,
+              parties,leader:parties[0]?.id??null,reportingPct:Math.round(fraction*100)});
+          });
+          m.on('mouseout',()=>setTooltip(null));
+          dotsRef.current.push(m);
+        }
+      });
+    };
+    layout();
+    map.on('zoomend',layout);
+    return()=>{map.off('zoomend',layout);for(const m of dotsRef.current)m.remove();dotsRef.current=[];};
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[map,geoData,natPcts,blankMode,projectedConsts,declaredConsts,constOverrides]);
+
+  return null;
+}
+
 // ── Constituency draft (blank-map live preview before "Update Projection") ─────
 type PlConstDraft = { constId: PlConstId; pcts: Record<PlPartyId, number>; rptPct: number } | null;
 
 // ── Map view ──────────────────────────────────────────────────────────────────
 function PlMapView({
-  natPcts, selectedConst, onSelect, dark, bubbleMap,
+  natPcts, selectedConst, onSelect, dark, bubbleMap, seatDots,
   declaredConsts, constOverrides, blankMode, projectedConsts, simConstFractions,
   constDraft, simNatPcts,
 }: {
   natPcts: Record<PlPartyId, number>; selectedConst: PlConstId | null;
-  onSelect: (id: PlConstId) => void; dark: boolean; bubbleMap: boolean;
+  onSelect: (id: PlConstId) => void; dark: boolean; bubbleMap: boolean; seatDots: boolean;
   declaredConsts?: Set<PlConstId>;
   constOverrides?: Partial<Record<PlConstId, Partial<Record<PlPartyId, number>>>>;
   blankMode?: boolean; projectedConsts?: Set<PlConstId>;
@@ -621,6 +732,7 @@ function PlMapView({
     const border  = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
 
     if (bubbleMap) return { fillOpacity:0, weight:0.4, color:dark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.18)', opacity:0.6 };
+    if (seatDots)  return { fillColor:dark?'#1f2937':'#EEF1F5', fillOpacity:isSel?0.5:0.35, weight:isSel?1.4:0.6, color:isSel?(dark?'#fff':'#111'):border, opacity:0.7 };
     if (!constId)  return { fillColor:dark?'#374151':'#E5E7EB', fillOpacity:0.5, weight:0.4, color:border, opacity:1 };
 
     const simFrac    = simConstFractions?.[constId];
@@ -633,11 +745,13 @@ function PlMapView({
     const isDeclared = !declaredConsts || declaredConsts.has(constId);
     if (!isDeclared && !hasSimData) return { fillColor:dark?'#1f2937':'#d1d5db', fillOpacity:0.7, weight:0.4, color:border, opacity:1 };
 
+    // Vibrant choropleth: winner colour shaded by margin, high opacity. Clean now that the
+    // geometry is valid — the white-triangle glitch was a geometry bug (since fixed).
     const effectiveNatPcts = simNatPcts ?? natPcts;
     const fill    = getConstFill(effectiveNatPcts, constId, dark, constOverrides?.[constId]);
     const opacity = isDeclared ? 0.78 : Math.max(0.35, 0.78 * (simFrac ?? 1));
     return { fillColor:fill, fillOpacity:opacity, weight:isSel?2:0.4, color:isSel?'#c8a020':border, opacity:1 };
-  }, [natPcts, selectedConst, dark, bubbleMap, declaredConsts, constOverrides, blankMode, simConstFractions, simNatPcts]);
+  }, [natPcts, selectedConst, dark, bubbleMap, seatDots, declaredConsts, constOverrides, blankMode, simConstFractions, simNatPcts]);
 
   useEffect(() => { layerRef.current?.setStyle((f:any)=>getStyle(f)); }, [getStyle]);
 
@@ -703,6 +817,16 @@ function PlMapView({
             simNatPctsRef={simNatPctsRef2}
           />
         )}
+        {geoData && seatDots && (
+          <PlSeatDotsLayer
+            geoData={geoData} natPcts={simNatPcts ?? natPcts} containerRef={containerRef}
+            setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
+            declaredConsts={declaredConsts} constOverrides={constOverrides}
+            constOverridesRef={constOverridesRef} blankMode={blankMode}
+            projectedConsts={projectedConsts} simConstFractions={simConstFractions}
+            simNatPctsRef={simNatPctsRef2}
+          />
+        )}
       </MapContainer>
 
       {/* ── Tooltip ── */}
@@ -721,13 +845,16 @@ function PlMapView({
                 {tooltip.reportingPct!=null ? `${tooltip.reportingPct}% reporting` : 'Estimated constituency result'}
               </div>
               <div style={{ marginTop:9, display:'flex', flexDirection:'column', gap:5 }}>
-                {tooltip.parties.map(({ id, pct, projSeats }, i) => {
+                {tooltip.parties.map(({ id, pct, rawVotes, projSeats }, i) => {
                   const pColor = partyColor(id);
                   return (
                     <div key={id} style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <span style={{ width:7, height:7, borderRadius:2, flexShrink:0, background:pColor }} />
                       <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{PL_PARTY_MAP[id]?.name??id}</span>
-                      <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:pColor }}>{pct.toFixed(1)}%</span>
+                      {rawVotes!=null && (
+                        <span style={{ fontSize:9.5, fontFamily:'"JetBrains Mono",monospace', color:tt.sub }}>{rawVotes.toLocaleString()}</span>
+                      )}
+                      <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:pColor, minWidth:42, textAlign:'right' }}>{pct.toFixed(1)}%</span>
                       {projSeats!=null && projSeats>0 && (
                         <span style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:tt.body, minWidth:14, textAlign:'right' }}>{projSeats}s</span>
                       )}
@@ -735,16 +862,6 @@ function PlMapView({
                   );
                 })}
               </div>
-              {tooltip.parties.some(p => (p.rawVotes ?? 0) > 0) && (
-                <div style={{ marginTop:8, paddingTop:7, borderTop:`1px solid ${tt.border}`, display:'flex', flexDirection:'column', gap:3 }}>
-                  {tooltip.parties.map(({ id, rawVotes }) => rawVotes==null ? null : (
-                    <div key={id} style={{ display:'flex', justifyContent:'space-between', fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub }}>
-                      <span>{PL_PARTY_MAP[id]?.name??id}</span>
-                      <span style={{ color:tt.body }}>{rawVotes.toLocaleString()}</span>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
           </div>
         );
@@ -781,26 +898,31 @@ function PlParliamentPanel({
   let idx = perRow.length - 1;
   while (diff !== 0) { perRow[idx] += diff > 0 ? 1 : -1; diff += diff > 0 ? -1 : 1; idx = (idx - 1 + perRow.length) % perRow.length; }
 
-  const dots: { x: number; y: number; r: number; color: string }[] = [];
-  let seatIdx = 0;
+  // Wikipedia parliament-diagram style: build every seat slot across all rows, then
+  // order them by ANGLE (left→right across the whole arc, not row by row) so each party
+  // occupies a contiguous angular wedge spanning inner→outer rows.
+  const slots: { x: number; y: number; angle: number; r: number }[] = [];
   for (let row = 0; row < ROWS; row++) {
     const r = rowR[row];
     const count = perRow[row];
     for (let i = 0; i < count; i++) {
       const tFrac = count === 1 ? 0.5 : i / (count - 1);
-      const angle = Math.PI - tFrac * Math.PI; // π → 0 (left to right)
-      const x = 220 + Math.cos(angle) * r;
-      const y = 230 - Math.sin(angle) * r;
-      const partyId = flat[seatIdx++] ?? order[order.length - 1];
-      dots.push({ x, y, r: 4.6, color: partyColor(partyId) });
+      const angle = Math.PI - tFrac * Math.PI; // π (left) → 0 (right)
+      slots.push({ x: 220 + Math.cos(angle) * r, y: 230 - Math.sin(angle) * r, angle, r });
     }
   }
+  // Sort left→right by angle (π first), inner→outer on ties, then assign parties in order.
+  slots.sort((a, b) => (b.angle - a.angle) || (a.r - b.r));
+  const dots = slots.map((s, k) => ({
+    x: s.x, y: s.y, r: 4.6,
+    color: partyColor(flat[k] ?? order[order.length - 1]),
+  }));
 
   return (
     <aside className={`w-[480px] shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h1 className="text-[14px] font-bold text-ink leading-none">Sejm RP — Hemicycle</h1>
+          <h1 className="text-[14px] font-bold text-ink leading-none">Sejm RP — Parliamentary Composition</h1>
           <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">{totalSeats} of 460 seats · Majority {PL_MAJORITY}</p>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -1054,10 +1176,10 @@ function PlConstPanel({
                   </button>
                   <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color }}>{pct.toFixed(1)}%</span>
                 </div>
-                <input type="range" min={0} max={70} step={0.1} value={pct} disabled={isLocked}
+                <input type="range" min={0} max={100} step={0.1} value={pct} disabled={isLocked}
                   onChange={e => handleSlider(id, parseFloat(e.target.value))}
                   className="br-party-slider w-full"
-                  style={{ '--party-color': color, '--pct':`${(pct / 70) * 100}%` } as React.CSSProperties} />
+                  style={{ '--party-color': color, '--pct':`${pct}%` } as React.CSSProperties} />
                 <div className="flex justify-between mt-0.5">
                   <span className="text-[8px] font-mono" style={{ color: dark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.28)' }}>
                     {rawVotes.toLocaleString()} votes
@@ -1132,9 +1254,6 @@ function PlBreakdownPanel({
 }) {
   const totalS = PL_LR_ORDER.reduce((s, id) => s + (seats[id] ?? 0), 0);
   const totalV = PL_PARTIES.reduce((s, p) => s + (natPcts[p.id] ?? 0), 0);
-  const govtS  = PL_GOVT_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
-  const oppS   = PL_OPP_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
-  const farrS  = PL_FARR_IDS.reduce((s, id) => s + (seats[id] ?? 0), 0);
 
   const enp = totalS > 0 ? 1 / PL_LR_ORDER.reduce((s, id) => { const sh = (seats[id] ?? 0) / totalS; return s + sh * sh; }, 0) : 0;
   const gallagher = Math.sqrt(PL_PARTIES.reduce((s, p) => {
@@ -1145,8 +1264,8 @@ function PlBreakdownPanel({
   const largest = [...PL_LR_ORDER].sort((a, b) => (seats[b] ?? 0) - (seats[a] ?? 0))[0];
   const shortOf = PL_MAJORITY - (seats[largest] ?? 0);
 
-  // Threshold check
-  const belowThr = PL_PARTIES.filter(p => (natPcts[p.id] ?? 0) > 0 && (natPcts[p.id] ?? 0) < p.threshold);
+  // Threshold check (national minorities are exempt)
+  const belowThr = PL_PARTIES.filter(p => !p.exempt && (natPcts[p.id] ?? 0) > 0 && (natPcts[p.id] ?? 0) < p.threshold);
 
   // Voivodeship strongholds
   const voivWinners = useMemo(() => {
@@ -1187,7 +1306,7 @@ function PlBreakdownPanel({
   }
 
   return (
-    <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit-left' : 'panel-slide-left'}`}>
+    <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit' : 'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Breakdown</h2>
@@ -1199,31 +1318,30 @@ function PlBreakdownPanel({
         <div className="flex items-center justify-center flex-1 text-[11px] font-mono text-ink-3 px-4 text-center">Load results or run simulation first</div>
       ) : (
         <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3.5 space-y-5">
-          <Section title="Three Blocs">
-            {[
-              { label:'Koalicja rządząca',     desc:'KO + Trzecia Droga + Lewica', seats: govtS, color: '#F05A28' },
-              { label:'Konfederacja (skrajna prawica)', desc:'Konfederacja WiN',   seats: farrS, color: '#1B1464' },
-              { label:'PiS (opozycja)',         desc:'Prawo i Sprawiedliwość',     seats: oppS,  color: '#003087' },
-            ].map(b => (
-              <div key={b.label} style={{ background: cardBg, borderRadius:5, padding:'6px 8px', borderLeft:`3px solid ${b.color}` }}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-[10px] font-bold text-ink">{b.label}</div>
-                    <div className="text-[8px] font-mono" style={{ color: ink2 }}>{b.desc}</div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[18px] font-black font-mono" style={{ color: b.color }}>{b.seats}</span>
-                    <div className="text-[7.5px] font-mono" style={{ color: b.seats >= PL_MAJORITY ? '#16a34a' : ink3 }}>
-                      {b.seats >= PL_MAJORITY ? '✓ większość' : `brakuje ${PL_MAJORITY - b.seats}`}
+          <Section title="Seats by Party">
+            {[...PL_LR_ORDER].filter(id => (seats[id] ?? 0) > 0).sort((a, b) => (seats[b] ?? 0) - (seats[a] ?? 0)).map(id => {
+              const p = PL_PARTY_MAP[id]; const n = seats[id] ?? 0;
+              return (
+                <div key={id} style={{ background: cardBg, borderRadius:5, padding:'6px 8px', borderLeft:`3px solid ${p.color}` }}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <div className="text-[10px] font-bold text-ink">{p.name}</div>
+                      <div className="text-[8px] font-mono" style={{ color: ink2 }}>{p.fullName}</div>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[18px] font-black font-mono" style={{ color: p.color }}>{n}</span>
+                      <div className="text-[7.5px] font-mono" style={{ color: n >= PL_MAJORITY ? '#16a34a' : ink3 }}>
+                        {n >= PL_MAJORITY ? '✓ większość' : `${(n / PL_TOTAL_SEATS * 100).toFixed(1)}% miejsc`}
+                      </div>
                     </div>
                   </div>
+                  <div className="mt-1.5 h-1.5 rounded-full overflow-hidden"
+                    style={{ background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
+                    <div style={{ width:`${Math.min(n / PL_TOTAL_SEATS * 100, 100)}%`, height:'100%', borderRadius:4, background: p.color }} />
+                  </div>
                 </div>
-                <div className="mt-1.5 h-1.5 rounded-full overflow-hidden"
-                  style={{ background: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }}>
-                  <div style={{ width:`${Math.min(b.seats / PL_TOTAL_SEATS * 100, 100)}%`, height:'100%', borderRadius:4, background: b.color }} />
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </Section>
 
           <Section title="Electoral Statistics">
@@ -1374,7 +1492,7 @@ function PlTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <H2 c="Simulation" />
         <P c="Pick a speed (1/2/5/10 min), then click Run. Each of the 41 okręgi reports in 5 random-sized batches on a bell-curve schedule. D'Hondt re-runs per constituency live as new vote counts arrive." />
         <H2 c="Parliament View" />
-        <P c="460 seats in a hemicycle, sorted left→right by ideology: Lewica · KO · Trzecia Droga · Konfederacja · PiS. Majority line marks 231." />
+        <P c="460 seats in a semicircle, sorted left→right by ideology: Razem · Lewica · KO · Trzecia Droga · Konfederacja · KKP · PiS. Majority line marks 231." />
       </div>
     </aside>
   );
@@ -1382,10 +1500,10 @@ function PlTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
 
 // ── Reporting widget ──────────────────────────────────────────────────────────
 function PlReportingWidget({
-  projectedConsts, constReportingPct, simConstFractions, isSim, dark,
+  projectedConsts, constReportingPct, simConstFractions, isSim, live, dark,
 }: {
   projectedConsts: Set<PlConstId>; constReportingPct: Partial<Record<PlConstId, number>>;
-  simConstFractions: Partial<Record<PlConstId, number>>; isSim: boolean; dark?: boolean;
+  simConstFractions: Partial<Record<PlConstId, number>>; isSim: boolean; live?: boolean; dark?: boolean;
 }) {
   const bg     = dark ? 'rgba(7,13,28,0.90)' : 'rgba(255,255,255,0.94)';
   const border = dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.09)';
@@ -1409,8 +1527,18 @@ function PlReportingWidget({
     <div className="absolute bottom-8 left-3 z-[1001] pointer-events-none"
       style={{ background: bg, border:`1px solid ${border}`, borderRadius:10, backdropFilter:'blur(10px)',
         padding:'10px 13px', minWidth:180, boxShadow:'0 4px 20px rgba(0,0,0,0.18)' }}>
-      <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.15em] mb-1.5" style={{ color: ink2 }}>
-        {isSim ? '⚡ Live Count' : '📊 Results'}
+      <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.15em] mb-1.5" style={{ color: live ? '#ef4444' : ink2 }}>
+        {live ? (
+          <>
+            <span className="relative flex h-2 w-2 shrink-0">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full opacity-75" style={{ background:'#ef4444' }} />
+              <span className="relative inline-flex h-2 w-2 rounded-full" style={{ background:'#ef4444' }} />
+            </span>
+            <span>Live Count</span>
+          </>
+        ) : (
+          <span>{isSim ? '⚡ Live Count' : '📊 Results'}</span>
+        )}
       </div>
       <div className="text-[13px] font-black font-mono text-ink leading-none">
         {projCount} <span className="text-[10px] font-semibold" style={{ color: ink2 }}>/ {PL_CONSTITUENCIES.length}</span>
@@ -1425,6 +1553,32 @@ function PlReportingWidget({
         {reportedPct.toFixed(1)}% of votes
       </div>
     </div>
+  );
+}
+
+// ── Simulation % input box ────────────────────────────────────────────────────
+// Keeps a local string buffer so the player can type freely (incl. trailing decimals)
+// without the value being re-parsed/reformatted mid-keystroke. Reports a clamped number.
+function PlSimInput({ value, color, dark, onChange }: {
+  value: number; color: string; dark: boolean; onChange: (n: number) => void;
+}) {
+  const [str, setStr] = useState(() => String(+value.toFixed(2)));
+  useEffect(() => { if (parseFloat(str) !== value) setStr(String(+value.toFixed(2))); }, [value]); // eslint-disable-line
+  return (
+    <input
+      type="text" inputMode="decimal"
+      value={str}
+      onChange={e => {
+        const s = e.target.value;
+        if (!/^\d*\.?\d*$/.test(s)) return;       // digits + one optional decimal point only
+        setStr(s);
+        const n = parseFloat(s);
+        onChange(Number.isFinite(n) ? Math.max(0, n) : 0);
+      }}
+      onBlur={() => { const n = parseFloat(str); setStr(String(Number.isFinite(n) ? +Math.max(0, n).toFixed(2) : 0)); }}
+      className={`w-16 h-7 px-1.5 text-right text-[12px] font-mono font-bold tabular-nums rounded-[4px] border outline-none focus:border-blue-500 ${dark ? 'bg-[#0a1626] border-white/15' : 'bg-white border-black/15'}`}
+      style={{ color }}
+    />
   );
 }
 
@@ -1506,17 +1660,18 @@ export default function PolandApp() {
   // ── UI state ────────────────────────────────────────────────────────────────
   const [selectedConst, setSelectedConst]         = useState<PlConstId | null>(null);
   const [bubbleMap, setBubbleMap]                 = useState(false);
+  const [seatDots, setSeatDots]                   = useState(false);
   const [scoreboardVisible, setScoreboardVisible] = useState(true);
   const [hiddenParties, setHiddenParties]         = useState<Set<PlPartyId>>(new Set());
 
-  const [leftPanel, setLeftPanel]   = useState<'parties'|'parli'|'breakdown'|null>(null);
-  const [rightPanel, setRightPanel] = useState<'sim'|'tutorial'|'coalition'|null>(null);
+  const [leftPanel, setLeftPanel]   = useState<'parties'|'parli'|null>(null);
+  const [rightPanel, setRightPanel] = useState<'sim'|'tutorial'|'coalition'|'breakdown'|null>(null);
   const [exitLeft, setExitLeft]     = useState<string | null>(null);
   const [exitRight, setExitRight]   = useState<string | null>(null);
   const exitTimerL = useRef<ReturnType<typeof setTimeout> | null>(null);
   const exitTimerR = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const openLeft = useCallback((panel: 'parties'|'parli'|'breakdown') => {
+  const openLeft = useCallback((panel: 'parties'|'parli') => {
     if (leftPanel === panel) {
       setExitLeft(panel); setLeftPanel(null);
       exitTimerL.current = setTimeout(() => setExitLeft(null), 280);
@@ -1525,7 +1680,7 @@ export default function PolandApp() {
       setLeftPanel(panel);
     }
   }, [leftPanel]);
-  const openRight = useCallback((panel: 'sim'|'tutorial'|'coalition') => {
+  const openRight = useCallback((panel: 'sim'|'tutorial'|'coalition'|'breakdown') => {
     if (rightPanel === panel) {
       setExitRight(panel); setRightPanel(null);
       exitTimerR.current = setTimeout(() => setExitRight(null), 280);
@@ -1546,7 +1701,6 @@ export default function PolandApp() {
 
   // ── Simulation ──────────────────────────────────────────────────────────────
   const [simDraftPcts,  setSimDraftPcts]  = useState<Record<PlPartyId, number>>(() => ({ ...PL_VOTE_PCT_2026 }));
-  const [simDraftLocks, setSimDraftLocks] = useState<Set<PlPartyId>>(new Set());
   const [, setSimDraftTouched]            = useState(false);
   const [simDuration, setSimDuration]     = useState<60000|120000|300000|600000>(120000);
   const [simNatPcts, setSimNatPcts]       = useState<Record<PlPartyId, number> | null>(null);
@@ -1560,7 +1714,13 @@ export default function PolandApp() {
 
   useEffect(() => { if (rightPanel === 'sim') { setSimDraftPcts({ ...natPcts }); setSimDraftTouched(false); } }, [rightPanel === 'sim']); // eslint-disable-line
 
-  const simEffLocks = useMemo(() => new Set<PlPartyId>([...simDraftLocks, ...hiddenParties]), [simDraftLocks, hiddenParties]);
+  // Sum of the editable party inputs. Player types freely (no auto-redistribution);
+  // simulation may only run when the total is between 95% and 100%.
+  const simDraftTotal = useMemo(
+    () => PL_LR_ORDER.filter(id => !hiddenParties.has(id)).reduce((s, id) => s + (simDraftPcts[id] ?? 0), 0),
+    [simDraftPcts, hiddenParties],
+  );
+  const simTotalValid = simDraftTotal >= 95 && simDraftTotal <= 100;
 
   function stopSim() {
     simTimersRef.current.forEach(clearTimeout);
@@ -1642,7 +1802,7 @@ export default function PolandApp() {
   // ── Derived display state ──────────────────────────────────────────────────
   const showConst     = !!selectedConst && rightPanel !== 'sim' && !simRunning;
   const showParli     = leftPanel  === 'parli'     || exitLeft  === 'parli';
-  const showBreakdown = leftPanel  === 'breakdown' || exitLeft  === 'breakdown';
+  const showBreakdown = rightPanel === 'breakdown' || exitRight === 'breakdown';
   const showTutorial  = rightPanel === 'tutorial'  || exitRight === 'tutorial';
   const showCoalition = rightPanel === 'coalition' || exitRight === 'coalition';
 
@@ -1674,11 +1834,13 @@ export default function PolandApp() {
             className={`${leftPanel === 'parties' ? btnActive : btnMuted}${simRunning ? ' opacity-40 cursor-not-allowed' : ''}`}
             title={simRunning ? 'Parties locked while simulation runs' : 'Show/hide parties'}>Parties</button>
           <button onClick={() => setScoreboardVisible(v => !v)} className={scoreboardVisible ? btnActive : btnMuted}>Scoreboard</button>
-          <button onClick={() => openLeft('breakdown')}  className={leftPanel  === 'breakdown' ? btnActive : btnMuted}>Breakdown</button>
+          <button onClick={() => openRight('breakdown')} className={rightPanel === 'breakdown' ? btnActive : btnMuted}>Breakdown</button>
           <button onClick={() => openRight('coalition')} className={rightPanel === 'coalition' ? btnActive : btnMuted}>Coalition</button>
           <button onClick={() => openLeft('parli')}      className={leftPanel  === 'parli'     ? btnActive : btnMuted}>Parliament</button>
-          <button onClick={() => setBubbleMap(v => !v)}
+          <button onClick={() => { setBubbleMap(v => !v); setSeatDots(false); }}
             className={bubbleMap ? `${btnBase} bg-emerald-600 text-white hover:bg-emerald-700` : btnMuted}>Bubble Map</button>
+          <button onClick={() => { setSeatDots(v => !v); setBubbleMap(false); }}
+            className={seatDots ? `${btnBase} bg-violet-600 text-white hover:bg-violet-700` : btnMuted}>Seat Dots</button>
           <button onClick={() => openRight('tutorial')}  className={rightPanel === 'tutorial' ? btnActive : btnMuted}>Tutorial</button>
         </div>
         <div className="shrink-0 flex items-center gap-2 pr-4">
@@ -1709,15 +1871,13 @@ export default function PolandApp() {
             onClose={() => openLeft('parties')} dark={dark} />
         )}
         {showParli     && <PlParliamentPanel seats={displaySeats} onClose={() => openLeft('parli')}     exiting={exitLeft  === 'parli'}     dark={dark} />}
-        {showBreakdown && <PlBreakdownPanel  seats={displaySeats} natPcts={displayPcts} isBaseline={preset === 'baseline'}
-                            constOverrides={constOverrides} onClose={() => openLeft('breakdown')}      exiting={exitLeft  === 'breakdown'} dark={dark} />}
 
         {/* MAP */}
         <div className="relative flex-1 min-w-0 min-h-0">
           <PlMapView
             natPcts={natPcts} selectedConst={selectedConst}
             onSelect={c => setSelectedConst(prev => prev === c ? null : c)}
-            dark={dark} bubbleMap={bubbleMap}
+            dark={dark} bubbleMap={bubbleMap} seatDots={seatDots}
             declaredConsts={declaredConsts} constOverrides={constOverrides}
             blankMode={preset === 'blank'} projectedConsts={projectedConsts}
             simConstFractions={simConstFractions}
@@ -1729,6 +1889,7 @@ export default function PolandApp() {
               projectedConsts={projectedConsts} constReportingPct={constReportingPct}
               simConstFractions={simConstFractions}
               isSim={simRunning || (simSeats != null && preset !== 'blank')}
+              live={simRunning}
               dark={dark}
             />
           )}
@@ -1755,44 +1916,49 @@ export default function PolandApp() {
                 ))}
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
+            <div className="px-3.5 pt-2 pb-1 text-[8.5px] font-mono text-ink-3 shrink-0">
+              Type each party's vote %. Values are not auto-balanced — the total must be between 95% and 100% to run.
+            </div>
+            <div className="flex-1 overflow-y-auto px-3.5 py-2 thin-scroll space-y-2">
               {PL_LR_ORDER.filter(id => !hiddenParties.has(id)).map(id => {
                 const party    = PL_PARTY_MAP[id];
                 const pct      = simDraftPcts[id] ?? 0;
-                const isLocked = simDraftLocks.has(id);
                 const color    = partyColor(id);
                 const rawVotes = Math.round(pct / 100 * PL_GRAND_TOTAL_VALID);
-                const belowThr = pct < party.threshold;
+                const belowThr = !party.exempt && pct < party.threshold;
                 return (
-                  <div key={id}>
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
-                      <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{party.fullName}</span>
-                      <button onClick={() => setSimDraftLocks(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
-                        className={`w-4 h-4 flex items-center justify-center shrink-0 ${isLocked ? 'text-gold' : 'text-ink-3 hover:text-ink'}`}>
-                        {isLocked
-                          ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                          : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>}
-                      </button>
-                      <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color }}>{pct.toFixed(1)}%</span>
+                  <div key={id} className="flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
+                    <div className="flex-1 min-w-0">
+                      <div className="text-[10px] font-medium text-ink truncate leading-tight">{party.fullName}</div>
+                      <div className="text-[8px] font-mono leading-tight" style={{ color: party.exempt ? '#16a34a' : belowThr ? '#f59e0b' : (dark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.35)') }}>
+                        {fmtN(rawVotes)} votes · {party.exempt ? 'exempt' : belowThr ? `⚠ < ${party.threshold}%` : `≥ ${party.threshold}%`}
+                      </div>
                     </div>
-                    <input type="range" min={0} max={55} step={0.1} value={pct} disabled={isLocked}
-                      onChange={e => { setSimDraftPcts(redistributePcts(simDraftPcts, id, parseFloat(e.target.value), simEffLocks)); setSimDraftTouched(true); }}
-                      className="br-party-slider w-full"
-                      style={{ '--party-color': color, '--pct':`${(pct / 55) * 100}%` } as React.CSSProperties} />
-                    <div className="flex justify-between mt-0.5">
-                      <span className="text-[8px] font-mono" style={{ color: dark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.28)' }}>{fmtN(rawVotes)} votes</span>
-                      <span className="text-[7.5px] font-mono" style={{ color: belowThr ? '#f59e0b' : '#16a34a' }}>
-                        {belowThr ? `⚠ < ${party.threshold}%` : `✓ ≥ ${party.threshold}%`}
-                      </span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <PlSimInput value={pct} color={color} dark={dark}
+                        onChange={n => { setSimDraftPcts(prev => ({ ...prev, [id]: n })); setSimDraftTouched(true); }} />
+                      <span className="text-[10px] font-mono text-ink-3">%</span>
                     </div>
                   </div>
                 );
               })}
             </div>
             <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
-              <button disabled={simRunning} onClick={runSim}
-                className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              <div className="flex items-center justify-between">
+                <span className="text-[9px] font-mono uppercase tracking-wide text-ink-3">Total</span>
+                <span className="text-[12px] font-mono font-bold tabular-nums"
+                  style={{ color: simTotalValid ? '#16a34a' : '#ef4444' }}>{simDraftTotal.toFixed(1)}%</span>
+              </div>
+              {!simRunning && !simTotalValid && (
+                <div className="text-[8.5px] font-mono leading-snug" style={{ color: '#ef4444' }}>
+                  {simDraftTotal < 95
+                    ? `Add ${(95 - simDraftTotal).toFixed(1)}% more — total must reach at least 95%.`
+                    : `Remove ${(simDraftTotal - 100).toFixed(1)}% — total cannot exceed 100%.`}
+                </div>
+              )}
+              <button disabled={simRunning || !simTotalValid} onClick={runSim}
+                className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 {simRunning ? `${simProgress}/${PL_CONSTITUENCIES.length} okręgi reporting…` : '▶ Run Simulation'}
               </button>
               {(simSeats || declaredConsts) && (
@@ -1821,6 +1987,8 @@ export default function PolandApp() {
             hiddenParties={hiddenParties} dark={dark} />
         )}
 
+        {showBreakdown && <PlBreakdownPanel  seats={displaySeats} natPcts={displayPcts} isBaseline={preset === 'baseline'}
+                            constOverrides={constOverrides} onClose={() => openRight('breakdown')}     exiting={exitRight === 'breakdown'} dark={dark} />}
         {showTutorial  && <PlTutorialPanel   onClose={() => openRight('tutorial')}  exiting={exitRight === 'tutorial'}  dark={dark} />}
         {showCoalition && <PlCoalitionPanel  seats={displaySeats} onClose={() => openRight('coalition')} exiting={exitRight === 'coalition'} dark={dark} />}
       </div>

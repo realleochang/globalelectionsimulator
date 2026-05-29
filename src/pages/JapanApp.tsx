@@ -1404,7 +1404,7 @@ function JpTutorialPanel({ onClose, exiting }: { onClose: ()=>void; exiting: boo
         <div className="space-y-1 text-[10px] text-ink-2 leading-relaxed">
           <div><Tag>Swing</Tag> National ±pp swing to all prefectures.</div>
           <div><Tag>Breakdown</Tag> Region view, closest races, vote vs seat distortion, and prefecture flip tracker.</div>
-          <div><Tag>Parliament</Tag> 465-seat hemicycle sorted by ideology (left → right).</div>
+          <div><Tag>Parliament</Tag> 465-seat semicircle sorted by ideology (left → right).</div>
           <div><Tag>Bubble Map</Tag> Circles sized by raw vote margin (winner − runner-up).</div>
         </div>
         <div className="h-4"/>

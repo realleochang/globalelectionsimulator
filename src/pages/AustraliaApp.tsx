@@ -1653,7 +1653,7 @@ function AuParliamentPanel({
         <button onClick={onClose} className="w-7 h-7 flex items-center justify-center rounded-lg hover:bg-hover text-ink-3 hover:text-ink text-lg">×</button>
       </div>
       <div className="flex-1 overflow-y-auto thin-scroll px-2 py-2">
-        <svg width="380" height="200" viewBox={`0 0 ${AU_HEMI_CX * 2 + 10} 210`} aria-label="Hemicycle">
+        <svg width="380" height="200" viewBox={`0 0 ${AU_HEMI_CX * 2 + 10} 210`} aria-label="Parliamentary composition">
           {dots.map((pid, i) => {
             const pos = AU_HEMI_POSITIONS[i];
             if (!pos) return null;
@@ -2135,7 +2135,7 @@ function AuTutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: 
 
         {/* ── Parliament ── */}
         <H2>Parliament View</H2>
-        <P>Click <Tag>Parliament</Tag> to open a hemicycle visualisation of the 151-seat House of Representatives. Seats are arranged left → right by ideology and coloured by party. The Coalition parties are grouped on the right.</P>
+        <P>Click <Tag>Parliament</Tag> to open a parliamentary-composition view of the 151-seat House of Representatives. Seats are arranged left → right by ideology and coloured by party. The Coalition parties are grouped on the right.</P>
 
         {/* ── Bubble map ── */}
         <H2>Bubble Map</H2>

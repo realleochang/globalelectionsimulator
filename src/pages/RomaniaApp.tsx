@@ -1857,7 +1857,7 @@ function RoTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exit
         <P>Click <strong>▶ Run Simulation</strong>: the map resets to blank and all 42 counties report in <strong>5 random batches</strong> on a bell-curve schedule. Seats update live. The <strong>↩ Reference</strong> button shows the last preset's shares for comparison.</P>
 
         <H2>🏟 Parliament</H2>
-        <P>Click <strong>Parliament</strong> for the hemicycle diagram (Camera Deputaților, 331 seats) with a majority bar and left-to-right party ordering.</P>
+        <P>Click <strong>Parliament</strong> for the parliamentary-composition diagram (Camera Deputaților, 331 seats) with a majority bar and left-to-right party ordering.</P>
 
         <H2>🤝 Coalition Builder</H2>
         <P>Click <strong>Coalition</strong> to toggle parties in/out and check whether a combination reaches the <strong>166-seat majority</strong>.</P>

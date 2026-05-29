@@ -160,6 +160,17 @@ export const COUNTRIES = [
     ],
   },
   {
+    id: 'poland', path: '/poland', name: 'Poland', flag: '🇵🇱', demonym: 'Polish', mapColor: '#DC143C',
+    flagSrc: 'poland-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'Parliamentary Election', subtitle: 'Sejm Rzeczypospolitej Polskiej',
+    lat: 52, lng: 19.4,
+    accent: 'linear-gradient(90deg,#FFFFFF,#DC143C,#FFFFFF)',
+    parties: [
+      { color: '#C0392B', abbr: 'Lewica' }, { color: '#F05A28', abbr: 'KO'   },
+      { color: '#1B1464', abbr: 'KWiN'   }, { color: '#003087', abbr: 'PiS'  },
+    ],
+  },
+  {
     id: 'new-zealand', path: '/new-zealand', name: 'New Zealand', flag: '🇳🇿', demonym: 'New Zealand', mapColor: '#00247D', locked: true as const,
     flagSrc: 'new-zealand-flag.png', flagStyle: {} as React.CSSProperties,
     electionType: 'General Election', subtitle: 'MMP Parliament',
@@ -169,18 +180,6 @@ export const COUNTRIES = [
       { color: '#00529F', abbr: 'NAT' }, { color: '#D82A20', abbr: 'LAB' },
       { color: '#098137', abbr: 'GRN' }, { color: '#FFCC00', abbr: 'ACT' },
       { color: '#C0392B', abbr: 'TPM' },
-    ],
-  },
-  {
-    id: 'poland', path: '/poland', name: 'Poland', flag: '🇵🇱', demonym: 'Polish', mapColor: '#DC143C', locked: true as const,
-    flagSrc: 'poland-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'Parliamentary Election', subtitle: 'Sejm Rzeczypospolitej Polskiej',
-    lat: 52, lng: 19.4,
-    accent: 'linear-gradient(90deg,#FFFFFF,#DC143C,#FFFFFF)',
-    parties: [
-      { color: '#003087', abbr: 'PiS'    }, { color: '#F05A28', abbr: 'KO'     },
-      { color: '#2E7D32', abbr: 'TD'     }, { color: '#C0392B', abbr: 'Lewica' },
-      { color: '#1B1464', abbr: 'Konf'   },
     ],
   },
   {
@@ -231,7 +230,7 @@ const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
   '710': 'ZA', '642': 'RO', '752': 'SE',
-  '566': 'NG', '724': 'ES',
+  '566': 'NG', '724': 'ES', '616': 'PL',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
