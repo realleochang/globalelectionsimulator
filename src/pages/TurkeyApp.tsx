@@ -972,29 +972,6 @@ function ProvincePanel({
     onUpdate(dept.code, newVotes);
   }
 
-  function startDrag(id: string, trackEl: HTMLElement) {
-    if (locksRef.current.has(id)) return;
-    function onMove(ev: MouseEvent) {
-      const rect = trackEl.getBoundingClientRect();
-      const raw  = Math.min(Math.max(((ev.clientX - rect.left) / rect.width) * 100, 0), 100);
-      const newPcts = redistributePcts(pctsRef.current, id, raw, locksRef.current);
-      pctsRef.current = newPcts;
-      setPcts({ ...newPcts });
-      // Live-update map shading while dragging
-      const newVotes = Object.fromEntries(ids.map(cid => [cid, Math.round((newPcts[cid] ?? 0) * total / 100)]));
-      onUpdate(dept.code, newVotes);
-    }
-    function onUp(ev: MouseEvent) {
-      const rect = trackEl.getBoundingClientRect();
-      const raw  = Math.min(Math.max(((ev.clientX - rect.left) / rect.width) * 100, 0), 100);
-      applyChange(id, raw);
-      document.removeEventListener('mousemove', onMove);
-      document.removeEventListener('mouseup', onUp);
-    }
-    document.addEventListener('mousemove', onMove);
-    document.addEventListener('mouseup', onUp);
-  }
-
   function toggleLock(id: string) {
     setLocks(prev => {
       const next = new Set(prev);
@@ -1157,27 +1134,24 @@ function ProvincePanel({
                 )}
               </div>
 
-              <div
-                className="relative w-full rounded-full select-none"
-                style={{ height: '6px', background: '#eae8e3', cursor: isLocked ? 'not-allowed' : 'ew-resize', opacity: isLocked ? 0.55 : 1 }}
-                onMouseDown={e => { if (!isLocked) startDrag(id, e.currentTarget); }}
-              >
-                <div className="absolute inset-y-0 left-0 rounded-full pointer-events-none" style={{ width: `${pct}%`, background: info.color }} />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 rounded-full pointer-events-none"
-                  style={{
-                    width: '13px', height: '13px',
-                    left: `calc(${Math.min(pct, 99.5)}% - 6.5px)`,
-                    background: info.color,
-                    border: '2.5px solid white',
-                    boxShadow: '0 1px 5px rgba(0,0,0,0.30)',
-                    opacity: pct > 0.5 ? 1 : 0.3,
-                    transition: 'opacity 0.1s',
-                  }}
-                />
-              </div>
+              <input type="range" min={0} max={100} step={0.1} value={pct} disabled={isLocked}
+
+
+                onChange={e => applyChange(id, parseFloat(e.target.value))}
+
+
+                className="br-party-slider w-full"
+
+
+                style={{ '--party-color': info.color, '--pct': `${pct}%` } as React.CSSProperties} />
+
+
               <div className="text-right text-[8.5px] font-mono text-ink-3 mt-0.5">
+
+
                 {Math.round(pct * total / 100).toLocaleString()} votes
+
+
               </div>
             </div>
           );
@@ -1187,7 +1161,7 @@ function ProvincePanel({
       {/* ── Footer ─────────────────────────────────────────────── */}
       <div className="px-3.5 py-2 border-t border-default">
         <p className="text-[8px] font-mono text-ink-3 text-center uppercase tracking-wide">
-          Drag bars · Click % to type · Lock to fix
+          Drag sliders · Click % to type · Lock to fix
         </p>
       </div>
     </aside>
@@ -2047,44 +2021,24 @@ function TrMultiSelectPanel({
                 </span>
               </div>
 
-              <div
-                className="relative w-full rounded-full select-none"
-                style={{ height: '6px', background: '#eae8e3', cursor: isLocked ? 'not-allowed' : 'ew-resize', opacity: isLocked ? 0.55 : 1 }}
-                onMouseDown={e => {
-                  if (isLocked) return;
-                  const track = e.currentTarget;
-                  function onMove(ev: MouseEvent) {
-                    const rect = track.getBoundingClientRect();
-                    const raw = Math.min(Math.max(((ev.clientX - rect.left) / rect.width) * 100, 0), 100);
-                    handleSlider(partyId, raw);
-                  }
-                  function onUp(ev: MouseEvent) {
-                    const rect = track.getBoundingClientRect();
-                    const raw = Math.min(Math.max(((ev.clientX - rect.left) / rect.width) * 100, 0), 100);
-                    handleSlider(partyId, raw);
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-                  }
-                  document.addEventListener('mousemove', onMove);
-                  document.addEventListener('mouseup', onUp);
-                }}
-              >
-                <div className="absolute inset-y-0 left-0 rounded-full pointer-events-none" style={{ width: `${pct}%`, background: info.color }} />
-                <div
-                  className="absolute top-1/2 -translate-y-1/2 rounded-full pointer-events-none"
-                  style={{
-                    width: '13px', height: '13px',
-                    left: `calc(${Math.min(pct, 99.5)}% - 6.5px)`,
-                    background: info.color,
-                    border: '2.5px solid white',
-                    boxShadow: '0 1px 5px rgba(0,0,0,0.30)',
-                    opacity: pct > 0.5 ? 1 : 0.3,
-                  }}
-                />
-              </div>
+              <input type="range" min={0} max={100} step={0.1} value={pct} disabled={isLocked}
+
+
+                onChange={e => handleSlider(partyId, parseFloat(e.target.value))}
+
+
+                className="br-party-slider w-full"
+
+
+                style={{ '--party-color': info.color, '--pct': `${pct}%` } as React.CSSProperties} />
+
 
               <div className="text-right text-[8.5px] font-mono text-ink-3 mt-0.5">
+
+
                 {votes.toLocaleString()} votes
+
+
               </div>
             </div>
           );
@@ -2093,7 +2047,7 @@ function TrMultiSelectPanel({
 
       <div className="px-3.5 py-2 border-t border-default">
         <p className="text-[8px] font-mono text-ink-3 text-center uppercase tracking-wide">
-          Drag bars · Lock to fix · Delta applied per dept
+          Drag sliders · Lock to fix · Delta applied per dept
         </p>
       </div>
     </aside>
