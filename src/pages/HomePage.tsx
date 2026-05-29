@@ -202,6 +202,17 @@ export const COUNTRIES = [
       { color: '#00ADEF', abbr: 'IL' }, { color: '#202056', abbr: 'CH' },
     ],
   },
+  {
+    id: 'turkey', path: '/turkey', name: 'Turkey', flag: '🇹🇷', demonym: 'Turkish', mapColor: '#E30A17',
+    flagSrc: 'turkey-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'Presidential Election', subtitle: 'Presidential Complex',
+    lat: 39, lng: 35,
+    accent: 'linear-gradient(90deg,#E30A17,#FFFFFF,#E30A17)',
+    parties: [
+      { color: '#E30A17', abbr: 'CHP' }, { color: '#8E44AD', abbr: 'MEM' },
+      { color: '#F37021', abbr: 'AKP' }, { color: '#1AA0A0', abbr: 'ATA' },
+    ],
+  },
 ];
 
 export type Country = typeof COUNTRIES[0];
@@ -211,14 +222,14 @@ const ISO_TO_COLOR: Record<string, string> = {
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
   'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7',
   'PL': '#DC143C', 'IN': '#FF6B1A', 'NG': '#008751',
-  'ES': '#AA151B', 'KR': '#CD2E3A', 'PT': '#006600',
+  'ES': '#AA151B', 'KR': '#CD2E3A', 'PT': '#006600', 'TR': '#E30A17',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
   'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden',
-  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india', 'KR': 'south-korea', 'PT': 'portugal',
+  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india', 'KR': 'south-korea', 'PT': 'portugal', 'TR': 'turkey',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
@@ -226,7 +237,7 @@ const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
   '710': 'ZA', '642': 'RO', '752': 'SE',
-  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN', '410': 'KR', '620': 'PT',
+  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN', '410': 'KR', '620': 'PT', '792': 'TR',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
