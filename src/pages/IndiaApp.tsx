@@ -767,6 +767,15 @@ export default function IndiaApp() {
   }
   function resetSim() { stopSim(); setDeclared(null); }
 
+  // Sim panel "armed" = open with no run yet (declared==null, not running): the map, tooltips,
+  // scoreboard and bubbles must stay BLANK — no preview — until Run is clicked. Model it as sim
+  // mode over an empty declared set so nothing is counted. (CLAUDE.md: never premap sim results;
+  // adjusting the sliders must not preview anything before the run button is pressed.)
+  const emptyDeclared = useRef<Set<string>>(new Set()).current;
+  const simArmed = rightPanel === 'sim' && !simRunning && declared == null;
+  const effDeclared = simArmed ? emptyDeclared : declared;
+  const effSimMode = simRunning || effDeclared != null;
+
   // ── Active scenario winners / shares / raw votes ──
   // Unified engine: per-seat shares = override, else canonical (real 2024 / calibrated 2026)
   // when no national swing, else the baseline shares swung by (natTarget − nat2024). Winners
@@ -779,7 +788,7 @@ export default function IndiaApp() {
     const natV: Shares = { NDA: 0, INDIA: 0, OTH: 0 }; let natTot = 0;
     let natP: Shares = { NDA: 0, INDIA: 0, OTH: 0 }; let declaredTotal = IN_TOTAL;
     if (data) {
-      const simMode = simRunning || declared != null;
+      const simMode = effSimMode;
       const blankMode = preset === 'blank' && !simMode;
       const swing: Shares = { NDA: natTarget.NDA - data.nat2024.NDA, INDIA: natTarget.INDIA - data.nat2024.INDIA, OTH: natTarget.OTH - data.nat2024.OTH };
       const canonNat = preset === 'polling2026' ? IN_NAT_2026 : data.nat2024;
@@ -804,15 +813,18 @@ export default function IndiaApp() {
         const tv = r.totalVotes * rpt;
         rawByKey[key] = { NDA: Math.round(shares.NDA / 100 * tv), INDIA: Math.round(shares.INDIA / 100 * tv), OTH: Math.round(shares.OTH / 100 * tv) };
         rawMargin[key] = Math.abs(r.margin ?? 0);
-        if (!simMode || declared?.has(key)) seats[win]++;
-        // national tally (full-count shares; blank counts only projected seats)
-        for (const c of CATS) natV[c] += shares[c] / 100 * r.totalVotes; natTot += r.totalVotes;
+        const counted = !simMode || effDeclared?.has(key);
+        if (counted) seats[win]++;
+        // national tally — accumulate ONLY from counted constituencies so the dashboard's
+        // % and raw votes grow live as seats declare during the simulation. tv is the
+        // reporting-adjusted total (= full total in sim/normal, % reporting in blank mode).
+        if (counted) { for (const c of CATS) natV[c] += shares[c] / 100 * tv; natTot += tv; }
       }
       natP = natTot > 0 ? { NDA: natV.NDA / natTot * 100, INDIA: natV.INDIA / natTot * 100, OTH: natV.OTH / natTot * 100 } : { NDA: 0, INDIA: 0, OTH: 0 };
-      declaredTotal = simMode ? (declared?.size ?? 0) : (blankMode ? projectedConsts.size : IN_TOTAL);
+      declaredTotal = simMode ? (effDeclared?.size ?? 0) : (blankMode ? projectedConsts.size : IN_TOTAL);
     }
     return { winners, marginByKey, sharesByKey, rawByKey, rawMargin, seats, natPct: natP, natVotes: natV, declaredTotal };
-  }, [data, preset, overrides, projectedConsts, reporting, flips2026, simRunning, declared, natTarget]);
+  }, [data, preset, overrides, projectedConsts, reporting, flips2026, simRunning, effDeclared, effSimMode, natTarget]);
 
   const btnBase = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
@@ -824,7 +836,7 @@ export default function IndiaApp() {
   const showParli = leftPanel === 'parli' || exitLeft === 'parli';
   const showTutorial = rightPanel === 'tutorial' || exitRight === 'tutorial';
   const showSwing = rightPanel === 'swing' || exitRight === 'swing';
-  const simMode = simRunning || declared != null;
+  const simMode = effSimMode;
   // Click a seat to adjust it in any preset (not during a live sim).
   const showConst = !!selected && rightPanel !== 'sim' && rightPanel !== 'swing' && !simRunning;
 
@@ -842,7 +854,7 @@ export default function IndiaApp() {
           <button onClick={() => choosePreset('blank')} className={preset === 'blank' && !simMode ? btnGold : btnMuted}>Blank Map</button>
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
           <button onClick={() => openRight('swing')} className={rightPanel === 'swing' ? btnActive : btnMuted}>⇄ Swing</button>
-          <button onClick={() => openRight('sim')} className={rightPanel === 'sim' ? btnActive : btnMuted}>▶ Simulation</button>
+          <button onClick={() => { if (rightPanel !== 'sim') choosePreset('blank'); openRight('sim'); }} className={rightPanel === 'sim' ? btnActive : btnMuted}>▶ Simulation</button>
           <button onClick={() => setScoreboardOn(v => !v)} className={scoreboardOn ? btnActive : btnMuted}>Scoreboard</button>
           <button onClick={() => openRight('breakdown')} className={rightPanel === 'breakdown' ? btnActive : btnMuted}>Breakdown</button>
           <button onClick={() => openRight('analysis')} className={rightPanel === 'analysis' ? btnActive : btnMuted}>Analysis</button>
@@ -863,7 +875,7 @@ export default function IndiaApp() {
         <div className="relative flex-1 min-w-0 min-h-0">
           <InMapView geoData={geoData} winners={winners} marginByKey={marginByKey} sharesByKey={sharesByKey} rawByKey={rawByKey} rawMargin={rawMargin}
             baseResults={data?.results ?? {}} selected={selected} onSelect={setSelected} dark={dark} bubble={bubble}
-            blankMode={preset === 'blank' && !simMode} projected={projectedConsts} declared={simMode ? (declared ?? new Set()) : undefined} />
+            blankMode={preset === 'blank' && !simMode} projected={projectedConsts} declared={effSimMode ? (effDeclared ?? emptyDeclared) : undefined} />
           {(simMode || preset === 'blank') && <InReportingWidget declared={declaredTotal} live={simRunning} dark={dark} />}
         </div>
 
@@ -876,7 +888,7 @@ export default function IndiaApp() {
             <div className="px-3.5 py-3 space-y-4 flex-1 overflow-y-auto thin-scroll">
               <div>
                 <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 mb-2">Vote share to simulate</div>
-                <NatSliders target={natTarget} onChange={simRunning ? () => {} : setNatTarget} dark={dark} />
+                <NatSliders target={natTarget} onChange={simRunning ? () => {} : (v) => { setNatTarget(v); if (declared != null) setDeclared(null); }} dark={dark} />
               </div>
               <div>
                 <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 mb-1.5">Length</div>
