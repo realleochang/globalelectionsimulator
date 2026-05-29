@@ -192,28 +192,14 @@ export const COUNTRIES = [
     ],
   },
   {
-    id: 'new-zealand', path: '/new-zealand', name: 'New Zealand', flag: '🇳🇿', demonym: 'New Zealand', mapColor: '#00247D', locked: true as const,
-    flagSrc: 'new-zealand-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'General Election', subtitle: 'MMP Parliament',
-    lat: -41, lng: 174,
-    accent: 'linear-gradient(90deg,#00247D,#CC142B,#00247D)',
+    id: 'portugal', path: '/portugal', name: 'Portugal', flag: '🇵🇹', demonym: 'Portuguese', mapColor: '#006600',
+    flagSrc: 'portugal-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'Legislative Election', subtitle: 'Assembleia da República',
+    lat: 39.5, lng: -8.0,
+    accent: 'linear-gradient(90deg,#006600,#FF0000,#006600)',
     parties: [
-      { color: '#00529F', abbr: 'NAT' }, { color: '#D82A20', abbr: 'LAB' },
-      { color: '#098137', abbr: 'GRN' }, { color: '#FFCC00', abbr: 'ACT' },
-      { color: '#C0392B', abbr: 'TPM' },
-    ],
-  },
-  {
-    id: 'japan', path: '/japan', name: 'Japan', flag: '🇯🇵', demonym: 'Japanese', mapColor: '#C62828', locked: true as const,
-    flagSrc: 'japan-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'General Election', subtitle: '衆議院 — 465 seats',
-    lat: 36.5, lng: 136,
-    accent: 'linear-gradient(90deg,#C62828,white,#C62828)',
-    parties: [
-      { color: '#B71C1C', abbr: 'JCP'   }, { color: '#AD1457', abbr: 'Reiwa' },
-      { color: '#1565C0', abbr: 'CDP'   }, { color: '#E65100', abbr: 'DPP'   },
-      { color: '#F57F17', abbr: 'KOM'   }, { color: '#00897B', abbr: 'Ishin' },
-      { color: '#C62828', abbr: 'LDP'   },
+      { color: '#FF6699', abbr: 'PS' }, { color: '#F58220', abbr: 'AD' },
+      { color: '#00ADEF', abbr: 'IL' }, { color: '#202056', abbr: 'CH' },
     ],
   },
 ];
@@ -224,15 +210,15 @@ const ISO_TO_COLOR: Record<string, string> = {
   'GB': '#C8102E', 'FR': '#002395', 'CA': '#D52B1E', 'US': '#002868',
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
   'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7',
-  'PL': '#DC143C', 'IN': '#FF6B1A', 'JP': '#C62828', 'NG': '#008751',
-  'ES': '#AA151B', 'KR': '#CD2E3A',
+  'PL': '#DC143C', 'IN': '#FF6B1A', 'NG': '#008751',
+  'ES': '#AA151B', 'KR': '#CD2E3A', 'PT': '#006600',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
   'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden',
-  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india', 'KR': 'south-korea',
+  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india', 'KR': 'south-korea', 'PT': 'portugal',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
@@ -240,7 +226,7 @@ const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
   '710': 'ZA', '642': 'RO', '752': 'SE',
-  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN', '410': 'KR',
+  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN', '410': 'KR', '620': 'PT',
 };
 
 function hexToRgba(hex: string, alpha: number): string {

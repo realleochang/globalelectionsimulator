@@ -16,12 +16,11 @@ import SouthAfricaApp from './pages/SouthAfricaApp.tsx'
 import RomaniaApp from './pages/RomaniaApp.tsx'
 import SwedenApp from './pages/SwedenApp.tsx'
 import SpainApp from './pages/SpainApp.tsx'
-import NewZealandApp from './pages/NewZealandApp.tsx'
 import PolandApp from './pages/PolandApp.tsx'
 import IndiaApp from './pages/IndiaApp.tsx'
-import JapanApp from './pages/JapanApp.tsx'
 import NigeriaApp from './pages/NigeriaApp.tsx'
 import SouthKoreaApp from './pages/SouthKoreaApp.tsx'
+import PortugalApp from './pages/PortugalApp.tsx'
 import CountriesPage from './pages/CountriesPage.tsx'
 
 const splash = document.getElementById('splash')
@@ -48,12 +47,11 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/romania" element={<RomaniaApp />} />
         <Route path="/sweden" element={<SwedenApp />} />
         <Route path="/spain" element={<SpainApp />} />
-        <Route path="/new-zealand" element={<NewZealandApp />} />
         <Route path="/poland" element={<PolandApp />} />
         <Route path="/india" element={<IndiaApp />} />
-        <Route path="/japan" element={<JapanApp />} />
         <Route path="/nigeria" element={<NigeriaApp />} />
         <Route path="/south-korea" element={<SouthKoreaApp />} />
+        <Route path="/portugal" element={<PortugalApp />} />
         <Route path="/countries" element={<CountriesPage />} />
       </Routes>
     </HashRouter>
