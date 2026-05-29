@@ -71,6 +71,11 @@ For the official data results for the last election baseline, try to source that
 
 Remember, you can always add features, but never delete a single line of code unless you have to for the new sim.
 
+
+
+***MISTAKES YOU HAVE MADE IN PAST ELECTION SIMULATION GAME CREATIONS --- & REPEATED OFFENSES (MISTAKES LOL)****
+
+
 EXTREMELY INFORMATION MUST GO THROUGH AND CONFIRM BEFORE COMPLETION ********** 1) double check that the candidates are up
 to date for each of the 2022 baseline, and (2026 polling blank map and simulation bundle) 2) for the blank map constituency sliders, the player has to at least touch a
 slider to make the project result button
@@ -133,3 +138,14 @@ CHECK THE CODE FOR ALL OF THIS, DONT SAY ITS DONE WHEN SOMETHING STILL DOESNT WO
 
 IF YOU COPY THE CODE ON THE PART OF HOW EVERY THE STUFF GOES ON I DONT THINK THE SAME PROBLEM SHALL KEEP ARISING WITH REPEATED ERRORS ON DIFFERENT GAMES. YOU ARE SMARTER THAN THIS!
 **********
+
+Make sure that for the blank map when you one of the districts slider popups open, the it includes a button on top to open another popup to the left of it showing the last election results (baseline) for that specific district, as a reference!
+
+Make sure you know EXACTLY how the election system and the way seats or votes are calculated! Learn about it before making it. You may add features to demonstrate those things, such as overseas counts, hanging seats, list seats, etc... idc how you do it!
+
+Reference Wikipedia pages or official data pages for official election results data by district, province, state, etc... Best if officially completely accurate!
+
+Also make sure that regional parties are always landlocked in their region. Also cap the amount of votes they can get based on their region size in the simulator game input!
+
+Also, when referencing a past project to build the current simulator, dont reference ones that are partially done (game card is locked).
+

@@ -171,6 +171,16 @@ export const COUNTRIES = [
     ],
   },
   {
+    id: 'india', path: '/india', name: 'India', flag: '🇮🇳', demonym: 'Indian', mapColor: '#FF6B1A',
+    flagSrc: 'india-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'General Election', subtitle: 'Lok Sabha — 543 seats',
+    lat: 20.5937, lng: 78.9629,
+    accent: 'linear-gradient(90deg,#FF6B1A,#FFFFFF,#1464C8)',
+    parties: [
+      { color: '#1464C8', abbr: 'INDIA' }, { color: '#FF6B1A', abbr: 'NDA' },
+    ],
+  },
+  {
     id: 'new-zealand', path: '/new-zealand', name: 'New Zealand', flag: '🇳🇿', demonym: 'New Zealand', mapColor: '#00247D', locked: true as const,
     flagSrc: 'new-zealand-flag.png', flagStyle: {} as React.CSSProperties,
     electionType: 'General Election', subtitle: 'MMP Parliament',
@@ -195,17 +205,6 @@ export const COUNTRIES = [
       { color: '#C62828', abbr: 'LDP'   },
     ],
   },
-  {
-    id: 'india', path: '/india', name: 'India', flag: '🇮🇳', demonym: 'Indian', mapColor: '#FF6B1A', locked: true as const,
-    flagSrc: 'india-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'General Election', subtitle: 'Lok Sabha — 543 seats',
-    lat: 20.5937, lng: 78.9629,
-    accent: 'linear-gradient(90deg,#FF6B1A,#FFFFFF,#1464C8)',
-    parties: [
-      { color: '#1464C8', abbr: 'INDIA' }, { color: '#777777', abbr: 'OTH' },
-      { color: '#FF6B1A', abbr: 'NDA'   },
-    ],
-  },
 ];
 
 export type Country = typeof COUNTRIES[0];
@@ -222,7 +221,7 @@ const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
   'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden',
-  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain',
+  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
@@ -230,7 +229,7 @@ const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
   '710': 'ZA', '642': 'RO', '752': 'SE',
-  '566': 'NG', '724': 'ES', '616': 'PL',
+  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN',
 };
 
 function hexToRgba(hex: string, alpha: number): string {

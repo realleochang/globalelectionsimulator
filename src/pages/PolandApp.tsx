@@ -8,7 +8,7 @@ import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import { GlobeLogo } from './HomePage';
 
 // ── Party types ───────────────────────────────────────────────────────────────
-type PlPartyId = 'PIS' | 'KO' | 'TD' | 'LEWICA' | 'RAZEM' | 'KONF' | 'KKP' | 'MN';
+type PlPartyId = 'PIS' | 'KO' | 'TD' | 'PSL' | 'PL2050' | 'LEWICA' | 'RAZEM' | 'KONF' | 'KKP' | 'MN';
 
 type PlParty = {
   id:             PlPartyId;
@@ -30,16 +30,23 @@ type PlParty = {
 
 // Ideology order left → right for parliament view (MN: centrist regional minority).
 // KWiN (KONF) and Braun's KKP sit to the RIGHT of PiS as the hard/far right.
-const PL_LR_ORDER: PlPartyId[] = ['RAZEM','LEWICA','KO','MN','TD','PIS','KONF','KKP'];
+const PL_LR_ORDER: PlPartyId[] = ['RAZEM','LEWICA','KO','MN','PL2050','TD','PSL','PIS','KONF','KKP'];
 
 const PL_PARTIES: PlParty[] = [
   { id:'PIS',    name:'PiS',      fullName:'Prawo i Sprawiedliwość',       color:'#003087', seats2023:194, threshold:5,
     leader:'Jarosław Kaczyński',          wikiTitle:'Jarosław_Kaczyński' },
   { id:'KO',     name:'KO',       fullName:'Koalicja Obywatelska',         color:'#F05A28', seats2023:157, threshold:8,
     leader:'Donald Tusk',                 wikiTitle:'Donald_Tusk' },
+  // Trzecia Droga ran as a coalition (PSL + Polska 2050) in 2023 → 65 seats in the baseline.
+  // For 2026 it has split back into its two parties (below), so TD is 0 in 2026/blank/sim.
   { id:'TD',     name:'TD',       fullName:'Trzecia Droga (PSL+PL2050)', color:'#2E7D32', seats2023:65,  threshold:8,
-    leader:'Władysław Kosiniak-Kamysz',   wikiTitle:'Władysław_Kosiniak-Kamysz',
-    leader2026:'Szymon Hołownia',         wikiTitle2026:'Szymon_Hołownia' },
+    leader:'Władysław Kosiniak-Kamysz',   wikiTitle:'Władysław_Kosiniak-Kamysz' },
+  // PSL and Polska 2050 — the two halves of the former Trzecia Droga, now running separately.
+  // Prospective-only (0 seats in 2023, which is captured by TD). Single-party 5% threshold.
+  { id:'PSL',    name:'PSL',      fullName:'Polskie Stronnictwo Ludowe',   color:'#1A8A4C', seats2023:0,   threshold:5,
+    leader:'Władysław Kosiniak-Kamysz',   wikiTitle:'Władysław_Kosiniak-Kamysz' },
+  { id:'PL2050', name:'PL2050',   fullName:'Polska 2050',                  color:'#00A0B0', seats2023:0,   threshold:5,
+    leader:'Katarzyna Pełczyńska-Nałęcz', wikiTitle:'Katarzyna_Pełczyńska-Nałęcz' },
   { id:'LEWICA', name:'Lewica',   fullName:'Nowa Lewica',                  color:'#C0392B', seats2023:26,  threshold:5,
     leader:'Włodzimierz Czarzasty',       wikiTitle:'Włodzimierz_Czarzasty' },
   // Partia Razem — left the Lewica coalition in 2024 to run independently. Inside Lewica
@@ -64,16 +71,19 @@ const PL_MAJORITY    = 231;
 
 // 2023 official results — source: PKW (Państwowa Komisja Wyborcza), 15 Oct 2023
 const PL_VOTE_PCT_2023: Record<PlPartyId, number> = {
-  PIS: 35.38, KO: 30.70, TD: 14.40, LEWICA: 8.61, RAZEM: 0, KONF: 7.16, KKP: 0, MN: 0.12,
+  PIS: 35.38, KO: 30.70, TD: 14.40, PSL: 0, PL2050: 0, LEWICA: 8.61, RAZEM: 0, KONF: 7.16, KKP: 0, MN: 0.12,
 };
 const PL_VOTE_RAW_2023: Record<PlPartyId, number> = {
-  PIS: 7_640_854, KO: 6_629_402, TD: 3_110_670, LEWICA: 1_859_018, RAZEM: 0, KONF: 1_547_364, KKP: 0, MN: 25_778,
+  PIS: 7_640_854, KO: 6_629_402, TD: 3_110_670, PSL: 0, PL2050: 0, LEWICA: 1_859_018, RAZEM: 0, KONF: 1_547_364, KKP: 0, MN: 25_778,
 };
 // 2026 polling — KO surging ahead of PiS; Konfederacja (KWiN) strong, Braun's KKP over
-// threshold; Nowa Lewica clears 5% but Razem and Trzecia Droga fall short.
+// threshold; Nowa Lewica clears 5%. Trzecia Droga has split: PSL 3.0% + Polska 2050 1.7%
+// (TD = 0), both below the 5% threshold; Razem also falls short.
 const PL_VOTE_PCT_2026: Record<PlPartyId, number> = {
-  PIS: 25.3, KO: 34.3, TD: 6.0, LEWICA: 6.6, RAZEM: 4.0, KONF: 13.1, KKP: 8.0, MN: 0.12,
+  PIS: 25.3, KO: 34.3, TD: 0, PSL: 3.0, PL2050: 1.7, LEWICA: 6.6, RAZEM: 4.0, KONF: 13.1, KKP: 8.0, MN: 0.12,
 };
+// Parties contesting the prospective (2026) election — excludes the now-split Trzecia Droga.
+const PL_PROSPECTIVE: PlPartyId[] = PL_LR_ORDER.filter(id => (PL_VOTE_PCT_2026[id] ?? 0) > 0);
 
 // ── Constituency types ────────────────────────────────────────────────────────
 type PlConstId =
@@ -1598,7 +1608,10 @@ export default function PolandApp() {
   function loadBaseline()    { setNatPcts({ ...PL_VOTE_PCT_2023 });  setPreset('baseline');    resetMapState(); }
   function loadPolling2026() { setNatPcts({ ...PL_VOTE_PCT_2026 });  setPreset('polling2026'); resetMapState(); }
   function loadBlank() {
-    setNatPcts(Object.fromEntries(PL_PARTIES.map(p => [p.id, 100 / PL_PARTIES.length])) as Record<PlPartyId, number>);
+    // Blank map is a prospective election → only the parties contesting 2026 (TD has split
+    // into PSL/PL2050, so it is excluded); distribute an equal starting share among them.
+    const share = 100 / PL_PROSPECTIVE.length;
+    setNatPcts(Object.fromEntries(PL_PARTIES.map(p => [p.id, PL_PROSPECTIVE.includes(p.id) ? share : 0])) as Record<PlPartyId, number>);
     setPreset('blank'); resetMapState();
   }
 
@@ -1712,12 +1725,12 @@ export default function PolandApp() {
   const simTimersRef  = useRef<ReturnType<typeof setTimeout>[]>([]);
   const simNatPctsRef = useRef<Record<PlPartyId, number>>(natPcts);
 
-  useEffect(() => { if (rightPanel === 'sim') { setSimDraftPcts({ ...natPcts }); setSimDraftTouched(false); } }, [rightPanel === 'sim']); // eslint-disable-line
+  useEffect(() => { if (rightPanel === 'sim') { setSimDraftPcts({ ...PL_VOTE_PCT_2026 }); setSimDraftTouched(false); } }, [rightPanel === 'sim']); // eslint-disable-line
 
-  // Sum of the editable party inputs. Player types freely (no auto-redistribution);
-  // simulation may only run when the total is between 95% and 100%.
+  // Sum of the editable party inputs (prospective parties only — TD has split into PSL/PL2050).
+  // Player types freely (no auto-redistribution); simulation runs only when total is 95–100%.
   const simDraftTotal = useMemo(
-    () => PL_LR_ORDER.filter(id => !hiddenParties.has(id)).reduce((s, id) => s + (simDraftPcts[id] ?? 0), 0),
+    () => PL_PROSPECTIVE.filter(id => !hiddenParties.has(id)).reduce((s, id) => s + (simDraftPcts[id] ?? 0), 0),
     [simDraftPcts, hiddenParties],
   );
   const simTotalValid = simDraftTotal >= 95 && simDraftTotal <= 100;
@@ -1920,7 +1933,7 @@ export default function PolandApp() {
               Type each party's vote %. Values are not auto-balanced — the total must be between 95% and 100% to run.
             </div>
             <div className="flex-1 overflow-y-auto px-3.5 py-2 thin-scroll space-y-2">
-              {PL_LR_ORDER.filter(id => !hiddenParties.has(id)).map(id => {
+              {PL_PROSPECTIVE.filter(id => !hiddenParties.has(id)).map(id => {
                 const party    = PL_PARTY_MAP[id];
                 const pct      = simDraftPcts[id] ?? 0;
                 const color    = partyColor(id);
