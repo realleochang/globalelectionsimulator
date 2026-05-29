@@ -173,11 +173,22 @@ export const COUNTRIES = [
   {
     id: 'india', path: '/india', name: 'India', flag: '🇮🇳', demonym: 'Indian', mapColor: '#FF6B1A',
     flagSrc: 'india-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'General Election', subtitle: 'Lok Sabha — 543 seats',
+    electionType: 'General Election', subtitle: 'Lok Sabha',
     lat: 20.5937, lng: 78.9629,
     accent: 'linear-gradient(90deg,#FF6B1A,#FFFFFF,#1464C8)',
     parties: [
       { color: '#1464C8', abbr: 'INDIA' }, { color: '#FF6B1A', abbr: 'NDA' },
+    ],
+  },
+  {
+    id: 'south-korea', path: '/south-korea', name: 'South Korea', flag: '🇰🇷', demonym: 'South Korean', mapColor: '#CD2E3A',
+    flagSrc: 'south-korea-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'Legislative Election', subtitle: 'National Assembly',
+    lat: 36.5, lng: 127.8,
+    accent: 'linear-gradient(90deg,#CD2E3A,#FFFFFF,#0047A0)',
+    parties: [
+      { color: '#1B3A8B', abbr: 'RKP' }, { color: '#004EA2', abbr: 'DPK' },
+      { color: '#FF7210', abbr: 'REF' }, { color: '#E61E2B', abbr: 'PPP' },
     ],
   },
   {
@@ -214,14 +225,14 @@ const ISO_TO_COLOR: Record<string, string> = {
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
   'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7',
   'PL': '#DC143C', 'IN': '#FF6B1A', 'JP': '#C62828', 'NG': '#008751',
-  'ES': '#AA151B',
+  'ES': '#AA151B', 'KR': '#CD2E3A',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
   'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden',
-  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india',
+  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india', 'KR': 'south-korea',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
@@ -229,7 +240,7 @@ const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
   '710': 'ZA', '642': 'RO', '752': 'SE',
-  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN',
+  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN', '410': 'KR',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
@@ -612,6 +623,50 @@ function GlobeView({ dark }: { dark: boolean }) {
     }
   }, [getProj, hlFeats, navigate]);
 
+  // ── Touch support (rotate by dragging, tap to open a country) ──────────────
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
+    const t = e.touches[0];
+    spinRef.current = false;
+    dragRef.current = { active: true, lastX: t.clientX, lastY: t.clientY };
+    mouseDownPos.current = { x: t.clientX, y: t.clientY };
+    setDragging(true);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    if (!dragRef.current.active || e.touches.length !== 1) return;
+    const t = e.touches[0];
+    const dx = t.clientX - dragRef.current.lastX;
+    const dy = t.clientY - dragRef.current.lastY;
+    dragRef.current.lastX = t.clientX;
+    dragRef.current.lastY = t.clientY;
+    const sens = 0.4 / scaleRef.current;
+    rotRef.current[0] += dx * sens;
+    rotRef.current[1] = Math.max(-85, Math.min(85, rotRef.current[1] - dy * sens));
+  }, []);
+
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    dragRef.current.active = false;
+    setDragging(false);
+    const t = e.changedTouches[0];
+    if (!t) return;
+    const dx = t.clientX - mouseDownPos.current.x;
+    const dy = t.clientY - mouseDownPos.current.y;
+    if (dx * dx + dy * dy > 100) return; // moved → was a drag, not a tap
+    const rect = canvasRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const coords = getProj().invert?.([t.clientX - rect.left, t.clientY - rect.top]);
+    if (!coords) return;
+    for (const { feat, id } of hlFeats) {
+      if (d3.geoContains(feat, coords)) {
+        const c = COUNTRIES.find(c => c.id === id);
+        if ((c as { locked?: true } | undefined)?.locked) return;
+        navigate(c?.path ?? '/');
+        return;
+      }
+    }
+  }, [getProj, hlFeats, navigate]);
+
   const hoveredCountry = hoveredId ? COUNTRIES.find(c => c.id === hoveredId) : null;
 
   return (
@@ -628,13 +683,16 @@ function GlobeView({ dark }: { dark: boolean }) {
         ref={canvasRef}
         width={canvasWidth}
         height={canvasHeight}
-        style={{ display: 'block' }}
+        style={{ display: 'block', touchAction: 'none' }}
         onMouseDown={handleMouseDown}
         onMouseMove={handleMouseMove}
         onMouseUp={handleMouseUp}
         onMouseLeave={handleMouseUp}
         onWheel={handleWheel}
         onClick={handleClick}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
       />
       {/* Country name tooltip at bottom */}
       {hoveredCountry && !dragging && (

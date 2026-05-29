@@ -7,25 +7,24 @@ import { hsl } from 'd3';
 import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import { GlobeLogo } from './HomePage';
 import {
-  DE_PARTIES, DE_PARTY_MAP, DE_WAHLKREISE, DE_LEADERS, DE_LEADERS_2026,
-  calcBundestag, calcDirectSeats, calcMMP,
-  BUNDESTAG_TOTAL, DIRECT_THRESHOLD,
-  ZWEITSTIMMEN_2025, ZWEIT_GRAND_TOTAL_2025,
-  DIRECT_SEATS_2025_BY_STATE, LIST_SEATS_2025_BY_STATE,
-  type DePartyId, type DeWahlkreis,
-} from '../data/germany2025';
+  KR_PARTIES, KR_PARTY_MAP, KR_DISTRICTS, KR_LEADERS, KR_LEADERS_2026,
+  KR_CODE_TO_NR, calcConstituencySeats, calcPRSeats, calcAssembly,
+  ASSEMBLY_TOTAL, DIRECT_THRESHOLD,
+  PR_VOTES_2024, PR_GRAND_TOTAL_2024,
+  type KrPartyId, type KrDistrict,
+} from '../data/southKorea2024';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 type TooltipState = {
   x: number; y: number;
   name: string; nr: number; state: string;
-  parties: { id: DePartyId; votes: number; pct: number }[];
-  winner: DePartyId | null;
+  parties: { id: KrPartyId; votes: number; pct: number }[];
+  winner: KrPartyId | null;
 } | null;
 
 // ── Coloring ───────────────────────────────────────────────────────────────────
-function getWkFill(results: Partial<Record<DePartyId, number>>, dark: boolean): string {
-  const sorted = (Object.entries(results) as [DePartyId, number][])
+function getWkFill(results: Partial<Record<KrPartyId, number>>, dark: boolean): string {
+  const sorted = (Object.entries(results) as [KrPartyId, number][])
     .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
   if (sorted.length === 0) return dark ? '#374151' : '#E5E7EB';
   const [winner, winnerVotes] = sorted[0];
@@ -54,24 +53,25 @@ function fmtN(n: number) {
 }
 
 // ── Dark-mode party colour helper ──────────────────────────────────────────────
-function partyColor(id: DePartyId, dark = false): string {
-  if (dark && id === 'CDU') return '#00BCD4'; // CDU official teal/turquoise — visible on dark bg
-  return DE_PARTY_MAP[id]?.color ?? '#888';
+function partyColor(id: KrPartyId, dark = false): string {
+  const p = KR_PARTY_MAP[id];
+  if (dark && p?.darkColor) return p.darkColor; // lighter shade for dark mode where base is too dark
+  return p?.color ?? '#888';
 }
 
-const PARTY_DISPLAY_ID: Partial<Record<DePartyId, string>> = { GRUE: 'GRÜNEN' };
+const PARTY_DISPLAY_ID: Partial<Record<KrPartyId, string>> = {};
 
 // ── Scoreboard tile ────────────────────────────────────────────────────────────
-function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVotes, isLeader, isWinner, hasMajority, dark, leaders }: {
-  partyId: DePartyId; totalSeats: number; pct: number; votes: number;
-  zweitPct?: number; zweitRawVotes?: number;
+function ScoreboardTile({ partyId, totalSeats, pct, votes, prPct, prRawVotes, isLeader, isWinner, hasMajority, dark, leaders }: {
+  partyId: KrPartyId; totalSeats: number; pct: number; votes: number;
+  prPct?: number; prRawVotes?: number;
   isLeader: boolean; isWinner: boolean;
   hasMajority?: boolean; dark?: boolean;
-  leaders?: Partial<Record<DePartyId, { name: string; wikiTitle?: string }>>;
+  leaders?: Partial<Record<KrPartyId, { name: string; wikiTitle?: string }>>;
 }) {
-  const party = DE_PARTY_MAP[partyId];
+  const party = KR_PARTY_MAP[partyId];
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
-  const leader = (leaders ?? DE_LEADERS)[partyId];
+  const leader = (leaders ?? KR_LEADERS)[partyId];
 
   useEffect(() => {
     if (!leader?.wikiTitle) { setPhotoUrl(null); return; }
@@ -116,19 +116,19 @@ function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVot
       <span className="cand-party-name">{party.name}</span>
 
       {/* Zweitstimme row (primary) */}
-      {zweitPct !== undefined ? (<>
+      {prPct !== undefined ? (<>
         <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
-          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>LIST</span>
-          <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>{zweitPct.toFixed(1)}%</span>
+          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>PR</span>
+          <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>{prPct.toFixed(1)}%</span>
         </div>
         <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
-          <span className="cand-votes-full" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{(zweitRawVotes ?? 0).toLocaleString()}</span>
-          <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{fmtN(zweitRawVotes ?? 0)}</span>
+          <span className="cand-votes-full" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{(prRawVotes ?? 0).toLocaleString()}</span>
+          <span className="cand-votes-compact" style={{ fontSize: 8.5, fontFamily: '"JetBrains Mono",monospace', color: '#7a7870' }}>{fmtN(prRawVotes ?? 0)}</span>
         </div>
         <div style={{ width: '100%', height: 1, background: hexToRgba(color, 0.14), marginBottom: 3 }} />
         {/* Erststimme row (secondary) */}
         <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
-          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>ERST</span>
+          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>DIST</span>
           <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: hexToRgba(color, 0.65) }}>{pct.toFixed(1)}%</span>
         </div>
         <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
@@ -138,7 +138,7 @@ function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVot
       </>) : (<>
         {/* Erststimme only (no list data) */}
         <div style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 1 }}>
-          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>ERST</span>
+          <span style={{ fontSize: 6.5, fontFamily: '"JetBrains Mono",monospace', fontWeight: 600, color: hexToRgba(color, 0.48), letterSpacing: '0.10em', textTransform: 'uppercase' }}>DIST</span>
           <span style={{ fontSize: 11, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color }}>{pct.toFixed(1)}%</span>
         </div>
         <div style={{ width: '100%', textAlign: 'right', lineHeight: 1, marginBottom: 4 }}>
@@ -148,26 +148,24 @@ function ScoreboardTile({ partyId, totalSeats, pct, votes, zweitPct, zweitRawVot
       </>)}
 
       <div className="cand-bar-track" style={{ width: '100%', height: 3, borderRadius: 2, background: 'var(--bar-track)' }}>
-        <div className="cand-bar-fill" style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min((zweitPct ?? pct) / 40 * 100, 100)}%`, transition: 'width 0.3s ease' }} />
+        <div className="cand-bar-fill" style={{ height: '100%', borderRadius: 2, background: color, width: `${Math.min((prPct ?? pct) / 40 * 100, 100)}%`, transition: 'width 0.3s ease' }} />
       </div>
     </div>
   );
 }
 
 // ── Scoreboard ─────────────────────────────────────────────────────────────────
-const MAJORITY = Math.floor(BUNDESTAG_TOTAL / 2) + 1;
-const UNION_IDS: DePartyId[] = ['CDU', 'CSU'];
+const MAJORITY = Math.floor(ASSEMBLY_TOTAL / 2) + 1;
+// Left → right political spectrum order for hemicycle (by KrParty.order)
+const PARTY_LR_ORDER: KrPartyId[] = ['PROG', 'GJP', 'RKP', 'DEMALL', 'DPK', 'NFP', 'REF', 'PPP', 'PFP', 'LUP', 'IND', 'OTH'];
 
-// Left → right political spectrum order for hemicycle
-const PARTY_LR_ORDER: DePartyId[] = ['LINKE', 'BSW', 'SPD', 'GRUE', 'SSW', 'FW', 'FDP', 'CDU', 'CSU', 'AFD'];
-
-function GermanyScoreboard({ wahlkreise, currentResults, zweitstimmen, directSeats: directSeatsOverride, dark, leaders }: {
-  wahlkreise: DeWahlkreis[];
-  currentResults: Record<number, Partial<Record<DePartyId, number>>>;
-  zweitstimmen?: Partial<Record<DePartyId, number>>;
-  directSeats?: Partial<Record<DePartyId, number>>;
+function KoreaScoreboard({ districts, currentResults, prList, directSeats: directSeatsOverride, dark, leaders }: {
+  districts: KrDistrict[];
+  currentResults: Record<number, Partial<Record<KrPartyId, number>>>;
+  prList?: Partial<Record<KrPartyId, number>>;
+  directSeats?: Partial<Record<KrPartyId, number>>;
   dark?: boolean;
-  leaders?: Partial<Record<DePartyId, { name: string; wikiTitle?: string }>>;
+  leaders?: Partial<Record<KrPartyId, { name: string; wikiTitle?: string }>>;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -183,128 +181,70 @@ function GermanyScoreboard({ wahlkreise, currentResults, zweitstimmen, directSea
   }, []);
 
   const { totalSeats, qualifyingParties } = useMemo(() => {
-    if (zweitstimmen && directSeatsOverride) {
-      const r = calcMMP(zweitstimmen, directSeatsOverride);
-      return { totalSeats: r.totalSeats, qualifyingParties: r.qualifyingParties };
-    }
-    return calcBundestag(wahlkreise, currentResults);
-  }, [wahlkreise, currentResults, zweitstimmen, directSeatsOverride]);
+    const r = calcAssembly(districts, currentResults, prList ?? PR_VOTES_2024);
+    return { totalSeats: r.totalSeats, qualifyingParties: r.eligible };
+  }, [districts, currentResults, prList]);
+  void directSeatsOverride;
 
   const { popularVote, grandTotal } = useMemo(() => {
-    const pv: Partial<Record<DePartyId, number>> = {};
+    const pv: Partial<Record<KrPartyId, number>> = {};
     let gt = 0;
-    for (const wk of wahlkreise) {
-      const results = currentResults[wk.nr] ?? wk.erststimmen;
-      for (const [pid, v] of Object.entries(results) as [DePartyId, number][]) {
+    for (const wk of districts) {
+      const results = currentResults[wk.nr] ?? wk.votes;
+      for (const [pid, v] of Object.entries(results) as [KrPartyId, number][]) {
         if (v > 0) { pv[pid] = (pv[pid] ?? 0) + v; gt += v; }
       }
     }
     return { popularVote: pv, grandTotal: gt };
-  }, [wahlkreise, currentResults]);
+  }, [districts, currentResults]);
 
   // Zweitstimmen data — use provided prop or fall back to 2025 official results
   const { zweitData, zweitTotal } = useMemo(() => {
-    const zd: Partial<Record<DePartyId, number>> = zweitstimmen ?? ZWEITSTIMMEN_2025;
+    const zd: Partial<Record<KrPartyId, number>> = prList ?? PR_VOTES_2024;
     const zt = Object.values(zd).reduce((s, v) => s + (v ?? 0), 0);
     return { zweitData: zd, zweitTotal: zt };
-  }, [zweitstimmen]);
+  }, [prList]);
 
-  const unionSeats = UNION_IDS.reduce((s, id) => s + (totalSeats[id] ?? 0), 0);
-  const isUnionWinner = unionSeats >= MAJORITY;
+  // One card per bloc: fold each PR satellite (PFP→PPP, DemAll→DPK) into its parent,
+  // combining the parent's constituency result with the satellite's party-list result.
+  const cards = useMemo(() => {
+    const satByParent: Partial<Record<KrPartyId, KrPartyId[]>> = {};
+    for (const p of KR_PARTIES) if (p.parentId) (satByParent[p.parentId] ??= []).push(p.id);
+    const isSatellite = new Set(KR_PARTIES.filter(p => p.parentId).map(p => p.id));
+    return KR_PARTIES
+      .filter(p => p.id !== 'OTH' && !isSatellite.has(p.id))
+      .map(p => {
+        const sats = satByParent[p.id] ?? [];
+        const seats     = (totalSeats[p.id] ?? 0) + sats.reduce((s, id) => s + (totalSeats[id] ?? 0), 0);
+        const distVotes = popularVote[p.id] ?? 0; // satellites contest no constituencies
+        const prVotes   = (zweitData[p.id] ?? 0) + sats.reduce((s, id) => s + (zweitData[id] ?? 0), 0);
+        const qualifies = qualifyingParties.has(p.id) || sats.some(id => qualifyingParties.has(id));
+        return { id: p.id, seats, distVotes, prVotes, qualifies };
+      })
+      .filter(c => c.seats > 0 || c.distVotes > 0 || c.prVotes > 0 || c.qualifies)
+      .sort((a, b) => b.seats - a.seats || b.prVotes - a.prVotes); // seats desc, then PR vote (≡ PR %)
+  }, [totalSeats, popularVote, zweitData, qualifyingParties]);
 
-  const maxEntitySeats = Math.max(
-    unionSeats,
-    ...DE_PARTIES.filter(p => !UNION_IDS.includes(p.id) && p.id !== 'SONST').map(p => totalSeats[p.id] ?? 0),
-  );
-  const isUnionLeading = unionSeats > 0 && unionSeats >= maxEntitySeats;
-
-  // Non-union parties with any votes (qualifying or not), sorted by Zweitstimme count
-  const nonUnion = useMemo(() => DE_PARTIES
-    .filter(p => !UNION_IDS.includes(p.id) && p.id !== 'SONST' && ((popularVote[p.id] ?? 0) > 0 || qualifyingParties.has(p.id)))
-    .sort((a, b) => (zweitData[b.id] ?? 0) - (zweitData[a.id] ?? 0)),
-    [qualifyingParties, popularVote, zweitData]
-  );
-
-  const unionZweit = UNION_IDS.reduce((s, id) => s + (zweitData[id] ?? 0), 0);
-  const unionInsertAt = (() => {
-    const idx = nonUnion.findIndex(p => (zweitData[p.id] ?? 0) < unionZweit);
-    return idx === -1 ? nonUnion.length : idx;
-  })();
-
-  const unionColor = DE_PARTY_MAP['CDU'].color;
-
-  const renderUnionGroup = () => (
-    <div key="union-group" className="ni-group" style={{
-      position: 'relative',
-      overflow: isUnionWinner ? 'hidden' : undefined,
-      borderColor: isUnionLeading ? unionColor : undefined,
-      boxShadow: isUnionWinner
-        ? `0 0 0 1.5px ${unionColor}, 0 3px 12px rgba(0,0,0,0.09)`
-        : isUnionLeading ? `0 0 0 1px ${unionColor}` : undefined,
-    }}>
-      {isUnionWinner && (
-        <div style={{
-          position: 'absolute', inset: 0, pointerEvents: 'none', zIndex: 2,
-          background: 'linear-gradient(105deg, transparent 30%, rgba(255,255,255,0.26) 50%, transparent 70%)',
-          animation: 'shimmerSweep 2.2s ease-in-out infinite',
-        }} />
-      )}
-      <span className="ni-group-label" style={{ position: 'relative' }}>
-        CDU/CSU
-        {isUnionWinner && (
-          <span style={{ position: 'absolute', top: -6, right: -10 }}>
-            <svg width="13" height="13" viewBox="0 0 17 17" fill="none">
-              <circle cx="8.5" cy="8.5" r="8.5" fill={unionColor}/>
-              <path d="M4.5 8.5l2.8 2.8L12.5 5.5" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </span>
-        )}
-      </span>
-      <div className="ni-group-tiles">
-        {UNION_IDS.filter(id => qualifyingParties.has(id) || (popularVote[id] ?? 0) > 0).map(id => {
-          const votes = popularVote[id] ?? 0;
-          const pct = grandTotal > 0 ? (votes / grandTotal) * 100 : 0;
-          const zv = zweitData[id] ?? 0;
-          const zp = zweitTotal > 0 ? (zv / zweitTotal) * 100 : 0;
-          return (
-            <ScoreboardTile key={id} partyId={id}
-              totalSeats={totalSeats[id] ?? 0} pct={pct} votes={votes}
-              zweitPct={zp} zweitRawVotes={zv}
-              isLeader={false} isWinner={false}
-              hasMajority={isUnionWinner} dark={dark} leaders={leaders}
-            />
-          );
-        })}
-      </div>
-    </div>
-  );
+  const maxSeats = cards.reduce((m, c) => Math.max(m, c.seats), 0);
 
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
-          {nonUnion.map((party, i) => {
-            const votes = popularVote[party.id] ?? 0;
-            const pct = grandTotal > 0 ? (votes / grandTotal) * 100 : 0;
-            const seats = totalSeats[party.id] ?? 0;
-            const isLeader = !isUnionLeading && seats > 0 && seats >= maxEntitySeats;
-            const isWinner = seats >= MAJORITY;
-            const zv = zweitData[party.id] ?? 0;
-            const zp = zweitTotal > 0 ? (zv / zweitTotal) * 100 : 0;
-            const hasMaj = seats >= MAJORITY;
+          {cards.map(c => {
+            const distPct = grandTotal > 0 ? (c.distVotes / grandTotal) * 100 : 0;
+            const prPct   = zweitTotal > 0 ? (c.prVotes / zweitTotal) * 100 : 0;
+            const isWinner = c.seats >= MAJORITY;
+            const isLeader = c.seats > 0 && c.seats >= maxSeats;
             return (
-              <>
-                {i === unionInsertAt && renderUnionGroup()}
-                <ScoreboardTile key={party.id} partyId={party.id}
-                  totalSeats={seats} pct={pct} votes={votes}
-                  zweitPct={zp} zweitRawVotes={zv}
-                  isLeader={isLeader} isWinner={isWinner}
-                  hasMajority={hasMaj} dark={dark} leaders={leaders}
-                />
-              </>
+              <ScoreboardTile key={c.id} partyId={c.id}
+                totalSeats={c.seats} pct={distPct} votes={c.distVotes}
+                prPct={prPct} prRawVotes={c.prVotes}
+                isLeader={isLeader} isWinner={isWinner}
+                hasMajority={isWinner} dark={dark} leaders={leaders}
+              />
             );
           })}
-          {unionInsertAt >= nonUnion.length && renderUnionGroup()}
         </div>
       </div>
     </div>
@@ -349,12 +289,12 @@ function BubbleLayer({
   geoData, currentResults, wkLookup, containerRef, setTooltip, onSelect, currentResultsRef, dark,
 }: {
   geoData: any;
-  currentResults: Record<number, Partial<Record<DePartyId, number>>>;
-  wkLookup: Record<number, DeWahlkreis>;
+  currentResults: Record<number, Partial<Record<KrPartyId, number>>>;
+  wkLookup: Record<number, KrDistrict>;
   containerRef: React.RefObject<HTMLDivElement | null>;
   setTooltip: (t: TooltipState) => void;
   onSelect: (nr: number) => void;
-  currentResultsRef: React.MutableRefObject<Record<number, Partial<Record<DePartyId, number>>>>;
+  currentResultsRef: React.MutableRefObject<Record<number, Partial<Record<KrPartyId, number>>>>;
   dark?: boolean;
 }) {
   const map = useMap();
@@ -380,15 +320,15 @@ function BubbleLayer({
     const gj = L.geoJSON(geoData);
     gj.eachLayer((layer: L.Layer) => {
       const path = layer as any;
-      const nr: number = path.feature?.properties?.WKR_NR ?? 0;
+      const nr: number = KR_CODE_TO_NR[path.feature?.properties?.SGG_Code] ?? 0;
       const wk = wkLookup[nr];
       if (!wk) return;
       const bounds = (layer as any).getBounds?.();
       if (!bounds || !bounds.isValid()) return;
       const center = bounds.getCenter();
 
-      const results = currentResults[nr] ?? wk.erststimmen;
-      const sorted = (Object.entries(results) as [DePartyId, number][]).filter(([,v]) => v > 0).sort(([,a],[,b]) => b-a);
+      const results = currentResults[nr] ?? wk.votes;
+      const sorted = (Object.entries(results) as [KrPartyId, number][]).filter(([,v]) => v > 0).sort(([,a],[,b]) => b-a);
       if (sorted.length === 0) return;
       const [winId, winVotes] = sorted[0];
       const runnerUpVotes = sorted[1]?.[1] ?? 0;
@@ -406,14 +346,14 @@ function BubbleLayer({
       marker.on('mousemove', (e: L.LeafletMouseEvent) => {
         const rect = containerRef.current?.getBoundingClientRect();
         if (!rect) return;
-        const r = currentResultsRef.current[nr] ?? wk.erststimmen;
+        const r = currentResultsRef.current[nr] ?? wk.votes;
         const tot = Object.values(r).reduce((s, v) => s + (v ?? 0), 0);
-        const parties = (Object.entries(r) as [DePartyId, number][])
+        const parties = (Object.entries(r) as [KrPartyId, number][])
           .filter(([,v]) => v > 0).sort(([,a],[,b]) => b-a).slice(0,5)
           .map(([id, votes]) => ({ id, votes, pct: tot > 0 ? (votes/tot)*100 : 0 }));
         const winner = parties[0]?.id ?? null;
-        const name = path.feature?.properties?.WKR_NAME ?? '';
-        const state = path.feature?.properties?.LAND_NAME ?? '';
+        const name = wk.name;
+        const state = wk.stateName;
         setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name, nr, state, parties, winner });
       });
 
@@ -431,12 +371,12 @@ function BubbleLayer({
 }
 
 // ── Map ────────────────────────────────────────────────────────────────────────
-function GermanyMapView({
-  wahlkreise, currentResults, selectedNr, onSelect, dark, bubbleMap,
+function KoreaMapView({
+  districts, currentResults, selectedNr, onSelect, dark, bubbleMap,
   multiSelectMode, selectedNrs, onMultiSelect,
 }: {
-  wahlkreise: DeWahlkreis[];
-  currentResults: Record<number, Partial<Record<DePartyId, number>>>;
+  districts: KrDistrict[];
+  currentResults: Record<number, Partial<Record<KrPartyId, number>>>;
   selectedNr: number | null;
   onSelect: (nr: number) => void;
   dark: boolean;
@@ -468,13 +408,13 @@ function GermanyMapView({
   useEffect(() => { onSelectRef.current         = onSelect;        }, [onSelect]);
 
   const wkLookup = useMemo(() => {
-    const m: Record<number, DeWahlkreis> = {};
-    for (const wk of wahlkreise) m[wk.nr] = wk;
+    const m: Record<number, KrDistrict> = {};
+    for (const wk of districts) m[wk.nr] = wk;
     return m;
-  }, [wahlkreise]);
+  }, [districts]);
 
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}germany-wahlkreise.geojson`)
+    fetch(`${import.meta.env.BASE_URL}south-korea-constituencies.geojson`)
       .then(r => r.json()).then(setGeoData).catch(console.error);
   }, []);
 
@@ -483,9 +423,9 @@ function GermanyMapView({
   }, [geoData]);
 
   const getStyle = useCallback((feature: any): L.PathOptions => {
-    const nr: number = feature?.properties?.WKR_NR ?? 0;
+    const nr: number = KR_CODE_TO_NR[feature?.properties?.SGG_Code] ?? 0;
     const wk = wkLookup[nr];
-    const results = currentResultsRef.current[nr] ?? wk?.erststimmen ?? {};
+    const results = currentResultsRef.current[nr] ?? wk?.votes ?? {};
     const fill = getWkFill(results, darkRef.current);
     const isSelected = nr === selectedNrRef.current;
     const isMultiSel = selectedNrsRef.current?.has(nr) ?? false;
@@ -510,9 +450,10 @@ function GermanyMapView({
   }, [currentResults, selectedNr, selectedNrs, dark, bubbleMap, getStyle]);
 
   const onEachFeature = useCallback((feature: any, layer: L.Layer) => {
-    const nr: number = feature?.properties?.WKR_NR ?? 0;
-    const name: string = feature?.properties?.WKR_NAME ?? '';
-    const stateName: string = feature?.properties?.LAND_NAME ?? '';
+    const nr: number = KR_CODE_TO_NR[feature?.properties?.SGG_Code] ?? 0;
+    const wkFeat = wkLookup[nr];
+    const name: string = wkFeat?.name ?? '';
+    const stateName: string = wkFeat?.stateName ?? '';
 
     layer.on('click', () => {
       if (multiSelectModeRef.current && onMultiSelectRef.current) {
@@ -527,9 +468,9 @@ function GermanyMapView({
       const rect = containerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const wk = wkLookup[nr];
-      const results = currentResultsRef.current[nr] ?? wk?.erststimmen ?? {};
+      const results = currentResultsRef.current[nr] ?? wk?.votes ?? {};
       const total = Object.values(results).reduce((s, v) => s + (v ?? 0), 0);
-      const parties = (Object.entries(results) as [DePartyId, number][])
+      const parties = (Object.entries(results) as [KrPartyId, number][])
         .filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 5)
         .map(([id, votes]) => ({ id, votes, pct: total > 0 ? (votes / total) * 100 : 0 }));
       const winner = parties[0]?.id ?? null;
@@ -542,7 +483,7 @@ function GermanyMapView({
   return (
     <div ref={containerRef} className="relative w-full h-full">
       <MapContainer
-        center={[51.2, 10.4]} zoom={6} minZoom={4} maxZoom={14}
+        center={[36.3, 127.8]} zoom={7} minZoom={5} maxZoom={14}
         style={{ width: '100%', height: '100%' }}
         zoomControl worldCopyJump={false}
       >
@@ -595,10 +536,10 @@ function GermanyMapView({
           <div className="absolute pointer-events-none z-[1000]" style={{ left, top: Math.max(6, tooltip.y - 20), width: TW }}>
             <div style={{ background: tt.bg, borderRadius: 10, border: `1px solid ${tt.border}`, boxShadow: tt.shadow, backdropFilter: 'blur(10px)', padding: '12px 14px' }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: tt.title, lineHeight: 1.2 }}>{tooltip.name}</div>
-              <div style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 2 }}>WK {tooltip.nr} · {tooltip.state}</div>
+              <div style={{ fontSize: 9, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 2 }}>{tooltip.state}</div>
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {tooltip.parties.map(({ id, votes, pct }, i) => {
-                  const p = DE_PARTY_MAP[id];
+                  const p = KR_PARTY_MAP[id];
                   const pColor = partyColor(id, dark);
                   return (
                     <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
@@ -623,20 +564,20 @@ function GermanyMapView({
 }
 
 // ── Panel helpers ──────────────────────────────────────────────────────────────
-function toPcts(results: Partial<Record<DePartyId, number>>, ids: DePartyId[]): Record<DePartyId, number> {
+function toPcts(results: Partial<Record<KrPartyId, number>>, ids: KrPartyId[]): Record<KrPartyId, number> {
   const total = ids.reduce((s, id) => s + (results[id] ?? 0), 0);
-  if (total === 0) return Object.fromEntries(ids.map(id => [id, 100 / ids.length])) as Record<DePartyId, number>;
-  return Object.fromEntries(ids.map(id => [id, ((results[id] ?? 0) / total) * 100])) as Record<DePartyId, number>;
+  if (total === 0) return Object.fromEntries(ids.map(id => [id, 100 / ids.length])) as Record<KrPartyId, number>;
+  return Object.fromEntries(ids.map(id => [id, ((results[id] ?? 0) / total) * 100])) as Record<KrPartyId, number>;
 }
 
-function redistributePcts(current: Record<DePartyId, number>, changedId: DePartyId, newRaw: number, locks: Set<DePartyId>): Record<DePartyId, number> {
-  const ids = Object.keys(current) as DePartyId[];
+function redistributePcts(current: Record<KrPartyId, number>, changedId: KrPartyId, newRaw: number, locks: Set<KrPartyId>): Record<KrPartyId, number> {
+  const ids = Object.keys(current) as KrPartyId[];
   const lockedSum = ids.filter(id => locks.has(id) && id !== changedId).reduce((s, id) => s + (current[id] ?? 0), 0);
   const clamped = Math.min(Math.max(newRaw, 0), 100 - lockedSum);
   const unlocked = ids.filter(id => !locks.has(id) && id !== changedId);
   const remaining = 100 - lockedSum - clamped;
   const unlockedSum = unlocked.reduce((s, id) => s + (current[id] ?? 0), 0);
-  const next: Record<DePartyId, number> = { ...current, [changedId]: clamped };
+  const next: Record<KrPartyId, number> = { ...current, [changedId]: clamped };
   if (unlockedSum > 0) {
     for (const id of unlocked) next[id] = ((current[id] ?? 0) / unlockedSum) * remaining;
   } else if (unlocked.length > 0) {
@@ -647,26 +588,26 @@ function redistributePcts(current: Record<DePartyId, number>, changedId: DeParty
 }
 
 // ── Constituency panel ─────────────────────────────────────────────────────────
-function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProjected, onProject }: {
-  wk: DeWahlkreis;
-  results: Partial<Record<DePartyId, number>>;
+function DistrictPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProjected, onProject }: {
+  wk: KrDistrict;
+  results: Partial<Record<KrPartyId, number>>;
   onClose: () => void;
-  onUpdate: (nr: number, newResults: Partial<Record<DePartyId, number>>) => void;
+  onUpdate: (nr: number, newResults: Partial<Record<KrPartyId, number>>) => void;
   dark?: boolean;
   isBlank?: boolean;
   isProjected?: boolean;
   onProject?: () => void;
 }) {
-  const ids: DePartyId[] = useMemo(
-    () => DE_PARTIES.filter(p => p.id !== 'SONST' && (!p.state || p.state === wk.state)).map(p => p.id),
-    [wk.state]
+  const ids: KrPartyId[] = useMemo(
+    () => KR_PARTIES.filter(p => p.tier !== 'pr' && p.id !== 'OTH').map(p => p.id),
+    []
   );
 
-  const [pcts, setPcts]     = useState<Record<DePartyId, number>>(() => toPcts(results, ids));
-  const [locks, setLocks]   = useState<Set<DePartyId>>(new Set());
-  const [editId, setEditId] = useState<DePartyId | null>(null);
+  const [pcts, setPcts]     = useState<Record<KrPartyId, number>>(() => toPcts(results, ids));
+  const [locks, setLocks]   = useState<Set<KrPartyId>>(new Set());
+  const [editId, setEditId] = useState<KrPartyId | null>(null);
   const [editVal, setEditVal] = useState('');
-  const [showRef, setShowRef] = useState(false);
+  const [reporting, setReporting] = useState(100); // % of votes counted (blank-map / election-night)
 
   const pctsRef  = useRef(pcts);
   const locksRef = useRef(locks);
@@ -677,10 +618,11 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
     setPcts(toPcts(results, ids));
     setLocks(new Set());
     setEditId(null);
+    setReporting(100);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [wk.nr]);
 
-  const basePcts = useMemo(() => toPcts(wk.erststimmen, ids), [wk.erststimmen, ids]);
+  const basePcts = useMemo(() => toPcts(wk.votes, ids), [wk.votes, ids]);
 
   const sortedIds = useMemo(
     () => [...ids].sort((a, b) => (results[b] ?? 0) - (results[a] ?? 0)),
@@ -692,13 +634,13 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
   const winnerId = sortedIds.length > 0
     ? sortedIds.reduce((best, id) => (pcts[id] ?? 0) > (pcts[best] ?? 0) ? id : best)
     : undefined;
-  const winnerParty = winnerId ? DE_PARTY_MAP[winnerId] : null;
+  const winnerParty = winnerId ? KR_PARTY_MAP[winnerId] : null;
   const winnerColor = winnerId ? partyColor(winnerId, dark ?? false) : '#888';
   const winnerPct = winnerId ? (pcts[winnerId] ?? 0) : 0;
   const runnerUpId = sortedIds.find(id => id !== winnerId);
   const margin = runnerUpId ? winnerPct - (pcts[runnerUpId] ?? 0) : winnerPct;
 
-  function applyChange(id: DePartyId, val: number) {
+  function applyChange(id: KrPartyId, val: number) {
     const newPcts = redistributePcts(pctsRef.current, id, val, locksRef.current);
     pctsRef.current = newPcts;
     setPcts(newPcts);
@@ -708,7 +650,7 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
     }
   }
 
-  function toggleLock(id: DePartyId) {
+  function toggleLock(id: KrPartyId) {
     setLocks(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -717,7 +659,7 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
     });
   }
 
-  function commitEdit(id: DePartyId, raw: string) {
+  function commitEdit(id: KrPartyId, raw: string) {
     const n = parseFloat(raw);
     if (!isNaN(n)) applyChange(id, Math.max(0, Math.min(100, n)));
     setEditId(null); setEditVal('');
@@ -730,7 +672,7 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
           <div className="flex-1 min-w-0">
             <h1 className="text-[17px] font-bold text-ink leading-tight truncate">{wk.name}</h1>
             <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">
-              WK {wk.nr} · {wk.stateName} · {total.toLocaleString()} votes
+              {wk.stateName} · {total.toLocaleString()} votes
             </p>
           </div>
           <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
@@ -747,13 +689,27 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
       </div>
 
       <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
+        {isBlank && (
+          <div className="pb-2.5 mb-1 border-b border-default">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-ink-3">% Reporting</span>
+              <span className="text-[10px] font-mono font-bold tabular-nums text-ink">{reporting}%</span>
+            </div>
+            <input type="range" min={0} max={100} step={1} value={reporting}
+              onChange={e => setReporting(parseInt(e.target.value, 10))}
+              className="party-slider w-full"
+              style={{ '--party-color': '#c8a020', '--pct': `${reporting}%` } as React.CSSProperties} />
+            <div className="text-[8px] font-mono text-ink-3 mt-0.5">{Math.round(total * reporting / 100).toLocaleString()} of {total.toLocaleString()} votes counted</div>
+          </div>
+        )}
         {sortedIds.map(id => {
-          const party = DE_PARTY_MAP[id];
+          const party = KR_PARTY_MAP[id];
           const color = partyColor(id, dark ?? false);
           const pct = pcts[id] ?? 0;
           const base = basePcts[id] ?? 0;
           const delta = pct - base;
-          const isLocked = isProjected || locks.has(id);
+          const rawVotes = Math.round((pct / 100) * total * (reporting / 100));
+          const isLocked = locks.has(id);
           return (
             <div key={id}>
               <div className="flex items-center gap-1 mb-0.5">
@@ -791,103 +747,68 @@ function WahlkreisPanel({ wk, results, onClose, onUpdate, dark, isBlank, isProje
                 className="party-slider w-full"
                 style={{ '--party-color': color, '--pct': `${pct}%` } as React.CSSProperties}
               />
-              {Math.abs(delta) > 0.05 && (
-                <div className="flex justify-end mt-0.5">
+              <div className="flex justify-between items-center mt-0.5">
+                <span className="text-[8px] font-mono tabular-nums text-ink-3">{rawVotes.toLocaleString()} votes</span>
+                {Math.abs(delta) > 0.05 && (
                   <span className={`text-[8px] font-mono tabular-nums ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                     {delta > 0 ? '+' : ''}{delta.toFixed(1)}pp
                   </span>
-                </div>
-              )}
+                )}
+              </div>
+              <div className="text-[8px] font-mono tabular-nums text-ink-3/55 leading-none mt-px">2024 · {base.toFixed(1)}% · {Math.round((base / 100) * total).toLocaleString()}</div>
             </div>
           );
         })}
-        {/* 2025 reference — blank map only */}
-        {isBlank && showRef && (
-          <div className="mt-3 pt-3 border-t border-default">
-            <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-2">2025 Actual Results</div>
-            <div className="space-y-1.5">
-              {[...sortedIds]
-                .filter(id => (basePcts[id] ?? 0) > 0)
-                .sort((a, b) => (basePcts[b] ?? 0) - (basePcts[a] ?? 0))
-                .map(id => {
-                  const color = partyColor(id, dark ?? false);
-                  const base = basePcts[id] ?? 0;
-                  return (
-                    <div key={id}>
-                      <div className="flex items-center gap-1.5 mb-0.5">
-                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
-                        <span className="text-[9px] font-medium text-ink-2 flex-1 truncate">{DE_PARTY_MAP[id].name}</span>
-                        <span className="text-[9px] font-mono font-semibold tabular-nums text-ink-2">{base.toFixed(1)}%</span>
-                      </div>
-                      <div className="w-full h-1 rounded-full overflow-hidden bg-black/6">
-                        <div style={{ width: `${Math.min(base / 50 * 100, 100)}%`, height: '100%', background: color, opacity: 0.6, borderRadius: 9999 }} />
-                      </div>
-                    </div>
-                  );
-                })}
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="px-3.5 py-2 border-t border-default space-y-1.5">
-        {isBlank && !isProjected && (
-          <button
-            onClick={() => setShowRef(v => !v)}
-            className={`w-full py-1.5 text-[10px] font-mono rounded-[4px] border transition-colors ${showRef ? 'border-gold/60 bg-amber-50 text-amber-700' : 'border-default text-ink-3 hover:bg-hover'}`}
-          >{showRef ? 'Hide 2025 Reference' : 'Show 2025 Reference'}</button>
-        )}
         {isBlank && (
-          isProjected ? (
-            <div className="w-full py-2 flex items-center justify-center gap-2 text-[11px] font-mono font-bold rounded-[4px] bg-emerald-600/15 text-emerald-700 border border-emerald-300 select-none">
-              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-                <circle cx="6.5" cy="6.5" r="6" stroke="currentColor" strokeWidth="1.2"/>
-                <path d="M3.5 6.5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Projected
-            </div>
-          ) : (
-            <button
-              onClick={() => {
-                const newVotes = Object.fromEntries(sortedIds.map(cid => [cid, Math.round((pcts[cid] ?? 0) * total / 100)]));
-                onUpdate(wk.nr, newVotes);
-                onProject?.();
-              }}
-              className="w-full py-2 text-[11px] font-mono font-bold rounded-[4px] bg-emerald-600 text-white hover:bg-emerald-700 transition-colors"
-            >Project Result</button>
-          )
+          <button
+            onClick={() => {
+              const f = total * reporting / 10000;
+              const newVotes = Object.fromEntries(sortedIds.map(cid => [cid, Math.round((pcts[cid] ?? 0) * f)]));
+              onUpdate(wk.nr, newVotes);
+              onProject?.();
+            }}
+            className={`w-full py-2 flex items-center justify-center gap-1.5 text-[11px] font-mono font-bold rounded-[4px] text-white transition-colors ${isProjected ? 'bg-emerald-700 hover:bg-emerald-800' : 'bg-emerald-600 hover:bg-emerald-700'}`}
+          >
+            {isProjected && (
+              <svg width="12" height="12" viewBox="0 0 13 13" fill="none" aria-hidden="true"><circle cx="6.5" cy="6.5" r="6" stroke="currentColor" strokeWidth="1.2"/><path d="M3.5 6.5l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            )}
+            {isProjected ? 'Update Projection' : 'Project Result'}
+          </button>
         )}
         {!isProjected && (
           <button
-            onClick={() => { setPcts(toPcts(wk.erststimmen, ids)); setLocks(new Set()); setEditId(null); if (!isBlank) onUpdate(wk.nr, wk.erststimmen); }}
+            onClick={() => { setPcts(toPcts(wk.votes, ids)); setLocks(new Set()); setEditId(null); if (!isBlank) onUpdate(wk.nr, wk.votes); }}
             className="w-full py-1.5 text-[10px] font-mono rounded-[4px] border border-default text-ink-3 hover:bg-hover transition-colors"
-          >Reset to 2025</button>
+          >Reset to 2024</button>
         )}
       </div>
     </aside>
   );
 }
 
-function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting, dark }: {
-  votes: Record<DePartyId, number>;
-  onVotesChange: (v: Record<DePartyId, number>) => void;
-  directSeats: Partial<Record<DePartyId, number>>;
+function PRPanel({ votes, onVotesChange, directSeats, onClose, exiting, dark }: {
+  votes: Record<KrPartyId, number>;
+  onVotesChange: (v: Record<KrPartyId, number>) => void;
+  directSeats: Partial<Record<KrPartyId, number>>;
   onClose: () => void;
   exiting?: boolean;
   dark: boolean;
 }) {
   // Convert incoming raw votes to percentages (over the fixed grand total)
-  const rawToZweitPcts = (raw: Record<DePartyId, number>): Record<DePartyId, number> =>
+  const rawToZweitPcts = (raw: Record<KrPartyId, number>): Record<KrPartyId, number> =>
     Object.fromEntries(
-      DE_PARTIES.filter(p => p.id !== 'SONST').map(p => [
+      KR_PARTIES.filter(p => p.id !== 'OTH').map(p => [
         p.id,
-        parseFloat(((raw[p.id] ?? 0) / ZWEIT_GRAND_TOTAL_2025 * 100).toFixed(2)),
+        parseFloat(((raw[p.id] ?? 0) / PR_GRAND_TOTAL_2024 * 100).toFixed(2)),
       ])
-    ) as Record<DePartyId, number>;
+    ) as Record<KrPartyId, number>;
 
-  const [pcts, setPcts] = useState<Record<DePartyId, number>>(() => rawToZweitPcts(votes));
-  const [locks, setLocks] = useState<Set<DePartyId>>(new Set());
-  const [editId, setEditId] = useState<DePartyId | null>(null);
+  const [pcts, setPcts] = useState<Record<KrPartyId, number>>(() => rawToZweitPcts(votes));
+  const [locks, setLocks] = useState<Set<KrPartyId>>(new Set());
+  const [editId, setEditId] = useState<KrPartyId | null>(null);
   const [editVal, setEditVal] = useState('');
 
   // Rebuild pcts if parent votes change (e.g. Reset preset)
@@ -907,16 +828,16 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
   const sum = useMemo(() => Object.values(pcts).reduce((s, v) => s + (v ?? 0), 0), [pcts]);
   const sumOk = Math.abs(sum - 100) < 0.015;
 
-  function pctToRaw(p: Record<DePartyId, number>): Record<DePartyId, number> {
+  function pctToRaw(p: Record<KrPartyId, number>): Record<KrPartyId, number> {
     return Object.fromEntries(
-      DE_PARTIES.map(party => [
+      KR_PARTIES.map(party => [
         party.id,
-        Math.round((p[party.id as DePartyId] ?? 0) / 100 * ZWEIT_GRAND_TOTAL_2025),
+        Math.round((p[party.id as KrPartyId] ?? 0) / 100 * PR_GRAND_TOTAL_2024),
       ])
-    ) as Record<DePartyId, number>;
+    ) as Record<KrPartyId, number>;
   }
 
-  function applyPctChange(id: DePartyId, newVal: number) {
+  function applyPctChange(id: KrPartyId, newVal: number) {
     const clamped = Math.max(0, Math.min(100, newVal));
     const next = { ...pctsRef.current, [id]: clamped };
     pctsRef.current = next;
@@ -924,38 +845,42 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
     onVotesChange(pctToRaw(next));
   }
 
-  function commitEdit(id: DePartyId, raw: string) {
+  function commitEdit(id: KrPartyId, raw: string) {
     const n = parseFloat(raw);
     if (!isNaN(n)) applyPctChange(id, Math.max(0, Math.min(100, n)));
     setEditId(null); setEditVal('');
   }
 
-  function toggleLock(id: DePartyId) {
+  function toggleLock(id: KrPartyId) {
     setLocks(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
   }
 
   function resetTo2025() {
-    const trackedSum = Object.values(ZWEITSTIMMEN_2025).reduce((s, v) => s + (v ?? 0), 0);
+    const trackedSum = Object.values(PR_VOTES_2024).reduce((s, v) => s + (v ?? 0), 0);
     const raw = {
-      ...Object.fromEntries(DE_PARTIES.filter(p => p.id !== 'SONST').map(p => [p.id, ZWEITSTIMMEN_2025[p.id] ?? 0])),
-      SONST: ZWEIT_GRAND_TOTAL_2025 - trackedSum,
-    } as Record<DePartyId, number>;
+      ...Object.fromEntries(KR_PARTIES.filter(p => p.id !== 'OTH').map(p => [p.id, PR_VOTES_2024[p.id] ?? 0])),
+      OTH: PR_GRAND_TOTAL_2024 - trackedSum,
+    } as Record<KrPartyId, number>;
     onVotesChange(raw);
     setPcts(rawToZweitPcts(raw));
     setLocks(new Set());
     setEditId(null);
   }
 
-  const { totalSeats, listSeats, constSeats, qualifyingParties } = useMemo(
-    () => calcMMP(votes, directSeats), [votes, directSeats]);
+  const { totalSeats, listSeats, constSeats, qualifyingParties } = useMemo(() => {
+    const { prSeats, eligible } = calcPRSeats(votes, directSeats);
+    const tot: Partial<Record<KrPartyId, number>> = {};
+    for (const p of KR_PARTIES) { const t = (directSeats[p.id] ?? 0) + (prSeats[p.id] ?? 0); if (t > 0) tot[p.id] = t; }
+    return { totalSeats: tot, listSeats: prSeats, constSeats: directSeats, qualifyingParties: eligible };
+  }, [votes, directSeats]);
 
   const grandTotalSeats = Object.values(totalSeats).reduce((s, v) => s + (v ?? 0), 0);
 
-  const sortedParties = useMemo(() => DE_PARTIES.filter(p => p.id !== 'SONST')
+  const sortedParties = useMemo(() => KR_PARTIES.filter(p => p.id !== 'OTH')
     .map(p => ({
       ...p,
       pct: pcts[p.id] ?? 0,
-      rawVotes: Math.round((pcts[p.id] ?? 0) / 100 * ZWEIT_GRAND_TOTAL_2025),
+      rawVotes: Math.round((pcts[p.id] ?? 0) / 100 * PR_GRAND_TOTAL_2024),
       total: totalSeats[p.id] ?? 0, list: listSeats[p.id] ?? 0, const_: constSeats[p.id] ?? 0,
       qualifies: qualifyingParties.has(p.id), direct: directSeats[p.id] ?? 0,
     }))
@@ -963,7 +888,7 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
   [pcts, totalSeats, listSeats, constSeats, qualifyingParties, directSeats]);
 
   const inputIds = useMemo(() =>
-    DE_PARTIES.filter(p => p.id !== 'SONST')
+    KR_PARTIES.filter(p => p.id !== 'OTH')
       .sort((a, b) => (pcts[b.id] ?? 0) - (pcts[a.id] ?? 0))
       .map(p => p.id),
   [pcts]);
@@ -972,8 +897,8 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
     <aside className={`w-80 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden ${exiting ? 'panel-slide-out' : 'panel-slide'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[14px] font-bold text-ink">List Seats</h2>
-          <p className="text-[9px] font-mono text-ink-3 mt-0.5">Zweitstimmen · {grandTotalSeats}/{BUNDESTAG_TOTAL} seats · Sainte-Laguë</p>
+          <h2 className="text-[14px] font-bold text-ink">Party List (PR)</h2>
+          <p className="text-[9px] font-mono text-ink-3 mt-0.5">Party List (PR) · {grandTotalSeats}/{ASSEMBLY_TOTAL} seats · semi-linked</p>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
@@ -984,7 +909,7 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
           <div className="flex h-3 rounded overflow-hidden mb-2">
             {sortedParties.filter(p => p.qualifies).map(p => (
               <div key={p.id} title={`${p.name}: ${p.total}`}
-                style={{ width: `${(p.total / BUNDESTAG_TOTAL) * 100}%`, background: partyColor(p.id, dark) }} />
+                style={{ width: `${(p.total / ASSEMBLY_TOTAL) * 100}%`, background: partyColor(p.id, dark) }} />
             ))}
           </div>
           {sortedParties.filter(p => p.qualifies || p.direct >= DIRECT_THRESHOLD).map(p => (
@@ -992,7 +917,7 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
               <span className="w-2 h-2 rounded-sm shrink-0" style={{ background: partyColor(p.id, dark) }} />
               <span className="text-[9px] font-medium text-ink w-12 shrink-0">{p.name}</span>
               <div className="flex-1 h-1 rounded overflow-hidden" style={{ background: dark ? 'rgba(80,140,220,0.13)' : 'rgba(0,0,0,0.07)' }}>
-                {p.qualifies && <div style={{ width: `${(p.total / BUNDESTAG_TOTAL) * 100}%`, height: '100%', background: partyColor(p.id, dark) }} />}
+                {p.qualifies && <div style={{ width: `${(p.total / ASSEMBLY_TOTAL) * 100}%`, height: '100%', background: partyColor(p.id, dark) }} />}
               </div>
               {p.qualifies ? <>
                 <span className="text-[8px] font-mono text-ink-3 tabular-nums w-5 text-right">{p.const_}C</span>
@@ -1017,17 +942,17 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
           {inputIds.map(id => {
             const color = partyColor(id, dark);
             const pct = pcts[id] ?? 0;
-            const rawVotes = Math.round(pct / 100 * ZWEIT_GRAND_TOTAL_2025);
+            const rawVotes = Math.round(pct / 100 * PR_GRAND_TOTAL_2024);
             const qualifies = qualifyingParties.has(id);
             const isLocked = locks.has(id);
-            const base2025 = ZWEITSTIMMEN_2025[id] ?? 0;
-            const basePct2025 = parseFloat((base2025 / ZWEIT_GRAND_TOTAL_2025 * 100).toFixed(2));
+            const base2025 = PR_VOTES_2024[id] ?? 0;
+            const basePct2025 = parseFloat((base2025 / PR_GRAND_TOTAL_2024 * 100).toFixed(2));
             const delta = pct - basePct2025;
             const isEditing = editId === id;
             return (
               <div key={id} className="flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full shrink-0 ml-0.5 mr-0.5" style={{ background: color }} />
-                <span className="text-[9.5px] font-medium text-ink truncate" style={{ minWidth: 0, flex: 1 }}>{DE_PARTY_MAP[id].name}</span>
+                <span className="text-[9.5px] font-medium text-ink truncate" style={{ minWidth: 0, flex: 1 }}>{KR_PARTY_MAP[id].name}</span>
                 {isEditing
                   ? <input type="number" min={0} max={100} step={0.01} value={editVal} autoFocus
                       className="w-16 h-6 text-[9.5px] font-mono tabular-nums text-right px-1.5 rounded border focus:outline-none bg-white shrink-0"
@@ -1066,7 +991,7 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
 
         <div className="px-3.5 pb-3">
           <button onClick={resetTo2025} className="w-full py-1.5 text-[10px] font-mono rounded-[4px] border border-default text-ink-3 hover:bg-hover transition-colors">
-            Reset to 2025 official
+            Reset to 2024 official
           </button>
         </div>
       </div>
@@ -1075,10 +1000,10 @@ function ZweitstimmenPanel({ votes, onVotesChange, directSeats, onClose, exiting
 }
 
 // ── State breakdown panel ──────────────────────────────────────────────────────
-function BreakdownPanel({ wahlkreise, currentResults, zweitVotes, onClose, exiting, dark, isBaseline }: {
-  wahlkreise: DeWahlkreis[];
-  currentResults: Record<number, Partial<Record<DePartyId, number>>>;
-  zweitVotes: Record<DePartyId, number> | null;
+function BreakdownPanel({ districts, currentResults, prVotes, onClose, exiting, dark }: {
+  districts: KrDistrict[];
+  currentResults: Record<number, Partial<Record<KrPartyId, number>>>;
+  prVotes: Record<KrPartyId, number> | null;
   onClose: () => void;
   exiting?: boolean;
   dark?: boolean;
@@ -1087,8 +1012,8 @@ function BreakdownPanel({ wahlkreise, currentResults, zweitVotes, onClose, exiti
   const { stateRows, activePids, grandTotals, grandDirect, grandList } = useMemo(() => {
 
     // Group WKs by state (needed for all modes)
-    const stateMap = new Map<string, { name: string; wks: DeWahlkreis[] }>();
-    for (const wk of wahlkreise) {
+    const stateMap = new Map<string, { name: string; wks: KrDistrict[] }>();
+    for (const wk of districts) {
       if (!stateMap.has(wk.state)) stateMap.set(wk.state, { name: wk.stateName, wks: [] });
       stateMap.get(wk.state)!.wks.push(wk);
     }
@@ -1096,122 +1021,52 @@ function BreakdownPanel({ wahlkreise, currentResults, zweitVotes, onClose, exiti
     // Per-state breakdown
     const rows: {
       stateCode: string; name: string; wkCount: number;
-      direct: Partial<Record<DePartyId, number>>;
-      list:   Partial<Record<DePartyId, number>>;
-      total:  Partial<Record<DePartyId, number>>;
+      direct: Partial<Record<KrPartyId, number>>;
+      list:   Partial<Record<KrPartyId, number>>;
+      total:  Partial<Record<KrPartyId, number>>;
       directTotal: number; listTotal: number; stateTotal: number;
       listIsExact: boolean;
     }[] = [];
 
-    // Authoritative national totals (set in each branch)
-    let natTotal: Partial<Record<DePartyId, number>> = {};
-    let natList:  Partial<Record<DePartyId, number>> = {};
-    let natDirect: Partial<Record<DePartyId, number>> = {};
-
-    if (isBaseline) {
-      // ── Baseline: use actual 2025 awarded seats from static tables ──────────
-      for (const [stateCode, { name, wks }] of stateMap) {
-        const direct = { ...(DIRECT_SEATS_2025_BY_STATE[stateCode] ?? {}) };
-        const list   = { ...(LIST_SEATS_2025_BY_STATE[stateCode]   ?? {}) };
-        const total: Partial<Record<DePartyId, number>> = {};
-        for (const pid of new Set([...Object.keys(direct), ...Object.keys(list)]) as Set<DePartyId>) {
-          const t = (direct[pid] ?? 0) + (list[pid] ?? 0);
-          if (t > 0) total[pid] = t;
-        }
-        const directTotal = Object.values(direct).reduce((s, v) => s + (v ?? 0), 0);
-        const listTotal   = Object.values(list).reduce((s, v) => s + (v ?? 0), 0);
-        rows.push({ stateCode, name, wkCount: wks.length, direct, list, total, directTotal, listTotal, stateTotal: directTotal + listTotal, listIsExact: true });
-      }
-      // National totals = sum of static tables (already exact)
-      for (const row of rows) {
-        for (const [pid, v] of Object.entries(row.total)  as [DePartyId, number][]) natTotal[pid]  = (natTotal[pid]  ?? 0) + v;
-        for (const [pid, v] of Object.entries(row.direct) as [DePartyId, number][]) natDirect[pid] = (natDirect[pid] ?? 0) + v;
-        for (const [pid, v] of Object.entries(row.list)   as [DePartyId, number][]) natList[pid]   = (natList[pid]   ?? 0) + v;
-      }
-    } else {
-      // ── Non-baseline: compute direct from current results; estimate list seats ──
-      const directNational = calcDirectSeats(wahlkreise, currentResults);
-
-      let qualifyingParties: Set<DePartyId>;
-
-      if (zweitVotes && Object.values(zweitVotes).some(v => (v ?? 0) > 0)) {
-        const r = calcMMP(zweitVotes, directNational);
-        natTotal = r.totalSeats; natList = r.listSeats; qualifyingParties = r.qualifyingParties;
-      } else {
-        const r = calcBundestag(wahlkreise, currentResults);
-        natTotal = r.totalSeats; qualifyingParties = r.qualifyingParties;
-        const lst: Partial<Record<DePartyId, number>> = {};
-        for (const pid of qualifyingParties) {
-          const tot = natTotal[pid] ?? 0;
-          lst[pid] = Math.max(0, tot - Math.min(r.directSeats[pid] ?? 0, tot));
-        }
-        natList = lst;
-      }
-      // natDirect = natTotal - natList
-      for (const pid of Object.keys(natTotal) as DePartyId[]) {
-        natDirect[pid] = (natTotal[pid] ?? 0) - (natList[pid] ?? 0);
-      }
-
-      // National Erststimmen by party (proxy for distributing list seats to states)
-      const natErst: Partial<Record<DePartyId, number>> = {};
-      for (const wk of wahlkreise) {
-        const r = currentResults[wk.nr] ?? wk.erststimmen;
-        for (const [pid, v] of Object.entries(r) as [DePartyId, number][]) {
-          if ((v ?? 0) > 0) natErst[pid] = (natErst[pid] ?? 0) + v;
-        }
-      }
-
-      for (const [stateCode, { name, wks }] of stateMap) {
-        const direct: Partial<Record<DePartyId, number>> = {};
-        const erstInState: Partial<Record<DePartyId, number>> = {};
-
-        for (const wk of wks) {
-          const r = currentResults[wk.nr] ?? wk.erststimmen;
-          let winner: DePartyId | null = null, maxV = 0;
-          for (const [pid, v] of Object.entries(r) as [DePartyId, number][]) {
-            if ((v ?? 0) > maxV) { maxV = v; winner = pid as DePartyId; }
-            erstInState[pid as DePartyId] = (erstInState[pid as DePartyId] ?? 0) + (v ?? 0);
-          }
-          if (winner) direct[winner] = (direct[winner] ?? 0) + 1;
-        }
-
-        // Distribute each party's national list seats proportionally by state Erststimmen share
-        const list: Partial<Record<DePartyId, number>> = {};
-        for (const pid of qualifyingParties) {
-          const natPidErst   = natErst[pid] ?? 0;
-          const statePidErst = erstInState[pid] ?? 0;
-          const natPidList   = natList[pid] ?? 0;
-          if (natPidErst > 0 && natPidList > 0 && statePidErst > 0) {
-            list[pid] = Math.round(natPidList * statePidErst / natPidErst);
-          }
-        }
-
-        const total: Partial<Record<DePartyId, number>> = {};
-        for (const pid of new Set([...Object.keys(direct), ...Object.keys(list)]) as Set<DePartyId>) {
-          const t = (direct[pid] ?? 0) + (list[pid] ?? 0);
-          if (t > 0) total[pid] = t;
-        }
-
-        const directTotal = Object.values(direct).reduce((s, v) => s + (v ?? 0), 0);
-        const listTotal   = Object.values(list).reduce((s, v) => s + (v ?? 0), 0);
-        rows.push({ stateCode, name, wkCount: wks.length, direct, list, total, directTotal, listTotal, stateTotal: directTotal + listTotal, listIsExact: false });
-      }
+    // South Korea: constituency seats are regional (FPTP); the 46 PR seats are a single national pool.
+    const natDirect = calcConstituencySeats(districts, currentResults);
+    const { prSeats: natList } = calcPRSeats(prVotes ?? PR_VOTES_2024, natDirect);
+    const natTotal: Partial<Record<KrPartyId, number>> = {};
+    for (const p of KR_PARTIES) {
+      const t = (natDirect[p.id] ?? 0) + (natList[p.id] ?? 0);
+      if (t > 0) natTotal[p.id] = t;
     }
 
+    // Per-region constituency (FPTP) seats from current results
+    for (const [stateCode, { name, wks }] of stateMap) {
+      const direct: Partial<Record<KrPartyId, number>> = {};
+      for (const wk of wks) {
+        const r = currentResults[wk.nr] ?? wk.votes;
+        let winner: KrPartyId | null = null, maxV = 0;
+        for (const [pid, v] of Object.entries(r) as [KrPartyId, number][]) {
+          if ((v ?? 0) > maxV) { maxV = v; winner = pid as KrPartyId; }
+        }
+        if (winner) direct[winner] = (direct[winner] ?? 0) + 1;
+      }
+      const directTotal = Object.values(direct).reduce((s, v) => s + (v ?? 0), 0);
+      rows.push({ stateCode, name, wkCount: wks.length, direct, list: {}, total: { ...direct }, directTotal, listTotal: 0, stateTotal: directTotal, listIsExact: true });
+    }
     rows.sort((a, b) => b.wkCount - a.wkCount);
 
-    // Grand totals: use authoritative national numbers (not per-state sums)
-    const grandTotals  = natTotal;
-    const grandDirect  = natDirect;
-    const grandList    = natList;
+    // National PR pool (46 seats) as its own card
+    const prTotalSeats = Object.values(natList).reduce((s, v) => s + (v ?? 0), 0);
+    if (prTotalSeats > 0) {
+      rows.push({ stateCode: "PR", name: "Proportional — national list (46)", wkCount: 0, direct: {}, list: { ...natList }, total: { ...natList }, directTotal: 0, listTotal: prTotalSeats, stateTotal: prTotalSeats, listIsExact: true });
+    }
 
-    const activePids = DE_PARTIES
-      .filter(p => p.id !== 'SONST' && (grandTotals[p.id] ?? 0) > 0)
+    const grandTotals = natTotal, grandDirect = natDirect, grandList = natList;
+    const activePids = KR_PARTIES
+      .filter(p => p.id !== "OTH" && (grandTotals[p.id] ?? 0) > 0)
       .sort((a, b) => (grandTotals[b.id] ?? 0) - (grandTotals[a.id] ?? 0))
       .map(p => p.id);
 
     return { stateRows: rows, activePids, grandTotals, grandDirect, grandList };
-  }, [wahlkreise, currentResults, zweitVotes, isBaseline]);
+  }, [districts, currentResults, prVotes]);
 
   const grandTotal = Object.values(grandTotals).reduce((s, v) => s + (v ?? 0), 0);
 
@@ -1220,9 +1075,9 @@ function BreakdownPanel({ wahlkreise, currentResults, zweitVotes, onClose, exiti
       {/* Header */}
       <div className={`flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0`}>
         <div>
-          <h2 className="text-[14px] font-bold text-ink leading-none">State Breakdown</h2>
+          <h2 className="text-[14px] font-bold text-ink leading-none">Regional Breakdown</h2>
           <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">
-            {isBaseline ? 'Direct · List · Total per State (2025 Official)' : 'Direct · ~List (est.) · Total per State'}
+            Constituency seats per region · national PR pool
           </p>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -1250,8 +1105,8 @@ function BreakdownPanel({ wahlkreise, currentResults, zweitVotes, onClose, exiti
       {/* Per-state cards */}
       <div className="flex-1 overflow-y-auto thin-scroll divide-y divide-default">
         {stateRows.map(({ stateCode, name, wkCount, direct, list, total, directTotal, listTotal, stateTotal, listIsExact }) => {
-          const directSorted = (Object.entries(direct) as [DePartyId, number][]).sort(([,a],[,b]) => b - a);
-          const listSorted   = (Object.entries(list)   as [DePartyId, number][]).sort(([,a],[,b]) => b - a);
+          const directSorted = (Object.entries(direct) as [KrPartyId, number][]).sort(([,a],[,b]) => b - a);
+          const listSorted   = (Object.entries(list)   as [KrPartyId, number][]).sort(([,a],[,b]) => b - a);
           const stateActive  = activePids.filter(pid => (total[pid] ?? 0) > 0);
 
           return (
@@ -1338,118 +1193,108 @@ function TutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: bo
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
-          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Bundestagswahl Guide</p>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">National Assembly Guide</p>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
 
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
 
-        {/* ── The German system ── */}
-        <H2>The German Electoral System</H2>
-        <P>Germany uses <strong>Mixed-Member Proportional (MMP)</strong> representation. Every voter casts <strong>two votes</strong>:</P>
+        {/* ── The Korean system ── */}
+        <H2>The Korean Electoral System</H2>
+        <P>South Korea elects its <strong>300-seat National Assembly</strong> with a <strong>mixed system</strong>. Every voter casts <strong>two votes</strong>:</P>
         <div className="flex gap-2 mb-2">
           <div className="flex-1 bg-[#f8f7f4] border border-default rounded-[4px] px-2.5 py-2">
-            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">Erststimme</div>
-            <div className="text-[10px] text-ink-2 leading-relaxed">Direct / constituency vote. Winner-takes-all in each of the 299 Wahlkreise.</div>
+            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">Jiyeokgu · District</div>
+            <div className="text-[10px] text-ink-2 leading-relaxed">First-past-the-post in each of the <strong>254</strong> single-member constituencies. Most votes wins.</div>
           </div>
           <div className="flex-1 bg-[#f8f7f4] border border-default rounded-[4px] px-2.5 py-2">
-            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">Zweitstimme</div>
-            <div className="text-[10px] text-ink-2 leading-relaxed">Party / list vote. Determines each party's <em>total</em> seat share. This is the decisive vote.</div>
+            <div className="text-[9px] font-mono font-bold text-ink uppercase tracking-wide mb-1">Biryedaepyo · Party List</div>
+            <div className="text-[10px] text-ink-2 leading-relaxed">A separate party vote that allocates the <strong>46</strong> proportional (PR) seats.</div>
           </div>
         </div>
-        <Note>The Zweitstimme decides parliament's composition. A party can win 50 constituencies and still get zero seats if it falls below 5% nationally with fewer than 3 direct wins.</Note>
+        <Note>A party's total = constituency wins + PR seats. The tiers are largely parallel, with a partial proportional top-up on the PR side.</Note>
+
+        {/* ── Satellite parties ── */}
+        <H2>Satellite Parties (2024)</H2>
+        <P>PR seats use a <strong>semi-linked</strong> formula (jun-yeondong) that <em>subtracts</em> a party's district wins from its proportional entitlement. To dodge it, the two majors ran <strong>satellite list parties</strong>:</P>
+        <div className="space-y-1 mb-2 text-[10px] text-ink-2 leading-relaxed">
+          <div>• <strong>People Power Party</strong> → list satellite <strong>People Future</strong> (Gukminui-mirae).</div>
+          <div>• <strong>Democratic Party</strong> → list satellite <strong>Democratic Alliance</strong> (Deobureo-minju-yeonhap).</div>
+        </div>
+        <Note>The satellites won zero districts, so the subtraction didn't bite — they captured the PR seats their parents couldn't. They appear in their parent's colour. This reproduces the real 2024 Assembly exactly.</Note>
 
         {/* ── Seat calculation ── */}
-        <H2>How Seats Are Calculated</H2>
-        <P>Total Bundestag seats are allocated proportionally to the <strong>Zweitstimme</strong> using the <strong>Sainte-Laguë</strong> method — but only for parties that pass the <em>qualifying threshold</em>:</P>
+        <H2>How PR Seats Are Allocated</H2>
+        <P>Only parties past the <em>threshold</em> share the 46 PR seats:</P>
         <div className="bg-[#f8f7f4] border border-default rounded-[4px] px-2.5 py-2 mb-2 space-y-1">
-          <div className="flex items-start gap-2 text-[10px] text-ink-2">
-            <span className="text-emerald-600 font-bold shrink-0">✓</span>
-            <span><strong>≥ 5% nationwide</strong> Zweitstimme, OR</span>
-          </div>
-          <div className="flex items-start gap-2 text-[10px] text-ink-2">
-            <span className="text-emerald-600 font-bold shrink-0">✓</span>
-            <span>Won <strong>≥ 3 direct constituencies</strong> (Erststimme)</span>
-          </div>
+          <div className="flex items-start gap-2 text-[10px] text-ink-2"><span className="text-emerald-600 font-bold shrink-0">✓</span><span><strong>≥ 3%</strong> of the national party-list vote, OR</span></div>
+          <div className="flex items-start gap-2 text-[10px] text-ink-2"><span className="text-emerald-600 font-bold shrink-0">✓</span><span>won <strong>≥ 5 constituency seats</strong>.</span></div>
         </div>
-        <P>Under the <strong>2023 Wahlrechtsreform</strong>, the Bundestag is fixed at exactly <strong>630 seats</strong>. If a party wins more constituencies than its proportional share allows, those extra candidates — called <em>losing winners</em> — do <em>not</em> receive their seats. In 2025, 23 such candidates were not seated. There are no overhang or leveling seats.</P>
-        <Note>The CDU and CSU are <strong>sister parties</strong> — CDU runs in all states except Bavaria; CSU runs only in Bavaria. They always form a joint parliamentary group (Fraktion) and never compete against each other. The simulator groups them as <em>CDU/CSU</em> in the scoreboard and seat count.</Note>
+        <P>Each qualifying party's linked entitlement is roughly <em>½ × (its proportional share of 300 − its constituency seats)</em>. In 2024 all 46 PR seats used this formula — yielding People Future 18, Democratic Alliance 14, Rebuilding Korea 12, Reform 2.</P>
+        <Note>Blocs: Democratic 175 (161+14) · People Power 108 (90+18) · Rebuilding Korea 12 · Reform 3 · New Future 1 · Progressive 1.</Note>
 
         {/* ── Presets ── */}
         <H2>Map Presets</H2>
         <div className="space-y-2 mb-2">
-          <div><Tag>2025 Baseline</Tag><span className="text-[10px] text-ink-2">The actual February 2025 Bundestagswahl results — a snapshot of what really happened.</span></div>
-          <div><Tag>2026 Polling</Tag><span className="text-[10px] text-ink-2">Current opinion polling estimates applied as a uniform national swing across all constituencies.</span></div>
-          <div><Tag>Blank Map</Tag><span className="text-[10px] text-ink-2">All constituencies empty — you fill in each result manually. See the Blank Map section below.</span></div>
+          <div><Tag>2024 Baseline</Tag><span className="text-[10px] text-ink-2">The actual 10 April 2024 (22nd) National Assembly result.</span></div>
+          <div><Tag>2026 Polling</Tag><span className="text-[10px] text-ink-2">A projection (post-2025 realignment) applied as a uniform swing. The next real election is 2028.</span></div>
+          <div><Tag>Blank Map</Tag><span className="text-[10px] text-ink-2">All districts empty — project results manually, election-night style.</span></div>
         </div>
 
-        {/* ── Clicking constituencies ── */}
+        {/* ── Editing a district ── */}
         <H2>Editing a Constituency</H2>
-        <P>Click any shaded area on the map to open its panel on the right.</P>
+        <P>Click any shaded district to open its panel on the right.</P>
         <Step n={1}>Drag a party's slider <em>or</em> click its percentage to type a value.</Step>
-        <Step n={2}>When you adjust one party, the remaining vote share is automatically redistributed among unlocked parties.</Step>
-        <Step n={3}>Click the <strong>lock icon</strong> next to a party to fix its share — it won't change when you adjust others.</Step>
-        <Step n={4}>Hit <Tag>Reset to 2025</Tag> to restore the constituency's actual 2025 result.</Step>
-        <P>Changes take effect immediately on the map and scoreboard (except in Blank Map mode — see below).</P>
+        <Step n={2}>Adjusting one party redistributes the rest among unlocked parties.</Step>
+        <Step n={3}>Click the <strong>lock icon</strong> to fix a party's share while you change others.</Step>
+        <Step n={4}>Hit <Tag>Reset to 2024</Tag> to restore that seat's official result, or open the in-panel <Tag>Baseline</Tag> reference to see the 2024 numbers.</Step>
 
         {/* ── Blank map ── */}
         <H2>Blank Map Mode</H2>
-        <Note>In Blank Map mode, nothing updates the map or scoreboard until you explicitly project it — this simulates an election-night experience where results come in gradually.</Note>
-        <Step n={1}>Click <Tag color="border border-gold text-gold bg-transparent">List Seats</Tag> first. The pulsing gold border is a reminder — the scoreboard stays hidden until you enter Zweitstimme data.</Step>
-        <Step n={2}>Enter a percentage for each party in the List Seats panel and close it. The scoreboard will appear showing seat projections.</Step>
-        <Step n={3}>Click a constituency on the map, adjust the sliders, then click <Tag color="bg-emerald-600 text-white">Project Result</Tag>. Only then does the map colour and dashboard update for that constituency.</Step>
-        <Step n={4}>Projected constituencies show a green <em>Projected</em> badge and their sliders lock.</Step>
-        <P>Use <strong>Multi-select</strong> or <strong>Simulation</strong> to project many constituencies at once.</P>
+        <Note>In Blank Map mode nothing updates until you explicitly project — like watching returns come in on election night. The % reporting slider (top of the panel) scales the raw votes shown.</Note>
+        <Step n={1}>Open <Tag color="border border-gold text-gold bg-transparent">Party List</Tag> and enter the national PR vote shares.</Step>
+        <Step n={2}>Click a district, set the sliders and % reporting, then click <Tag color="bg-emerald-600 text-white">Project Result</Tag> — only then do the map and dashboard update for that seat.</Step>
+        <Step n={3}>Re-click <Tag color="bg-emerald-600 text-white">Update</Tag> to revise a seat. Projected seats show a green badge.</Step>
 
-        {/* ── List seats ── */}
-        <H2>List Seats Panel</H2>
-        <P>The <Tag>List Seats</Tag> panel lets you set each party's <strong>Zweitstimme percentage</strong>. Percentages are automatically renormalised to sum to 100% — enter any figures and the tool balances the rest.</P>
-        <P>The panel shows each party's allocated list seats in real time. Remember: a party below 5% that hasn't won 3 direct seats will show <strong>0 list seats</strong> even with non-zero votes — it is blocked by the threshold.</P>
+        {/* ── Party list ── */}
+        <H2>Party List Panel</H2>
+        <P>The <Tag>Party List</Tag> panel sets each list party's <strong>PR vote %</strong> (shares renormalise to 100%). It shows live PR-seat allocation. A party below 3% with fewer than 5 district wins shows <strong>0 PR seats</strong> — blocked by the threshold.</P>
 
         {/* ── Multi-select ── */}
         <H2>Multi-Select</H2>
-        <P>Click <Tag>Multi-select</Tag> in the toolbar, then click multiple constituencies on the map to select them. The panel shows a combined swing editor — enter a uniform shift (e.g. <em>CDU +5pp</em>) and it applies across all selected constituencies simultaneously.</P>
+        <P>Click <Tag>Multi-select</Tag>, then click several districts. Apply one uniform swing (e.g. <em>DPK +5pp</em>) across all selected seats at once.</P>
 
         {/* ── Simulation ── */}
         <H2>Election Night Simulation</H2>
-        <P>Click <Tag>▶ Simulation</Tag> to open the sim panel. Set target Zweitstimme percentages for each party and pick a duration (60 s – 10 min).</P>
-        <P>The simulator calls constituencies one by one in a random order, applying uncertainty modelled on the UNS swing from your targets. Watch the scoreboard update in real time as results come in — just like election night.</P>
-        <Note>Simulated results are driven by Zweitstimme targets. Constituency-level noise means the final map may deviate slightly from your target percentages.</Note>
+        <P>Click <Tag>▶ Simulation</Tag>, set target district + party-list shares, and pick a duration (1, 2, 5 or 10 minutes).</P>
+        <P>Districts are called in random batches on a bell-curve schedule. Hover a called seat to see its % reported and current count; the scoreboard updates live. The Parties button locks while a sim runs.</P>
 
         {/* ── Scoreboard ── */}
         <H2>Reading the Scoreboard</H2>
-        <P>Party cards are ordered left-to-right by <strong>Zweitstimme count</strong> (list vote share). Each card shows:</P>
+        <P>Cards are ordered by seats. Each shows:</P>
         <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
-          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">LIST</span><span>Zweitstimme % and raw votes — the primary, decisive stat. The bar at the bottom tracks this.</span></div>
-          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">ERST</span><span>Erststimme % and raw votes — dimmed, shown below for reference.</span></div>
-          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">#</span><span>Total Bundestag seats (direct + list combined), shown in large type.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">PR</span><span>Party-list % and raw votes.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">DIST</span><span>Constituency vote % and raw votes.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink w-10">#</span><span>Total seats (constituency + PR), in large type.</span></div>
         </div>
         <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
-          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-gold mt-1" /><span><strong>Gold border</strong> — this party (or CDU/CSU bloc) has the most seats.</span></div>
-          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1" /><span><strong>Green shimmer</strong> — this entity has a majority (≥ 316 seats).</span></div>
-          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-ink/20 mt-1" /><span>A party with <strong>votes but 0 seats</strong> fell below the 5% threshold and won fewer than 3 direct mandates.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-gold mt-1" /><span><strong>Gold border</strong> — most seats.</span></div>
+          <div className="flex items-start gap-2"><span className="shrink-0 w-2 h-2 rounded-full bg-emerald-500 mt-1" /><span><strong>Green shimmer</strong> — majority (≥ 151 seats).</span></div>
         </div>
-        <P>Click the <em>Results</em> / <em>Hide</em> chevron at the bottom of the scoreboard to collapse it and get more map space.</P>
 
-        {/* ── State Breakdown ── */}
-        <H2>State Breakdown</H2>
-        <P>Click <Tag>Breakdown</Tag> to open the per-state panel. It shows direct seats and list seats awarded in each of Germany's 16 states, plus a national summary at the top.</P>
-        <div className="space-y-1.5 mb-2 text-[10px] text-ink-2 leading-relaxed">
-          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink">Direct</span><span>Constituencies won outright (Erststimme winners who received seats).</span></div>
-          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink">List N</span><span>Exact list seats (shown in 2025 Baseline mode, from official Federal Returning Officer data).</span></div>
-          <div className="flex items-start gap-2"><span className="shrink-0 font-mono font-bold text-ink">~List N</span><span>Estimated list seats (in other modes — distributed proportionally by state Erststimme share).</span></div>
-        </div>
-        <Note>The national summary always matches the scoreboard exactly. Per-state list bars are approximate outside baseline mode.</Note>
+        {/* ── Regional Breakdown ── */}
+        <H2>Regional Breakdown</H2>
+        <P>Click <Tag>Breakdown</Tag> for constituency seats in each of the 17 regions (Seoul, Gyeonggi, the Honam and Yeongnam provinces, etc.), plus the 46-seat national PR pool and a national summary.</P>
 
         {/* ── Parliament ── */}
         <H2>Parliament View</H2>
-        <P>Click <Tag>Parliament</Tag> to open a parliamentary-composition view arranged left → right by ideology. Seats are coloured by party; the legend below shows each party's count.</P>
+        <P>Click <Tag>Parliament</Tag> for a semicircle of all 300 seats, arranged left → right by ideology and coloured by party.</P>
 
         {/* ── Bubble map ── */}
         <H2>Bubble Map</H2>
-        <P>Toggle <Tag color="bg-emerald-600 text-white">Bubble Map</Tag> to replace the choropleth fill with circles. Each circle is centred on its constituency, coloured by the winning party, and sized proportionally to the <strong>raw vote margin</strong> — a large circle means a big win by many votes, not just a high percentage.</P>
-        <P>This reveals geographic concentration: urban constituencies with high turnout show larger bubbles even at the same percentage margin as a sparse rural seat.</P>
+        <P>Toggle <Tag color="bg-emerald-600 text-white">Bubble Map</Tag> to swap the choropleth for circles sized by <strong>raw vote margin</strong> (winner − runner-up) — a big circle means a big win in absolute votes, not just a high percentage.</P>
+
 
         <div className="h-4" />
       </div>
@@ -1459,14 +1304,14 @@ function TutorialPanel({ onClose, exiting }: { onClose: () => void; exiting?: bo
 
 // ── Parliament hemicycle panel ─────────────────────────────────────────────────
 function ParliamentPanel({ seats: totalSeatsMap, onClose, exiting, dark }: {
-  seats: Partial<Record<DePartyId, number>>;
+  seats: Partial<Record<KrPartyId, number>>;
   onClose: () => void;
   exiting?: boolean;
   dark?: boolean;
 }) {
   // Build left→right ordered seat colour array
   const seatColors: string[] = [];
-  const legend: { id: DePartyId; count: number; color: string }[] = [];
+  const legend: { id: KrPartyId; count: number; color: string }[] = [];
   for (const id of PARTY_LR_ORDER) {
     const n = totalSeatsMap[id] ?? 0;
     if (n === 0) continue;
@@ -1513,7 +1358,7 @@ function ParliamentPanel({ seats: totalSeatsMap, onClose, exiting, dark }: {
     <aside className={`w-80 shrink-0 bg-white border-r border-default flex flex-col overflow-hidden ${exiting ? 'panel-exit-left' : 'panel-slide-left'}`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">Bundestag — Parliamentary Composition</h2>
+          <h2 className="text-[13px] font-bold text-ink leading-none">National Assembly — 300 seats</h2>
           <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeats} seats · majority {MAJORITY}</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -1546,7 +1391,7 @@ function ParliamentPanel({ seats: totalSeatsMap, onClose, exiting, dark }: {
             <div className="px-3.5 pb-4">
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
                 {legend.map(({ id, count, color }) => {
-                  const party = DE_PARTY_MAP[id];
+                  const party = KR_PARTY_MAP[id];
                   return (
                     <div key={id} className="flex items-center gap-1.5">
                       <div style={{ width: 9, height: 9, borderRadius: 2, background: color, flexShrink: 0 }} />
@@ -1565,20 +1410,23 @@ function ParliamentPanel({ seats: totalSeatsMap, onClose, exiting, dark }: {
 }
 
 // ── Poll swing helper ──────────────────────────────────────────────────────────
-function applyPollSwing(pollPcts: Record<DePartyId, number>): Record<number, Partial<Record<DePartyId, number>>> {
-  const gt = ZWEIT_GRAND_TOTAL_2025;
-  const swing: Partial<Record<DePartyId, number>> = {};
-  for (const p of DE_PARTIES) {
-    const base2025 = ((ZWEITSTIMMEN_2025[p.id] ?? 0) / gt) * 100;
-    swing[p.id] = (pollPcts[p.id] ?? 0) - base2025;
+function applyPollSwing(pollPcts: Record<KrPartyId, number>): Record<number, Partial<Record<KrPartyId, number>>> {
+  // national constituency baseline share per party (2024 FPTP votes)
+  const natBase: Partial<Record<KrPartyId, number>> = {};
+  let natTotal = 0;
+  for (const wk of KR_DISTRICTS) for (const [id, v] of Object.entries(wk.votes) as [KrPartyId, number][]) { natBase[id] = (natBase[id] ?? 0) + (v ?? 0); natTotal += (v ?? 0); }
+  const swing: Partial<Record<KrPartyId, number>> = {};
+  for (const p of KR_PARTIES) {
+    const base2024 = natTotal > 0 ? ((natBase[p.id] ?? 0) / natTotal) * 100 : 0;
+    swing[p.id] = (pollPcts[p.id] ?? 0) - base2024;
   }
-  const out: Record<number, Partial<Record<DePartyId, number>>> = {};
-  for (const wk of DE_WAHLKREISE) {
-    const base = wk.erststimmen;
+  const out: Record<number, Partial<Record<KrPartyId, number>>> = {};
+  for (const wk of KR_DISTRICTS) {
+    const base = wk.votes;
     const total = Object.values(base).reduce((s, v) => s + (v ?? 0), 0);
     if (total === 0) { out[wk.nr] = {}; continue; }
-    const ids = (Object.keys(base) as DePartyId[]).filter(id => (base[id] ?? 0) > 0);
-    const adj: Partial<Record<DePartyId, number>> = {};
+    const ids = (Object.keys(base) as KrPartyId[]).filter(id => (base[id] ?? 0) > 0);
+    const adj: Partial<Record<KrPartyId, number>> = {};
     for (const id of ids) adj[id] = Math.max(0, ((base[id] ?? 0) / total) * 100 + (swing[id] ?? 0));
     const adjSum = Object.values(adj).reduce((s, v) => s + (v ?? 0), 0);
     out[wk.nr] = adjSum > 0
@@ -1588,45 +1436,36 @@ function applyPollSwing(pollPcts: Record<DePartyId, number>): Record<number, Par
   return out;
 }
 
-// ── 2026 poll preset (AfD 28.67 · Union 22 · Grüne 14 · SPD 12.17 · Linke 10.5 · Others 6 · FDP 3.5 · BSW 3.17)
-// CDU/CSU and FW/SSW/SONST split proportionally from 2025 Zweitstimmen
-const POLL_2026_PCTS: Record<DePartyId, number> = (() => {
-  const gt = ZWEIT_GRAND_TOTAL_2025;
-  const tracked = Object.values(ZWEITSTIMMEN_2025).reduce((s, v) => s + (v ?? 0), 0);
-  const sonst2025 = gt - tracked;
-  const unionTotal = (ZWEITSTIMMEN_2025.CDU ?? 0) + (ZWEITSTIMMEN_2025.CSU ?? 0);
-  const fw2025 = ZWEITSTIMMEN_2025.FW ?? 0;
-  const ssw2025 = ZWEITSTIMMEN_2025.SSW ?? 0;
-  const othersTotal = fw2025 + ssw2025 + sonst2025;
-  return {
-    CDU:   22 * (ZWEITSTIMMEN_2025.CDU ?? 0) / unionTotal,
-    CSU:   22 * (ZWEITSTIMMEN_2025.CSU ?? 0) / unionTotal,
-    AFD:   28.67,
-    SPD:   12.17,
-    GRUE:  14,
-    LINKE: 10.5,
-    BSW:   3.17,
-    FDP:   3.5,
-    FW:    6 * fw2025    / othersTotal,
-    SSW:   6 * ssw2025   / othersTotal,
-    SONST: 6 * sonst2025 / othersTotal,
-  };
-})();
+// ── 2026 polling projection ──────────────────────────────────────────────────
+// Hypothetical scenario after the Dec-2024 martial-law crisis, Yoon's impeachment and
+// the 2025 snap presidential election (won by DPK's Lee Jae-myung). The next REAL
+// legislative election is 2028, so this is a projection, not a scheduled contest.
+// Constituency-side national vote-share targets (applied as a uniform swing from the 2024 FPTP baseline):
+const POLL_2026_PCTS: Record<KrPartyId, number> = {
+  DPK: 47, PPP: 35, REF: 8, IND: 3, GJP: 2.5, PROG: 1.5, NFP: 1, LUP: 1,
+  DEMALL: 0, PFP: 0, RKP: 0, OTH: 0,
+};
+// PR (party-list) projection — list votes flow to the list parties
+// (the 2024 satellites stand in for the two majors' lists: DEMALL≈DPK, PFP≈PPP):
+const POLL_2026_PR: Record<KrPartyId, number> = {
+  DEMALL: 41, PFP: 30, RKP: 12, REF: 8, GJP: 3, NFP: 2, LUP: 2, OTH: 2,
+  DPK: 0, PPP: 0, PROG: 0, IND: 0,
+};
 
 // National Erststimmen aggregate if 2026 polling swing is applied to all WKs
-const POLL_2026_CONST_PCTS: Partial<Record<DePartyId, number>> = (() => {
+const POLL_2026_CONST_PCTS: Partial<Record<KrPartyId, number>> = (() => {
   const allResults = applyPollSwing(POLL_2026_PCTS);
-  const nat: Partial<Record<DePartyId, number>> = {};
+  const nat: Partial<Record<KrPartyId, number>> = {};
   let total = 0;
-  for (const wk of DE_WAHLKREISE) {
-    for (const [id, v] of Object.entries(allResults[wk.nr] ?? {}) as [DePartyId, number][]) {
+  for (const wk of KR_DISTRICTS) {
+    for (const [id, v] of Object.entries(allResults[wk.nr] ?? {}) as [KrPartyId, number][]) {
       nat[id] = (nat[id] ?? 0) + v;
       total += v;
     }
   }
-  const pcts: Partial<Record<DePartyId, number>> = {};
-  for (const [id, v] of Object.entries(nat) as [DePartyId, number][])
-    pcts[id as DePartyId] = total > 0 ? (v / total) * 100 : 0;
+  const pcts: Partial<Record<KrPartyId, number>> = {};
+  for (const [id, v] of Object.entries(nat) as [KrPartyId, number][])
+    pcts[id as KrPartyId] = total > 0 ? (v / total) * 100 : 0;
   return pcts;
 })();
 
@@ -1639,12 +1478,12 @@ function randNormal(): number {
 }
 
 // ── Simulation panel ───────────────────────────────────────────────────────────
-const SIM_PARTY_IDS: DePartyId[] = ['CDU', 'CSU', 'SPD', 'AFD', 'GRUE', 'LINKE', 'BSW', 'FDP', 'FW', 'SSW'];
+const SIM_PARTY_IDS: KrPartyId[] = ['DPK', 'PPP', 'REF', 'PROG', 'GJP', 'NFP', 'LUP', 'IND'];
 
-function DeSimulationPanel({
+function KrSimulationPanel({
   onStart, onClose, simRunning, simProgress, stopSim, dark,
 }: {
-  onStart: (erstResults: Record<number, Partial<Record<DePartyId, number>>>, zweitVotes: Record<DePartyId, number>, durationMs: number) => void;
+  onStart: (erstResults: Record<number, Partial<Record<KrPartyId, number>>>, prVotes: Record<KrPartyId, number>, durationMs: number) => void;
   onClose: () => void;
   simRunning: boolean;
   simProgress: number;
@@ -1652,17 +1491,17 @@ function DeSimulationPanel({
   dark?: boolean;
 }) {
   // Initialize Erststimmen from 2026 polling national constituency percentages
-  const [erstPcts, setErstPcts] = useState<Record<DePartyId, number>>(() => {
+  const [erstPcts, setErstPcts] = useState<Record<KrPartyId, number>>(() => {
     const base = Object.fromEntries(
       SIM_PARTY_IDS.map(id => [id, POLL_2026_CONST_PCTS[id] ?? 0])
-    ) as Record<DePartyId, number>;
+    ) as Record<KrPartyId, number>;
     const s = Object.values(base).reduce((a, b) => a + b, 0);
     if (s > 0) for (const id of SIM_PARTY_IDS) base[id] = (base[id] ?? 0) / s * 100;
     return base;
   });
 
   const [duration, setDuration] = useState(120_000);
-  const [editId, setEditId] = useState<DePartyId | null>(null);
+  const [editId, setEditId] = useState<KrPartyId | null>(null);
   const [editVal, setEditVal] = useState('');
 
   const erstSum = useMemo(() => Object.values(erstPcts).reduce((s, v) => s + v, 0), [erstPcts]);
@@ -1670,21 +1509,21 @@ function DeSimulationPanel({
   const canPlay = erstOk && !simRunning;
 
   // Derive Zweitstimmen: same swing as constituency swing from 2026 polling baseline
-  const zweitPcts = useMemo<Record<DePartyId, number>>(() => {
-    const raw: Partial<Record<DePartyId, number>> = {};
+  const prPcts = useMemo<Record<KrPartyId, number>>(() => {
+    const raw: Partial<Record<KrPartyId, number>> = {};
     for (const id of SIM_PARTY_IDS) {
       const constSwing = (erstPcts[id] ?? 0) - (POLL_2026_CONST_PCTS[id] ?? 0);
       raw[id] = Math.max(0, (POLL_2026_PCTS[id] ?? 0) + constSwing);
     }
     const sum = Object.values(raw).reduce((s, v) => s + (v ?? 0), 0);
-    if (sum <= 0) return raw as Record<DePartyId, number>;
-    return Object.fromEntries(SIM_PARTY_IDS.map(id => [id, ((raw[id] ?? 0) / sum) * 100])) as Record<DePartyId, number>;
+    if (sum <= 0) return raw as Record<KrPartyId, number>;
+    return Object.fromEntries(SIM_PARTY_IDS.map(id => [id, ((raw[id] ?? 0) / sum) * 100])) as Record<KrPartyId, number>;
   }, [erstPcts]);
 
-  function applyErstChange(id: DePartyId, val: number) {
+  function applyErstChange(id: KrPartyId, val: number) {
     setErstPcts(prev => redistributePcts(prev, id, Math.max(0, Math.min(100, val)), new Set()));
   }
-  function commitEdit(id: DePartyId, raw: string) {
+  function commitEdit(id: KrPartyId, raw: string) {
     const n = parseFloat(raw);
     if (!isNaN(n)) applyErstChange(id, n);
     setEditId(null); setEditVal('');
@@ -1693,10 +1532,10 @@ function DeSimulationPanel({
   function handlePlay() {
     if (!canPlay) return;
     const allResults = applyPollSwing(erstPcts);
-    const zweitVotes = Object.fromEntries(
-      SIM_PARTY_IDS.map(id => [id, Math.round((zweitPcts[id] ?? 0) / 100 * ZWEIT_GRAND_TOTAL_2025)])
-    ) as Record<DePartyId, number>;
-    onStart(allResults, zweitVotes, duration);
+    const prVotes = Object.fromEntries(
+      SIM_PARTY_IDS.map(id => [id, Math.round((prPcts[id] ?? 0) / 100 * PR_GRAND_TOTAL_2024)])
+    ) as Record<KrPartyId, number>;
+    onStart(allResults, prVotes, duration);
   }
 
   const durations = [
@@ -1705,7 +1544,7 @@ function DeSimulationPanel({
   ];
 
   const erstSorted = [...SIM_PARTY_IDS].sort((a, b) => (erstPcts[b] ?? 0) - (erstPcts[a] ?? 0));
-  const zweitSorted = [...SIM_PARTY_IDS].sort((a, b) => (zweitPcts[b] ?? 0) - (zweitPcts[a] ?? 0));
+  const zweitSorted = [...SIM_PARTY_IDS].sort((a, b) => (prPcts[b] ?? 0) - (prPcts[a] ?? 0));
 
   return (
     <aside className="w-72 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden panel-slide">
@@ -1713,7 +1552,7 @@ function DeSimulationPanel({
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
             <h1 className="text-[17px] font-bold text-ink leading-tight">Election Night</h1>
-            <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Germany Simulation</p>
+            <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">South Korea Simulation</p>
           </div>
           <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
         </div>
@@ -1722,7 +1561,7 @@ function DeSimulationPanel({
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-4">
         {/* Erststimmen — editable */}
         <div>
-          <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-ink-3 mb-2">Erststimmen (Constituency)</div>
+          <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-ink-3 mb-2">Constituency Vote (254 seats)</div>
           <div className="space-y-1.5">
             {erstSorted.map(id => {
               const color = partyColor(id, dark);
@@ -1731,7 +1570,7 @@ function DeSimulationPanel({
               return (
                 <div key={id} className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                  <span className="text-[9.5px] font-medium text-ink flex-1 truncate">{DE_PARTY_MAP[id].name}</span>
+                  <span className="text-[9.5px] font-medium text-ink flex-1 truncate">{KR_PARTY_MAP[id].name}</span>
                   {isEditing
                     ? <input type="number" min={0} max={100} step={0.01} value={editVal} autoFocus
                         className="w-14 h-5 text-[9.5px] font-mono tabular-nums text-right px-1 rounded border focus:outline-none bg-white"
@@ -1757,19 +1596,19 @@ function DeSimulationPanel({
         {/* Zweitstimmen — auto-derived, read-only */}
         <div>
           <div className="flex items-center gap-1.5 mb-2">
-            <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-ink-3">Zweitstimmen (List)</div>
+            <div className="text-[9px] font-mono font-bold uppercase tracking-wider text-ink-3">Party-List Vote (46 seats)</div>
             <span className="text-[7.5px] font-mono text-ink-3 bg-ink/6 rounded px-1 py-0.5">auto</span>
           </div>
           <div className="space-y-1.5">
             {zweitSorted.map(id => {
               const color = partyColor(id, dark);
-              const pct = zweitPcts[id] ?? 0;
+              const pct = prPcts[id] ?? 0;
               const base = POLL_2026_PCTS[id] ?? 0;
               const delta = pct - base;
               return (
                 <div key={id} className="flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                  <span className="text-[9.5px] font-medium text-ink-3 flex-1 truncate">{DE_PARTY_MAP[id].name}</span>
+                  <span className="text-[9.5px] font-medium text-ink-3 flex-1 truncate">{KR_PARTY_MAP[id].name}</span>
                   {Math.abs(delta) > 0.05 && (
                     <span className={`text-[7.5px] font-mono tabular-nums ${delta > 0 ? 'text-emerald-600' : 'text-red-500'}`}>
                       {delta > 0 ? '+' : ''}{delta.toFixed(2)}
@@ -1800,9 +1639,9 @@ function DeSimulationPanel({
         {/* Progress */}
         {simRunning && (
           <div>
-            <div className="text-[9px] font-mono text-ink-3 mb-1">{simProgress} / 299 declared</div>
+            <div className="text-[9px] font-mono text-ink-3 mb-1">{simProgress} / 254 declared</div>
             <div className="w-full h-2 rounded-full overflow-hidden" style={{ background: 'rgba(0,0,0,0.07)' }}>
-              <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${(simProgress / 299) * 100}%` }} />
+              <div className="h-full bg-emerald-500 transition-all duration-300" style={{ width: `${(simProgress / 254) * 100}%` }} />
             </div>
           </div>
         )}
@@ -1823,29 +1662,24 @@ function DeSimulationPanel({
   );
 }
 
-// ── Multi-select panel — additive (mirrors WahlkreisPanel) ────────────────────
-function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, currentResults }: {
+// ── Multi-select panel — additive (mirrors DistrictPanel) ────────────────────
+function MultiSelectPanel({ selectedNrs, districts, onUpdate, onClose, dark, currentResults }: {
   selectedNrs: Set<number>;
-  wahlkreise: DeWahlkreis[];
-  onUpdate: (nr: number, r: Partial<Record<DePartyId, number>>) => void;
+  districts: KrDistrict[];
+  onUpdate: (nr: number, r: Partial<Record<KrPartyId, number>>) => void;
   onClose: () => void;
   dark: boolean;
-  currentResults: Record<number, Partial<Record<DePartyId, number>>>;
+  currentResults: Record<number, Partial<Record<KrPartyId, number>>>;
 }) {
   const wkMap = useMemo(() => {
-    const m: Record<number, DeWahlkreis> = {};
-    for (const wk of wahlkreise) m[wk.nr] = wk;
+    const m: Record<number, KrDistrict> = {};
+    for (const wk of districts) m[wk.nr] = wk;
     return m;
-  }, [wahlkreise]);
+  }, [districts]);
 
-  const allState = useMemo(() => {
-    const states = new Set([...selectedNrs].map(nr => wkMap[nr]?.state).filter(Boolean));
-    return states.size === 1 ? [...states][0] : null;
-  }, [selectedNrs, wkMap]);
-
-  const ids: DePartyId[] = useMemo(
-    () => DE_PARTIES.filter(p => p.id !== 'SONST' && (!p.state || p.state === allState || allState === null)).map(p => p.id),
-    [allState]
+  const ids: KrPartyId[] = useMemo(
+    () => KR_PARTIES.filter(p => p.tier !== 'pr' && p.id !== 'OTH').map(p => p.id),
+    []
   );
 
   // Compute aggregate from actual (resolved) results
@@ -1855,19 +1689,19 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
     for (const nr of selectedNrs) {
       const wk = wkMap[nr];
       if (!wk) continue;
-      const res = currentResults[nr] ?? wk.erststimmen;
+      const res = currentResults[nr] ?? wk.votes;
       for (const id of ids) { agg[id] = (agg[id] ?? 0) + (res[id] ?? 0); }
       tv += wk.validVotes;
     }
     const aggTotal = ids.reduce((s, id) => s + (agg[id] ?? 0), 0);
-    const ip: Record<DePartyId, number> = {} as any;
-    const bp: Record<DePartyId, number> = {} as any;
+    const ip: Record<KrPartyId, number> = {} as any;
+    const bp: Record<KrPartyId, number> = {} as any;
     // base from 2025 erststimmen aggregate
     const baseAgg: Record<string, number> = {};
     for (const nr of selectedNrs) {
       const wk = wkMap[nr];
       if (!wk) continue;
-      for (const id of ids) { baseAgg[id] = (baseAgg[id] ?? 0) + (wk.erststimmen[id] ?? 0); }
+      for (const id of ids) { baseAgg[id] = (baseAgg[id] ?? 0) + (wk.votes[id] ?? 0); }
     }
     const baseTotal = ids.reduce((s, id) => s + (baseAgg[id] ?? 0), 0);
     for (const id of ids) {
@@ -1878,9 +1712,9 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedNrs, wkMap, ids]);
 
-  const [pcts, setPcts] = useState<Record<DePartyId, number>>(initPcts);
-  const [locks, setLocks] = useState<Set<DePartyId>>(new Set());
-  const [editId, setEditId] = useState<DePartyId | null>(null);
+  const [pcts, setPcts] = useState<Record<KrPartyId, number>>(initPcts);
+  const [locks, setLocks] = useState<Set<KrPartyId>>(new Set());
+  const [editId, setEditId] = useState<KrPartyId | null>(null);
   const [editVal, setEditVal] = useState('');
 
   const pctsRef  = useRef(pcts);
@@ -1907,10 +1741,10 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
   const winnerPct = winnerId ? (pcts[winnerId] ?? 0) : 0;
   const runnerUpId = sortedIds.find(id => id !== winnerId);
   const margin = runnerUpId ? winnerPct - (pcts[runnerUpId] ?? 0) : winnerPct;
-  const winnerParty = winnerId ? DE_PARTY_MAP[winnerId] : null;
+  const winnerParty = winnerId ? KR_PARTY_MAP[winnerId] : null;
   const winnerColor = winnerId ? partyColor(winnerId, dark) : '#888';
 
-  function applyChange(id: DePartyId, val: number) {
+  function applyChange(id: KrPartyId, val: number) {
     const newPcts = redistributePcts(pctsRef.current, id, val, locksRef.current);
     pctsRef.current = newPcts;
     setPcts(newPcts);
@@ -1921,7 +1755,7 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
     }
   }
 
-  function toggleLock(id: DePartyId) {
+  function toggleLock(id: KrPartyId) {
     setLocks(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -1930,7 +1764,7 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
     });
   }
 
-  function commitEdit(id: DePartyId, raw: string) {
+  function commitEdit(id: KrPartyId, raw: string) {
     const n = parseFloat(raw);
     if (!isNaN(n)) applyChange(id, Math.max(0, Math.min(100, n)));
     setEditId(null); setEditVal('');
@@ -1941,7 +1775,7 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
       <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0">
         <div className="flex items-start gap-2">
           <div className="flex-1 min-w-0">
-            <h2 className="text-[15px] font-bold text-ink leading-tight">{selectedNrs.size} Wahlkreise selected</h2>
+            <h2 className="text-[15px] font-bold text-ink leading-tight">{selectedNrs.size} constituencies selected</h2>
             <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">
               {totalVotes.toLocaleString()} votes total
             </p>
@@ -1970,7 +1804,7 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
             <div key={id}>
               <div className="flex items-center gap-1 mb-0.5">
                 <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: color }} />
-                <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{DE_PARTY_MAP[id].name}</span>
+                <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{KR_PARTY_MAP[id].name}</span>
                 <button onClick={() => toggleLock(id)} title={isLocked ? 'Unlock' : 'Lock'}
                   className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked ? 'text-gold' : 'text-ink-3 hover:text-ink'}`}>
                   {isLocked ? (
@@ -2021,7 +1855,7 @@ function MultiSelectPanel({ selectedNrs, wahlkreise, onUpdate, onClose, dark, cu
 }
 
 // ── Main app ───────────────────────────────────────────────────────────────────
-export default function GermanyApp() {
+export default function SouthKoreaApp() {
   const navigate = useNavigate();
 
   const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
@@ -2032,38 +1866,38 @@ export default function GermanyApp() {
 
   // ── Election state ───────────────────────────────────────────────────────────
   const [preset, setPreset] = useState<'baseline' | 'blank' | 'polling2026'>('polling2026');
-  const [currentResults, setCurrentResults] = useState<Record<number, Partial<Record<DePartyId, number>>>>(
+  const [currentResults, setCurrentResults] = useState<Record<number, Partial<Record<KrPartyId, number>>>>(
     () => applyPollSwing(POLL_2026_PCTS)
   );
 
-  function makeZweit2025(): Record<DePartyId, number> {
-    const trackedSum = Object.values(ZWEITSTIMMEN_2025).reduce((s, v) => s + (v ?? 0), 0);
+  function makePR2024(): Record<KrPartyId, number> {
+    const trackedSum = Object.values(PR_VOTES_2024).reduce((s, v) => s + (v ?? 0), 0);
     return {
-      ...Object.fromEntries(DE_PARTIES.filter(p => p.id !== 'SONST').map(p => [p.id, ZWEITSTIMMEN_2025[p.id] ?? 0])),
-      SONST: ZWEIT_GRAND_TOTAL_2025 - trackedSum,
-    } as Record<DePartyId, number>;
+      ...Object.fromEntries(KR_PARTIES.filter(p => p.id !== 'OTH').map(p => [p.id, PR_VOTES_2024[p.id] ?? 0])),
+      OTH: PR_GRAND_TOTAL_2024 - trackedSum,
+    } as Record<KrPartyId, number>;
   }
 
-  function loadBaseline() { setCurrentResults({}); setPreset('baseline'); setZweitVotes(makeZweit2025()); }
+  function loadBaseline() { setCurrentResults({}); setPreset('baseline'); setPrVotes(makePR2024()); }
   function loadPolling2026() {
     setCurrentResults(applyPollSwing(POLL_2026_PCTS));
     setPreset('polling2026');
-    const gt = ZWEIT_GRAND_TOTAL_2025;
-    setZweitVotes(Object.fromEntries(
-      DE_PARTIES.map(p => [p.id, Math.round((POLL_2026_PCTS[p.id] ?? 0) / 100 * gt)])
-    ) as Record<DePartyId, number>);
+    const gt = PR_GRAND_TOTAL_2024;
+    setPrVotes(Object.fromEntries(
+      KR_PARTIES.map(p => [p.id, Math.round((POLL_2026_PR[p.id] ?? 0) / 100 * gt)])
+    ) as Record<KrPartyId, number>);
   }
   function loadBlank() {
-    const blank: Record<number, Partial<Record<DePartyId, number>>> = {};
-    for (const wk of DE_WAHLKREISE) blank[wk.nr] = {};
+    const blank: Record<number, Partial<Record<KrPartyId, number>>> = {};
+    for (const wk of KR_DISTRICTS) blank[wk.nr] = {};
     setCurrentResults(blank);
     setPreset('blank');
-    setZweitVotes(Object.fromEntries(DE_PARTIES.map(p => [p.id, 0])) as Record<DePartyId, number>);
+    setPrVotes(Object.fromEntries(KR_PARTIES.map(p => [p.id, 0])) as Record<KrPartyId, number>);
     setProjectedNrs(new Set());
     setScoreboardVisible(false);
   }
 
-  function updateWk(nr: number, results: Partial<Record<DePartyId, number>>) {
+  function updateWk(nr: number, results: Partial<Record<KrPartyId, number>>) {
     setCurrentResults(prev => ({ ...prev, [nr]: results }));
     if (preset !== 'blank') setPreset('baseline');
   }
@@ -2073,13 +1907,13 @@ export default function GermanyApp() {
   const [multiSelectMode, setMultiSelectMode] = useState(false);
   const [selectedNrs, setSelectedNrs]         = useState<Set<number>>(new Set());
   const [projectedNrs, setProjectedNrs]       = useState<Set<number>>(new Set());
-  const [zweitOpen, setZweitOpen]             = useState(false);
+  const [prOpen, setPrOpen]             = useState(false);
   const [parliOpen, setParliOpen]             = useState(false);
-  const [zweitVotes, setZweitVotes]           = useState<Record<DePartyId, number> | null>(() => {
-    const gt = ZWEIT_GRAND_TOTAL_2025;
+  const [prVotes, setPrVotes]           = useState<Record<KrPartyId, number> | null>(() => {
+    const gt = PR_GRAND_TOTAL_2024;
     return Object.fromEntries(
-      DE_PARTIES.map(p => [p.id, Math.round((POLL_2026_PCTS[p.id] ?? 0) / 100 * gt)])
-    ) as Record<DePartyId, number>;
+      KR_PARTIES.map(p => [p.id, Math.round((POLL_2026_PR[p.id] ?? 0) / 100 * gt)])
+    ) as Record<KrPartyId, number>;
   });
   const [bubbleMap, setBubbleMap]               = useState(false);
   const [tutorialOpen, setTutorialOpen]         = useState(false);
@@ -2106,16 +1940,16 @@ export default function GermanyApp() {
   }
 
   function handleSimStart(
-    allResults: Record<number, Partial<Record<DePartyId, number>>>,
-    newZweitVotes: Record<DePartyId, number>,
+    allResults: Record<number, Partial<Record<KrPartyId, number>>>,
+    newPrVotes: Record<KrPartyId, number>,
     durationMs: number,
   ) {
     stopSim();
-    const blank: Record<number, Partial<Record<DePartyId, number>>> = {};
-    for (const wk of DE_WAHLKREISE) blank[wk.nr] = {};
+    const blank: Record<number, Partial<Record<KrPartyId, number>>> = {};
+    for (const wk of KR_DISTRICTS) blank[wk.nr] = {};
     setCurrentResults(blank);
     setPreset('blank');
-    setZweitVotes(Object.fromEntries(DE_PARTIES.map(p => [p.id, 0])) as Record<DePartyId, number>); // Zweitstimmen ramp up as districts report
+    setPrVotes(Object.fromEntries(KR_PARTIES.map(p => [p.id, 0])) as Record<KrPartyId, number>); // PR ramps up as districts report
     setProjectedNrs(new Set());
     setScoreboardVisible(false);
     setSimRunning(true);
@@ -2124,14 +1958,14 @@ export default function GermanyApp() {
     const timers: ReturnType<typeof setTimeout>[] = [];
     let declared = 0;
 
-    DE_WAHLKREISE.forEach(wk => {
+    KR_DISTRICTS.forEach(wk => {
       const t = Math.max(2000, Math.min(durationMs * 0.98,
         (durationMs / 2) + randNormal() * (durationMs / 6)));
-      const fullResult = allResults[wk.nr] ?? wk.erststimmen;
+      const fullResult = allResults[wk.nr] ?? wk.votes;
 
       timers.push(setTimeout(() => {
-        const partial: Partial<Record<DePartyId, number>> = {};
-        for (const [id, v] of Object.entries(fullResult) as [DePartyId, number][])
+        const partial: Partial<Record<KrPartyId, number>> = {};
+        for (const [id, v] of Object.entries(fullResult) as [KrPartyId, number][])
           partial[id] = Math.round(v * 0.35);
         setCurrentResults(prev => ({ ...prev, [wk.nr]: partial }));
       }, t * 0.6));
@@ -2140,10 +1974,10 @@ export default function GermanyApp() {
         setCurrentResults(prev => ({ ...prev, [wk.nr]: fullResult }));
         declared++;
         setSimProgress(declared);
-        // Zweitstimmen (list votes) report gradually, in step with constituency counting
-        const frac = declared / 299;
-        setZweitVotes(Object.fromEntries(DE_PARTIES.map(p => [p.id, Math.round((newZweitVotes[p.id] ?? 0) * frac)])) as Record<DePartyId, number>);
-        if (declared >= 299) setSimRunning(false);
+        // Party-list (PR) votes report little-by-little, in step with constituency counting
+        const frac = declared / 254;
+        setPrVotes(Object.fromEntries(KR_PARTIES.map(p => [p.id, Math.round((newPrVotes[p.id] ?? 0) * frac)])) as Record<KrPartyId, number>);
+        if (declared >= 254) setSimRunning(false);
       }, t));
     });
 
@@ -2171,10 +2005,10 @@ export default function GermanyApp() {
 
   // Auto-show scoreboard once list seats have been filled in blank mode
   useEffect(() => {
-    if (preset === 'blank' && zweitVotes && Object.values(zweitVotes).some(v => (v ?? 0) > 0)) {
+    if (preset === 'blank' && prVotes && Object.values(prVotes).some(v => (v ?? 0) > 0)) {
       setScoreboardVisible(true);
     }
-  }, [preset, zweitVotes]);
+  }, [preset, prVotes]);
 
   const triggerExit = useCallback((panel: string) => {
     if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
@@ -2191,54 +2025,45 @@ export default function GermanyApp() {
   }
 
   const resolvedResults = useMemo(() => {
-    const r: Record<number, Partial<Record<DePartyId, number>>> = {};
-    for (const wk of DE_WAHLKREISE) r[wk.nr] = currentResults[wk.nr] ?? wk.erststimmen;
+    const r: Record<number, Partial<Record<KrPartyId, number>>> = {};
+    for (const wk of KR_DISTRICTS) r[wk.nr] = currentResults[wk.nr] ?? wk.votes;
     return r;
   }, [currentResults]);
 
-  // Wahlkreise that have reported (blank-map / election-night) — drives the % reporting widget
+  // districts that have reported (blank-map / election-night) — drives the % reporting widget
   const reportedCount = useMemo(() => {
     let n = 0;
-    for (const wk of DE_WAHLKREISE) {
+    for (const wk of KR_DISTRICTS) {
       const r = currentResults[wk.nr];
       if (r && Object.values(r).some(v => (v ?? 0) > 0)) n++;
     }
     return n;
   }, [currentResults]);
 
-  const directSeats = useMemo(() => calcDirectSeats(DE_WAHLKREISE, resolvedResults), [resolvedResults]);
+  const directSeats = useMemo(() => calcConstituencySeats(KR_DISTRICTS, resolvedResults), [resolvedResults]);
 
-  // For baseline, use the actual awarded direct seats (excludes 23 "losing winners")
-  const effectiveDirectSeats = useMemo<Partial<Record<DePartyId, number>>>(() => {
-    if (preset !== 'baseline') return directSeats;
-    const r: Partial<Record<DePartyId, number>> = {};
-    for (const stateSeats of Object.values(DIRECT_SEATS_2025_BY_STATE)) {
-      for (const [pid, n] of Object.entries(stateSeats) as [DePartyId, number][]) {
-        r[pid] = (r[pid] ?? 0) + n;
-      }
-    }
-    return r;
-  }, [preset, directSeats]);
+  // South Korea seats every FPTP winner (no German-style "losing winners" adjustment).
+  const effectiveDirectSeats = directSeats;
 
-  const parliSeats = useMemo<Partial<Record<DePartyId, number>>>(() => {
-    if (!zweitVotes) return {};
-    return calcMMP(zweitVotes, effectiveDirectSeats).totalSeats;
-  }, [zweitVotes, effectiveDirectSeats]);
+  const parliSeats = useMemo<Partial<Record<KrPartyId, number>>>(() => {
+    if (!prVotes) return {};
+    return calcAssembly(KR_DISTRICTS, resolvedResults, prVotes).totalSeats;
+  }, [resolvedResults, prVotes]);
 
-  const selectedWk = selectedNr !== null ? DE_WAHLKREISE.find(w => w.nr === selectedNr) ?? null : null;
+  const selectedWk = selectedNr !== null ? KR_DISTRICTS.find(w => w.nr === selectedNr) ?? null : null;
 
   const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
   const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
   const btnMuted  = `${btnBase} border border-default text-ink-3 hover:bg-hover hover:text-ink`;
   const btnActive = `${btnBase} bg-ink/8 border border-default text-ink`;
 
-  const showWkPanel    = !!selectedNr && !multiSelectMode && !zweitOpen;
+  const showWkPanel    = !!selectedNr && !multiSelectMode && !prOpen;
   const showMultiPanel = multiSelectMode && selectedNrs.size > 0;
-  const showZweit      = zweitOpen;
+  const showPR      = prOpen;
   const showParli      = parliOpen;
 
   return (
-    <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="de">
+    <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="kr">
 
       {/* ── Topbar ──────────────────────────────────────────────────────────── */}
       <header className={`h-[52px] ${dark ? 'bg-[rgba(7,13,28,0.94)]' : 'bg-[rgba(245,244,240,0.92)]'} backdrop-blur-xl border-b border-default shadow-header shrink-0 flex items-center z-50`}>
@@ -2250,17 +2075,17 @@ export default function GermanyApp() {
         <div ref={headerScrollRef} className="flex-1 min-w-0 header-scroll-strip flex items-center gap-2 px-2">
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
 
-          <button onClick={loadBaseline}    className={preset === 'baseline'    ? btnGold : btnMuted}>2025 Baseline</button>
+          <button onClick={loadBaseline}    className={preset === 'baseline'    ? btnGold : btnMuted}>2024 Baseline</button>
           <button onClick={loadPolling2026} className={preset === 'polling2026' ? btnGold : btnMuted}>2026 Polling</button>
           <button onClick={loadBlank}       className={preset === 'blank'       ? btnGold : btnMuted}>Blank Map</button>
 
           <button
             onClick={() => {
-              if (zweitOpen) { setZweitOpen(false); triggerExit('zweit'); }
-              else { setZweitOpen(true); }
+              if (prOpen) { setPrOpen(false); triggerExit('pr'); }
+              else { setPrOpen(true); }
             }}
-            className={zweitOpen ? btnActive : preset === 'blank' ? `${btnBase} border-2 border-gold text-gold animate-pulse hover:bg-gold hover:text-white` : btnMuted}
-          >List Seats</button>
+            className={prOpen ? btnActive : preset === 'blank' ? `${btnBase} border-2 border-gold text-gold animate-pulse hover:bg-gold hover:text-white` : btnMuted}
+          >Party List</button>
 
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
 
@@ -2385,13 +2210,13 @@ export default function GermanyApp() {
         <div className="relative shrink-0">
           <div style={{ display: 'grid', gridTemplateRows: scoreboardVisible ? '1fr' : '0fr', transition: 'grid-template-rows 280ms cubic-bezier(0.4,0,0.2,1)' }}>
             <div className="overflow-hidden">
-              <GermanyScoreboard
-                wahlkreise={DE_WAHLKREISE}
+              <KoreaScoreboard
+                districts={KR_DISTRICTS}
                 currentResults={resolvedResults}
-                zweitstimmen={zweitVotes ?? undefined}
-                directSeats={zweitVotes ? effectiveDirectSeats : undefined}
+                prList={prVotes ?? undefined}
+                directSeats={prVotes ? effectiveDirectSeats : undefined}
                 dark={dark}
-                leaders={preset === 'polling2026' || preset === 'blank' ? { ...DE_LEADERS, ...DE_LEADERS_2026 } : DE_LEADERS}
+                leaders={preset === 'polling2026' || preset === 'blank' ? { ...KR_LEADERS, ...KR_LEADERS_2026 } : KR_LEADERS}
               />
             </div>
           </div>
@@ -2421,13 +2246,13 @@ export default function GermanyApp() {
             />
           )}
           <div className="flex-1 min-w-0 relative">
-            <GermanyMapView
-              wahlkreise={DE_WAHLKREISE}
+            <KoreaMapView
+              districts={KR_DISTRICTS}
               currentResults={resolvedResults}
               selectedNr={selectedNr}
               onSelect={nr => {
                 setSelectedNr(prev => prev === nr ? null : nr);
-                setZweitOpen(false);
+                setPrOpen(false);
               }}
               dark={dark}
               bubbleMap={bubbleMap}
@@ -2445,8 +2270,8 @@ export default function GermanyApp() {
                 )}
                 <div className={`rounded-[6px] px-3 py-1.5 shadow-md border text-left ${dark ? 'bg-[rgba(13,27,46,0.92)] border-white/10 text-white' : 'bg-white/95 border-default text-ink'}`}>
                   <div className="text-[8px] font-mono uppercase tracking-wider text-ink-3 leading-none mb-0.5">Reporting</div>
-                  <div className="text-[15px] font-mono font-bold tabular-nums leading-none">{Math.round((reportedCount / DE_WAHLKREISE.length) * 100)}%</div>
-                  <div className="text-[8px] font-mono text-ink-3 leading-none mt-0.5">{reportedCount} / {DE_WAHLKREISE.length} seats</div>
+                  <div className="text-[15px] font-mono font-bold tabular-nums leading-none">{Math.round((reportedCount / KR_DISTRICTS.length) * 100)}%</div>
+                  <div className="text-[8px] font-mono text-ink-3 leading-none mt-0.5">{reportedCount} / {KR_DISTRICTS.length} seats</div>
                 </div>
               </div>
             )}
@@ -2461,7 +2286,7 @@ export default function GermanyApp() {
 
           {/* Panels */}
           {showWkPanel && selectedWk && (
-            <WahlkreisPanel
+            <DistrictPanel
               wk={selectedWk}
               results={resolvedResults[selectedWk.nr] ?? {}}
               onClose={() => setSelectedNr(null)}
@@ -2475,7 +2300,7 @@ export default function GermanyApp() {
           {showMultiPanel && (
             <MultiSelectPanel
               selectedNrs={selectedNrs}
-              wahlkreise={DE_WAHLKREISE}
+              districts={KR_DISTRICTS}
               onUpdate={updateWk}
               onClose={() => { setMultiSelectMode(false); setSelectedNrs(new Set()); }}
               dark={dark}
@@ -2484,9 +2309,9 @@ export default function GermanyApp() {
           )}
           {(breakdownOpen || breakdownExiting) && (
             <BreakdownPanel
-              wahlkreise={DE_WAHLKREISE}
+              districts={KR_DISTRICTS}
               currentResults={resolvedResults}
-              zweitVotes={zweitVotes}
+              prVotes={prVotes}
               onClose={() => {
                 setBreakdownExiting(true);
                 setTimeout(() => { setBreakdownExiting(false); setBreakdownOpen(false); }, 280);
@@ -2496,18 +2321,18 @@ export default function GermanyApp() {
               isBaseline={preset === 'baseline'}
             />
           )}
-          {(showZweit || exitPanel === 'zweit') && zweitVotes && (
-            <ZweitstimmenPanel
-              votes={zweitVotes}
-              onVotesChange={setZweitVotes}
+          {(showPR || exitPanel === 'pr') && prVotes && (
+            <PRPanel
+              votes={prVotes}
+              onVotesChange={setPrVotes}
               directSeats={effectiveDirectSeats}
-              onClose={() => { setZweitOpen(false); triggerExit('zweit'); }}
-              exiting={exitPanel === 'zweit'}
+              onClose={() => { setPrOpen(false); triggerExit('pr'); }}
+              exiting={exitPanel === 'pr'}
               dark={dark}
             />
           )}
           {(simOpen || simExiting) && (
-            <DeSimulationPanel
+            <KrSimulationPanel
               onStart={handleSimStart}
               onClose={() => {
                 setSimExiting(true);
@@ -2533,7 +2358,7 @@ export default function GermanyApp() {
 
         {/* Branding */}
         <div className="absolute bottom-0 left-0 right-0 pointer-events-none z-30 flex items-center justify-between px-3 py-1 bg-ink/60">
-          <span className="text-[10px] text-white/70 font-mono tracking-wide uppercase">Global Election Simulator — Germany Bundestagswahl Edition</span>
+          <span className="text-[10px] text-white/70 font-mono tracking-wide uppercase">Global Election Simulator — South Korea National Assembly Edition</span>
           <span className="text-[10px] text-white/40 font-mono">{typeof window !== 'undefined' ? window.location.hostname : ''}</span>
         </div>
       </div>
