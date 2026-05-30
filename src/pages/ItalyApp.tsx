@@ -9,8 +9,8 @@ import { GlobeLogo } from './HomePage';
 
 // ── Party types ───────────────────────────────────────────────────────────────
 type ItPartyId =
-  | 'FDI' | 'PD' | 'M5S' | 'LEGA' | 'FI' | 'AZIV'
-  | 'AVS' | 'PIU' | 'NM' | 'IC' | 'SVP';
+  | 'FDI' | 'PD' | 'M5S' | 'LEGA' | 'FI' | 'AZ' | 'IV'
+  | 'AVS' | 'PIU' | 'NM' | 'IC' | 'SVP' | 'FN';
 
 type ItParty = {
   id:             ItPartyId;
@@ -28,9 +28,9 @@ type ItParty = {
 };
 
 // Ideological order left → right for the parliament hemicycle
-const IT_LR_ORDER: ItPartyId[] = ['AVS','M5S','PD','IC','PIU','AZIV','SVP','FI','NM','LEGA','FDI'];
+const IT_LR_ORDER: ItPartyId[] = ['AVS','M5S','PD','IC','PIU','IV','AZ','SVP','FI','NM','LEGA','FDI','FN'];
 // Party keys present in the geojson `pr` objects (PR list shares)
-const IT_PR_KEYS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZIV','AVS','PIU','NM','IC'];
+const IT_PR_KEYS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZ','IV','AVS','PIU','NM','IC'];
 
 const IT_PARTIES: ItParty[] = [
   { id: 'FDI',  name: 'FdI',     fullName: "Fratelli d'Italia",        color: '#214A7B', seats2022: 119, leader: 'Giorgia Meloni',     wikiTitle: 'Giorgia_Meloni' },
@@ -38,7 +38,9 @@ const IT_PARTIES: ItParty[] = [
   { id: 'M5S',  name: 'M5S',     fullName: 'Movimento 5 Stelle',       color: '#F2C200', seats2022:  52, leader: 'Giuseppe Conte',     wikiTitle: 'Giuseppe_Conte' },
   { id: 'LEGA', name: 'Lega',    fullName: 'Lega',                     color: '#1B9E4B', seats2022:  66, leader: 'Matteo Salvini',     wikiTitle: 'Matteo_Salvini' },
   { id: 'FI',   name: 'FI',      fullName: 'Forza Italia',             color: '#0F73B9', seats2022:  45, leader: 'Antonio Tajani',     wikiTitle: 'Antonio_Tajani' },
-  { id: 'AZIV', name: 'Az–IV',   fullName: 'Azione – Italia Viva',     color: '#00A3C7', seats2022:  21, leader: 'Carlo Calenda',      wikiTitle: 'Carlo_Calenda' },
+  { id: 'AZ',   name: 'Azione',  fullName: 'Azione',                  color: '#00A3C7', seats2022:  13, leader: 'Carlo Calenda',      wikiTitle: 'Carlo_Calenda' },
+  { id: 'IV',   name: 'IV',      fullName: 'Italia Viva',             color: '#E5147D', seats2022:   8, leader: 'Matteo Renzi',        wikiTitle: 'Matteo_Renzi' },
+  { id: 'FN',   name: 'FN',      fullName: 'Far Right (new)',         color: '#3E2723', seats2022:   0, leader: 'New far-right list',  wikiTitle: '' },
   { id: 'AVS',  name: 'AVS',     fullName: 'Alleanza Verdi e Sinistra',color: '#2E8B57', seats2022:  12, leader: 'Angelo Bonelli',     wikiTitle: 'Angelo_Bonelli' },
   { id: 'PIU',  name: '+Europa', fullName: '+Europa',                  color: '#C4006B', seats2022:   2, leader: 'Riccardo Magi',      wikiTitle: 'Riccardo_Magi', regional: false },
   { id: 'NM',   name: 'NM',      fullName: 'Noi Moderati',             color: '#5B6E8C', seats2022:   7, leader: 'Maurizio Lupi',      wikiTitle: 'Maurizio_Lupi' },
@@ -68,19 +70,19 @@ const IT_COAL_LABEL: Record<string, string> = { CDX:'Centre-right', CSX:'Centre-
 // Source: Wikipedia "Results of the 2022 Italian general election" (Camera,
 // quota proporzionale). Total valid Chamber votes: 28,098,196.
 const IT_VOTE_RAW_2022: Record<ItPartyId, number> = {
-  FDI: 7_301_303, PD: 5_348_676, M5S: 4_335_494, LEGA: 2_470_318, FI: 2_279_266, AZIV: 2_186_505,
+  FDI: 7_301_303, PD: 5_348_676, M5S: 4_335_494, LEGA: 2_470_318, FI: 2_279_266, AZ: 1_235_375, IV: 951_130, FN: 0,
   AVS: 1_021_808, PIU: 796_057, NM: 254_127, IC: 173_555, SVP: 117_032,
 };
 const IT_GRAND_TOTAL_VOTES = 28_098_196;
 const IT_VOTE_PCT_2022: Record<ItPartyId, number> = {
-  FDI: 25.98, PD: 19.04, M5S: 15.43, LEGA: 8.79, FI: 8.11, AZIV: 7.78,
+  FDI: 25.98, PD: 19.04, M5S: 15.43, LEGA: 8.79, FI: 8.11, AZ: 4.40, IV: 3.38, FN: 0,
   AVS: 3.64, PIU: 2.83, NM: 0.91, IC: 0.62, SVP: 0.42,
 };
 
 // 2026 polling — illustrative May 2026 estimate
 const IT_VOTE_PCT_2026: Record<ItPartyId, number> = {
-  FDI: 29.0, PD: 22.5, M5S: 11.5, LEGA: 8.5, FI: 9.5, AZIV: 4.5,
-  AVS: 6.5, PIU: 2.0, NM: 1.0, IC: 0.3, SVP: 0.4,
+  FDI: 28.4, PD: 22.2, M5S: 12.3, LEGA: 7.0, FI: 8.2, AZ: 3.0, IV: 2.5,
+  AVS: 6.5, PIU: 1.4, NM: 1.3, FN: 4.0, IC: 0.5, SVP: 0.4,
 };
 
 // ── Province types ────────────────────────────────────────────────────────────
@@ -154,103 +156,103 @@ const IT_GEOID_TO_ID: Record<string, ItProvId> = {
 // share is an estimate. The engine normalises within the modelled set.
 const IT_PROVINCES: ItProvince[] = [
   { id:'C10101', name:"Piemonte 1 - P01", seats:8, weight:2.09,
-    v2022:{FDI:23.8,PD:22,M5S:12.5,LEGA:8.5,FI:6.8,AZIV:9.1,AVS:5,PIU:4.6,NM:0.7,IC:0.5} },
+    v2022:{FDI:23.8,PD:22,M5S:12.5,LEGA:8.5,FI:6.8,AZ:5.1,IV:4,AVS:5,PIU:4.6,NM:0.7,IC:0.5} },
   { id:'C10102', name:"Piemonte 1 - P02", seats:7, weight:1.7,
-    v2022:{FDI:23.8,PD:22,M5S:12.5,LEGA:8.5,FI:6.8,AZIV:9.1,AVS:5,PIU:4.6,NM:0.7,IC:0.5} },
+    v2022:{FDI:23.8,PD:22,M5S:12.5,LEGA:8.5,FI:6.8,AZ:5.1,IV:4,AVS:5,PIU:4.6,NM:0.7,IC:0.5} },
   { id:'C10201', name:"Piemonte 2 - P01", seats:6, weight:1.49,
-    v2022:{FDI:30.4,PD:17.6,M5S:8.1,LEGA:13,FI:9,AZIV:8.7,AVS:3.1,PIU:3.6,NM:0.7,IC:0.5} },
+    v2022:{FDI:30.4,PD:17.6,M5S:8.1,LEGA:13,FI:9,AZ:4.9,IV:3.8,AVS:3.1,PIU:3.6,NM:0.7,IC:0.5} },
   { id:'C10202', name:"Piemonte 2 - P02", seats:8, weight:2.08,
-    v2022:{FDI:30.4,PD:17.6,M5S:8.1,LEGA:13,FI:9,AZIV:8.7,AVS:3.1,PIU:3.6,NM:0.7,IC:0.5} },
+    v2022:{FDI:30.4,PD:17.6,M5S:8.1,LEGA:13,FI:9,AZ:4.9,IV:3.8,AVS:3.1,PIU:3.6,NM:0.7,IC:0.5} },
   { id:'C30101', name:"Lombardia 1 - P01", seats:13, weight:3.36,
-    v2022:{FDI:24.9,PD:21.7,M5S:8.9,LEGA:10,FI:7.3,AZIV:11.8,AVS:4.7,PIU:4.3,NM:1.1,IC:0.5} },
+    v2022:{FDI:24.9,PD:21.7,M5S:8.9,LEGA:10,FI:7.3,AZ:6.7,IV:5.1,AVS:4.7,PIU:4.3,NM:1.1,IC:0.5} },
   { id:'C30102', name:"Lombardia 1 - P02", seats:12, weight:3.05,
-    v2022:{FDI:24.9,PD:21.7,M5S:8.9,LEGA:10,FI:7.3,AZIV:11.8,AVS:4.7,PIU:4.3,NM:1.1,IC:0.5} },
+    v2022:{FDI:24.9,PD:21.7,M5S:8.9,LEGA:10,FI:7.3,AZ:6.7,IV:5.1,AVS:4.7,PIU:4.3,NM:1.1,IC:0.5} },
   { id:'C30201', name:"Lombardia 2 - P01", seats:6, weight:1.47,
-    v2022:{FDI:30.2,PD:15.9,M5S:6.6,LEGA:15.7,FI:8.3,AZIV:10,AVS:3.4,PIU:3.5,NM:1.1,IC:0.4} },
+    v2022:{FDI:30.2,PD:15.9,M5S:6.6,LEGA:15.7,FI:8.3,AZ:5.6,IV:4.3,AVS:3.4,PIU:3.5,NM:1.1,IC:0.4} },
   { id:'C30202', name:"Lombardia 2 - P02", seats:8, weight:2.05,
-    v2022:{FDI:30.2,PD:15.9,M5S:6.6,LEGA:15.7,FI:8.3,AZIV:10,AVS:3.4,PIU:3.5,NM:1.1,IC:0.4} },
+    v2022:{FDI:30.2,PD:15.9,M5S:6.6,LEGA:15.7,FI:8.3,AZ:5.6,IV:4.3,AVS:3.4,PIU:3.5,NM:1.1,IC:0.4} },
   { id:'C30301', name:"Lombardia 3 - P01", seats:7, weight:1.64,
-    v2022:{FDI:31.4,PD:16.6,M5S:5.8,LEGA:16.2,FI:8,AZIV:9.7,AVS:3.4,PIU:3.1,NM:0.7,IC:0.3} },
+    v2022:{FDI:31.4,PD:16.6,M5S:5.8,LEGA:16.2,FI:8,AZ:5.5,IV:4.2,AVS:3.4,PIU:3.1,NM:0.7,IC:0.3} },
   { id:'C30302', name:"Lombardia 3 - P02", seats:8, weight:2.03,
-    v2022:{FDI:31.4,PD:16.6,M5S:5.8,LEGA:16.2,FI:8,AZIV:9.7,AVS:3.4,PIU:3.1,NM:0.7,IC:0.3} },
+    v2022:{FDI:31.4,PD:16.6,M5S:5.8,LEGA:16.2,FI:8,AZ:5.5,IV:4.2,AVS:3.4,PIU:3.1,NM:0.7,IC:0.3} },
   { id:'C30401', name:"Lombardia 4 - P01", seats:11, weight:2.76,
-    v2022:{FDI:30.7,PD:19.2,M5S:7.6,LEGA:13.8,FI:8.5,AZIV:8.1,AVS:2.9,PIU:2.7,NM:0.8,IC:0.4} },
+    v2022:{FDI:30.7,PD:19.2,M5S:7.6,LEGA:13.8,FI:8.5,AZ:4.6,IV:3.5,AVS:2.9,PIU:2.7,NM:0.8,IC:0.4} },
   { id:'C40001', name:"Trentino-Alto Adige/Südtirol - P01", seats:7, weight:1.74,
-    v2022:{FDI:13.2,PD:12,M5S:3.5,LEGA:6,FI:2.4,AZIV:4.3,AVS:4.1,PIU:2,NM:0.3,IC:0.3,SVP:30} },
+    v2022:{FDI:13.2,PD:12,M5S:3.5,LEGA:6,FI:2.4,AZ:2.4,IV:1.9,AVS:4.1,PIU:2,NM:0.3,IC:0.3,SVP:30} },
   { id:'C50101', name:"Veneto 1 - P01", seats:13, weight:3.26,
-    v2022:{FDI:32,PD:16.8,M5S:6,LEGA:14.4,FI:6.3,AZIV:8.1,AVS:3.5,PIU:3.2,NM:2.5,IC:0.3} },
+    v2022:{FDI:32,PD:16.8,M5S:6,LEGA:14.4,FI:6.3,AZ:4.6,IV:3.5,AVS:3.5,PIU:3.2,NM:2.5,IC:0.3} },
   { id:'C50201', name:"Veneto 2 - P01", seats:8, weight:1.96,
-    v2022:{FDI:33.1,PD:16,M5S:5.7,LEGA:14.6,FI:7.4,AZIV:8.6,AVS:3.2,PIU:3,NM:1.8,IC:0.3} },
+    v2022:{FDI:33.1,PD:16,M5S:5.7,LEGA:14.6,FI:7.4,AZ:4.9,IV:3.7,AVS:3.2,PIU:3,NM:1.8,IC:0.3} },
   { id:'C50202', name:"Veneto 2 - P02", seats:6, weight:1.45,
-    v2022:{FDI:33.1,PD:16,M5S:5.7,LEGA:14.6,FI:7.4,AZIV:8.6,AVS:3.2,PIU:3,NM:1.8,IC:0.3} },
+    v2022:{FDI:33.1,PD:16,M5S:5.7,LEGA:14.6,FI:7.4,AZ:4.9,IV:3.7,AVS:3.2,PIU:3,NM:1.8,IC:0.3} },
   { id:'C50203', name:"Veneto 2 - P03", seats:6, weight:1.52,
-    v2022:{FDI:33.1,PD:16,M5S:5.7,LEGA:14.6,FI:7.4,AZIV:8.6,AVS:3.2,PIU:3,NM:1.8,IC:0.3} },
+    v2022:{FDI:33.1,PD:16,M5S:5.7,LEGA:14.6,FI:7.4,AZ:4.9,IV:3.7,AVS:3.2,PIU:3,NM:1.8,IC:0.3} },
   { id:'C60001', name:"Friuli-Venezia Giulia - P01", seats:8, weight:2.06,
-    v2022:{FDI:31.4,PD:18.4,M5S:7.2,LEGA:10.9,FI:6.7,AZIV:8.7,AVS:3.7,PIU:3.3,NM:0.8,IC:0.4} },
+    v2022:{FDI:31.4,PD:18.4,M5S:7.2,LEGA:10.9,FI:6.7,AZ:4.9,IV:3.8,AVS:3.7,PIU:3.3,NM:0.8,IC:0.4} },
   { id:'C70001', name:"Liguria - P01", seats:11, weight:2.65,
-    v2022:{FDI:24.1,PD:22.7,M5S:12.7,LEGA:9.3,FI:6.6,AZIV:7.4,AVS:4.3,PIU:3.4,NM:2.1,IC:0.5} },
+    v2022:{FDI:24.1,PD:22.7,M5S:12.7,LEGA:9.3,FI:6.6,AZ:4.2,IV:3.2,AVS:4.3,PIU:3.4,NM:2.1,IC:0.5} },
   { id:'C80001', name:"Emilia-Romagna - P01", seats:8, weight:2.01,
-    v2022:{FDI:25,PD:28.1,M5S:9.9,LEGA:7.5,FI:5.8,AZIV:8.6,AVS:4.3,PIU:3.1,NM:0.6,IC:0.3} },
+    v2022:{FDI:25,PD:28.1,M5S:9.9,LEGA:7.5,FI:5.8,AZ:4.9,IV:3.7,AVS:4.3,PIU:3.1,NM:0.6,IC:0.3} },
   { id:'C80002', name:"Emilia-Romagna - P02", seats:12, weight:2.86,
-    v2022:{FDI:25,PD:28.1,M5S:9.9,LEGA:7.5,FI:5.8,AZIV:8.6,AVS:4.3,PIU:3.1,NM:0.6,IC:0.3} },
+    v2022:{FDI:25,PD:28.1,M5S:9.9,LEGA:7.5,FI:5.8,AZ:4.9,IV:3.7,AVS:4.3,PIU:3.1,NM:0.6,IC:0.3} },
   { id:'C80003', name:"Emilia-Romagna - P03", seats:10, weight:2.45,
-    v2022:{FDI:25,PD:28.1,M5S:9.9,LEGA:7.5,FI:5.8,AZIV:8.6,AVS:4.3,PIU:3.1,NM:0.6,IC:0.3} },
+    v2022:{FDI:25,PD:28.1,M5S:9.9,LEGA:7.5,FI:5.8,AZ:4.9,IV:3.7,AVS:4.3,PIU:3.1,NM:0.6,IC:0.3} },
   { id:'C90001', name:"Toscana - P01", seats:8, weight:2,
-    v2022:{FDI:25.9,PD:26.1,M5S:11.1,LEGA:6.6,FI:5.6,AZIV:9.4,AVS:5.1,PIU:2.9,NM:0.5,IC:0.5} },
+    v2022:{FDI:25.9,PD:26.1,M5S:11.1,LEGA:6.6,FI:5.6,AZ:5.3,IV:4.1,AVS:5.1,PIU:2.9,NM:0.5,IC:0.5} },
   { id:'C90002', name:"Toscana - P02", seats:8, weight:2.03,
-    v2022:{FDI:25.9,PD:26.1,M5S:11.1,LEGA:6.6,FI:5.6,AZIV:9.4,AVS:5.1,PIU:2.9,NM:0.5,IC:0.5} },
+    v2022:{FDI:25.9,PD:26.1,M5S:11.1,LEGA:6.6,FI:5.6,AZ:5.3,IV:4.1,AVS:5.1,PIU:2.9,NM:0.5,IC:0.5} },
   { id:'C90003', name:"Toscana - P03", seats:9, weight:2.16,
-    v2022:{FDI:25.9,PD:26.1,M5S:11.1,LEGA:6.6,FI:5.6,AZIV:9.4,AVS:5.1,PIU:2.9,NM:0.5,IC:0.5} },
+    v2022:{FDI:25.9,PD:26.1,M5S:11.1,LEGA:6.6,FI:5.6,AZ:5.3,IV:4.1,AVS:5.1,PIU:2.9,NM:0.5,IC:0.5} },
   { id:'C100001', name:"Umbria - P01", seats:6, weight:1.49,
-    v2022:{FDI:30.8,PD:20.9,M5S:12.7,LEGA:7.8,FI:6.8,AZIV:8.2,AVS:3.6,PIU:2.1,NM:0.4,IC:0.4} },
+    v2022:{FDI:30.8,PD:20.9,M5S:12.7,LEGA:7.8,FI:6.8,AZ:4.6,IV:3.6,AVS:3.6,PIU:2.1,NM:0.4,IC:0.4} },
   { id:'C110001', name:"Marche - P01", seats:10, weight:2.59,
-    v2022:{FDI:29.1,PD:20.4,M5S:13.6,LEGA:7.9,FI:6.8,AZIV:7.4,AVS:3.3,PIU:2.5,NM:0.8,IC:0.5} },
+    v2022:{FDI:29.1,PD:20.4,M5S:13.6,LEGA:7.9,FI:6.8,AZ:4.2,IV:3.2,AVS:3.3,PIU:2.5,NM:0.8,IC:0.5} },
   { id:'C120101', name:"Lazio 1 - P01", seats:8, weight:2,
-    v2022:{FDI:29.7,PD:21.5,M5S:14.8,LEGA:5.2,FI:5.1,AZIV:9.4,AVS:4.3,PIU:3.4,NM:0.6,IC:0.6} },
+    v2022:{FDI:29.7,PD:21.5,M5S:14.8,LEGA:5.2,FI:5.1,AZ:5.3,IV:4.1,AVS:4.3,PIU:3.4,NM:0.6,IC:0.6} },
   { id:'C120102', name:"Lazio 1 - P02", seats:8, weight:2.09,
-    v2022:{FDI:29.7,PD:21.5,M5S:14.8,LEGA:5.2,FI:5.1,AZIV:9.4,AVS:4.3,PIU:3.4,NM:0.6,IC:0.6} },
+    v2022:{FDI:29.7,PD:21.5,M5S:14.8,LEGA:5.2,FI:5.1,AZ:5.3,IV:4.1,AVS:4.3,PIU:3.4,NM:0.6,IC:0.6} },
   { id:'C120103', name:"Lazio 1 - P03", seats:8, weight:2.02,
-    v2022:{FDI:29.7,PD:21.5,M5S:14.8,LEGA:5.2,FI:5.1,AZIV:9.4,AVS:4.3,PIU:3.4,NM:0.6,IC:0.6} },
+    v2022:{FDI:29.7,PD:21.5,M5S:14.8,LEGA:5.2,FI:5.1,AZ:5.3,IV:4.1,AVS:4.3,PIU:3.4,NM:0.6,IC:0.6} },
   { id:'C120201', name:"Lazio 2 - P01", seats:6, weight:1.42,
-    v2022:{FDI:33.7,PD:14.9,M5S:15.5,LEGA:8.9,FI:10.2,AZIV:6.2,AVS:2.8,PIU:2,NM:0.5,IC:0.6} },
+    v2022:{FDI:33.7,PD:14.9,M5S:15.5,LEGA:8.9,FI:10.2,AZ:3.5,IV:2.7,AVS:2.8,PIU:2,NM:0.5,IC:0.6} },
   { id:'C120202', name:"Lazio 2 - P02", seats:7, weight:1.75,
-    v2022:{FDI:33.7,PD:14.9,M5S:15.5,LEGA:8.9,FI:10.2,AZIV:6.2,AVS:2.8,PIU:2,NM:0.5,IC:0.6} },
+    v2022:{FDI:33.7,PD:14.9,M5S:15.5,LEGA:8.9,FI:10.2,AZ:3.5,IV:2.7,AVS:2.8,PIU:2,NM:0.5,IC:0.6} },
   { id:'C130001', name:"Abruzzo - P01", seats:9, weight:2.2,
-    v2022:{FDI:27.7,PD:16.6,M5S:18.4,LEGA:8.3,FI:11.1,AZIV:6.3,AVS:2.7,PIU:2,NM:0.7,IC:0.7} },
+    v2022:{FDI:27.7,PD:16.6,M5S:18.4,LEGA:8.3,FI:11.1,AZ:3.6,IV:2.7,AVS:2.7,PIU:2,NM:0.7,IC:0.7} },
   { id:'C140001', name:"Molise - P01", seats:2, weight:0.53,
-    v2022:{FDI:21.5,PD:18.1,M5S:24.2,LEGA:8.3,FI:11.4,AZIV:4.8,AVS:2.9,PIU:1.6,NM:1.6,IC:0.7} },
+    v2022:{FDI:21.5,PD:18.1,M5S:24.2,LEGA:8.3,FI:11.4,AZ:2.7,IV:2.1,AVS:2.9,PIU:1.6,NM:1.6,IC:0.7} },
   { id:'C150101', name:"Campania 1 - P01", seats:10, weight:2.4,
-    v2022:{FDI:13.8,PD:14.4,M5S:41.4,LEGA:2.9,FI:9.5,AZIV:5.4,AVS:3,PIU:2.1,NM:0.6,IC:2.2} },
+    v2022:{FDI:13.8,PD:14.4,M5S:41.4,LEGA:2.9,FI:9.5,AZ:3.1,IV:2.3,AVS:3,PIU:2.1,NM:0.6,IC:2.2} },
   { id:'C150102', name:"Campania 1 - P02", seats:11, weight:2.75,
-    v2022:{FDI:13.8,PD:14.4,M5S:41.4,LEGA:2.9,FI:9.5,AZIV:5.4,AVS:3,PIU:2.1,NM:0.6,IC:2.2} },
+    v2022:{FDI:13.8,PD:14.4,M5S:41.4,LEGA:2.9,FI:9.5,AZ:3.1,IV:2.3,AVS:3,PIU:2.1,NM:0.6,IC:2.2} },
   { id:'C150201', name:"Campania 2 - P01", seats:8, weight:2.01,
-    v2022:{FDI:21.4,PD:17.1,M5S:27.6,LEGA:6,FI:10,AZIV:5.1,AVS:2.4,PIU:1.9,NM:0.4,IC:1.2} },
+    v2022:{FDI:21.4,PD:17.1,M5S:27.6,LEGA:6,FI:10,AZ:2.9,IV:2.2,AVS:2.4,PIU:1.9,NM:0.4,IC:1.2} },
   { id:'C150202', name:"Campania 2 - P02", seats:10, weight:2.57,
-    v2022:{FDI:21.4,PD:17.1,M5S:27.6,LEGA:6,FI:10,AZIV:5.1,AVS:2.4,PIU:1.9,NM:0.4,IC:1.2} },
+    v2022:{FDI:21.4,PD:17.1,M5S:27.6,LEGA:6,FI:10,AZ:2.9,IV:2.2,AVS:2.4,PIU:1.9,NM:0.4,IC:1.2} },
   { id:'C160001', name:"Puglia - P01", seats:7, weight:1.72,
-    v2022:{FDI:23.4,PD:16.7,M5S:27.9,LEGA:5.4,FI:11.5,AZIV:4.8,AVS:3.1,PIU:1.9,NM:0.7,IC:0.7} },
+    v2022:{FDI:23.4,PD:16.7,M5S:27.9,LEGA:5.4,FI:11.5,AZ:2.7,IV:2.1,AVS:3.1,PIU:1.9,NM:0.7,IC:0.7} },
   { id:'C160002', name:"Puglia - P02", seats:6, weight:1.56,
-    v2022:{FDI:23.4,PD:16.7,M5S:27.9,LEGA:5.4,FI:11.5,AZIV:4.8,AVS:3.1,PIU:1.9,NM:0.7,IC:0.7} },
+    v2022:{FDI:23.4,PD:16.7,M5S:27.9,LEGA:5.4,FI:11.5,AZ:2.7,IV:2.1,AVS:3.1,PIU:1.9,NM:0.7,IC:0.7} },
   { id:'C160003', name:"Puglia - P03", seats:6, weight:1.53,
-    v2022:{FDI:23.4,PD:16.7,M5S:27.9,LEGA:5.4,FI:11.5,AZIV:4.8,AVS:3.1,PIU:1.9,NM:0.7,IC:0.7} },
+    v2022:{FDI:23.4,PD:16.7,M5S:27.9,LEGA:5.4,FI:11.5,AZ:2.7,IV:2.1,AVS:3.1,PIU:1.9,NM:0.7,IC:0.7} },
   { id:'C160004', name:"Puglia - P04", seats:8, weight:2.03,
-    v2022:{FDI:23.4,PD:16.7,M5S:27.9,LEGA:5.4,FI:11.5,AZIV:4.8,AVS:3.1,PIU:1.9,NM:0.7,IC:0.7} },
+    v2022:{FDI:23.4,PD:16.7,M5S:27.9,LEGA:5.4,FI:11.5,AZ:2.7,IV:2.1,AVS:3.1,PIU:1.9,NM:0.7,IC:0.7} },
   { id:'C170001', name:"Basilicata - P01", seats:4, weight:0.97,
-    v2022:{FDI:18.2,PD:15.2,M5S:25,LEGA:9,FI:9.4,AZIV:9.8,AVS:3.4,PIU:2.1,NM:1.8,IC:0.9} },
+    v2022:{FDI:18.2,PD:15.2,M5S:25,LEGA:9,FI:9.4,AZ:5.5,IV:4.3,AVS:3.4,PIU:2.1,NM:1.8,IC:0.9} },
   { id:'C180001', name:"Calabria - P01", seats:13, weight:3.3,
-    v2022:{FDI:19,PD:14.4,M5S:29.4,LEGA:5.7,FI:15.6,AZIV:4.2,AVS:1.7,PIU:1.1,NM:1,IC:0.9} },
+    v2022:{FDI:19,PD:14.4,M5S:29.4,LEGA:5.7,FI:15.6,AZ:2.4,IV:1.8,AVS:1.7,PIU:1.1,NM:1,IC:0.9} },
   { id:'C190101', name:"Sicilia 1 - P01", seats:8, weight:2.1,
-    v2022:{FDI:17.9,PD:12.3,M5S:30.8,LEGA:4.7,FI:11.5,AZIV:5.7,AVS:2.1,PIU:1.8,NM:0.9,IC:0.8} },
+    v2022:{FDI:17.9,PD:12.3,M5S:30.8,LEGA:4.7,FI:11.5,AZ:3.2,IV:2.5,AVS:2.1,PIU:1.8,NM:0.9,IC:0.8} },
   { id:'C190102', name:"Sicilia 1 - P02", seats:8, weight:1.89,
-    v2022:{FDI:17.9,PD:12.3,M5S:30.8,LEGA:4.7,FI:11.5,AZIV:5.7,AVS:2.1,PIU:1.8,NM:0.9,IC:0.8} },
+    v2022:{FDI:17.9,PD:12.3,M5S:30.8,LEGA:4.7,FI:11.5,AZ:3.2,IV:2.5,AVS:2.1,PIU:1.8,NM:0.9,IC:0.8} },
   { id:'C190201', name:"Sicilia 2 - P01", seats:6, weight:1.39,
-    v2022:{FDI:20.2,PD:11.6,M5S:26,LEGA:5.3,FI:10.9,AZIV:4.6,AVS:2.1,PIU:1.6,NM:0.7,IC:0.8} },
+    v2022:{FDI:20.2,PD:11.6,M5S:26,LEGA:5.3,FI:10.9,AZ:2.6,IV:2,AVS:2.1,PIU:1.6,NM:0.7,IC:0.8} },
   { id:'C190202', name:"Sicilia 2 - P02", seats:6, weight:1.58,
-    v2022:{FDI:20.2,PD:11.6,M5S:26,LEGA:5.3,FI:10.9,AZIV:4.6,AVS:2.1,PIU:1.6,NM:0.7,IC:0.8} },
+    v2022:{FDI:20.2,PD:11.6,M5S:26,LEGA:5.3,FI:10.9,AZ:2.6,IV:2,AVS:2.1,PIU:1.6,NM:0.7,IC:0.8} },
   { id:'C190203', name:"Sicilia 2 - P03", seats:6, weight:1.48,
-    v2022:{FDI:20.2,PD:11.6,M5S:26,LEGA:5.3,FI:10.9,AZIV:4.6,AVS:2.1,PIU:1.6,NM:0.7,IC:0.8} },
+    v2022:{FDI:20.2,PD:11.6,M5S:26,LEGA:5.3,FI:10.9,AZ:2.6,IV:2,AVS:2.1,PIU:1.6,NM:0.7,IC:0.8} },
   { id:'C200001', name:"Sardegna - P01", seats:11, weight:2.76,
-    v2022:{FDI:23.6,PD:18.7,M5S:21.8,LEGA:6.3,FI:8.6,AZIV:4.6,AVS:5.1,PIU:2.3,NM:2.1,IC:0.9} },
+    v2022:{FDI:23.6,PD:18.7,M5S:21.8,LEGA:6.3,FI:8.6,AZ:2.6,IV:2,AVS:5.1,PIU:2.3,NM:2.1,IC:0.9} },
 ];
 const IT_PROVINCE_MAP   = Object.fromEntries(IT_PROVINCES.map(p => [p.id, p])) as Record<ItProvId, ItProvince>;
 const IT_TOTAL_PROV_WEIGHT = IT_PROVINCES.reduce((s, p) => s + p.weight, 0);
@@ -355,7 +357,7 @@ function hareLR(weights: Record<string, number>, total: number): Record<string, 
 // coalition strength (vote^k majoritarian bonus), split within a coalition by
 // √share; PR + overseas via national Hare-quota largest remainder.
 const IT_COAL_DEF: Record<string, ItPartyId[]> = {
-  CDX: ['FDI','LEGA','FI','NM'], CSX: ['PD','AVS','PIU','IC'], M5S: ['M5S'], AZIV: ['AZIV'],
+  CDX: ['FDI','LEGA','FI','NM'], CSX: ['PD','AVS','PIU','IC'], M5S: ['M5S'], AZ: ['AZ'], IV: ['IV'], FN: ['FN'],
 };
 // fptpCounts: seats won per coalition in the 147 single-member collegi (editable
 // FPTP view). When omitted, FPTP is modelled from national coalition strength.
@@ -380,21 +382,23 @@ function calcRosatellum(
   }
   const pr = hareLR(qual, PR);
   // FPTP — from edited per-collegio coalition wins, or modelled from coalition strength
-  const coalFptp: Record<string, number> = {};
+  const fptp: Record<string, number> = {};
+  const distribute = (coalSeats: Record<string, number>, def: Record<string, ItPartyId[]>) => {
+    for (const [c, ps] of Object.entries(def)) {
+      const within: Record<string, number> = {}; ps.forEach(id => within[id] = Math.sqrt(Math.max(0.04, natPcts[id] ?? 0)));
+      const a = hareLR(within, coalSeats[c] || 0);
+      for (const [id, n] of Object.entries(a)) fptp[id] = (fptp[id] || 0) + n;
+    }
+  };
   if (useCounts) {
-    for (const c of ['CDX','CSX','M5S','AZIV']) coalFptp[c] = fptpCounts![c] || 0;
+    // counts are keyed by the single-member coalitions (incl. AZIV = Third Pole, OTH = regional)
+    distribute(fptpCounts!, { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZ','IV'] });
+    if ((fptpCounts!.OTH || 0) > 0) fptp.SVP = (fptp.SVP || 0) + (fptpCounts!.OTH || 0); // South Tyrol / regional collegi
   } else {
     const coalW: Record<string, number> = {};
     for (const c in coalPct) coalW[c] = Math.pow(Math.max(coalPct[c], 0.01), 3.2);
-    Object.assign(coalFptp, hareLR(coalW, FPTP));
+    distribute(hareLR(coalW, FPTP), IT_COAL_DEF);
   }
-  const fptp: Record<string, number> = {};
-  for (const [c, ps] of Object.entries(IT_COAL_DEF)) {
-    const within: Record<string, number> = {}; ps.forEach(id => within[id] = Math.sqrt(Math.max(0.04, natPcts[id] ?? 0)));
-    const a = hareLR(within, coalFptp[c] || 0);
-    for (const [id, n] of Object.entries(a)) fptp[id] = (fptp[id] || 0) + n;
-  }
-  if (useCounts && (fptpCounts!.OTH || 0) > 0) fptp.SVP = (fptp.SVP || 0) + (fptpCounts!.OTH || 0); // South Tyrol / regional collegi
   const ov = hareLR(qual, OV);
   const out: Partial<Record<ItPartyId, number>> = {};
   for (const pty of IT_PARTIES) {
@@ -413,7 +417,7 @@ function calcAllProvinceSeats(
 }
 
 // Coalition of a uninominale's shares (max), with optional national swing applied
-const IT_UNI_COAL_DEF: Record<string, ItPartyId[]> = { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZIV'] };
+const IT_UNI_COAL_DEF: Record<string, ItPartyId[]> = { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZ','IV'] };
 function uniWinner(shares: Record<string, number>, natPcts: Record<ItPartyId, number>): string {
   let best = 'NONE', bestV = -1;
   for (const c of ['CDX','CSX','M5S','AZIV','OTH']) {
@@ -613,8 +617,8 @@ function ItScoreboardTile({
 // nationalist/regionalist parties — ERC, Junts, EH Bildu, PNV, BNG, CC, UPN — are
 // grouped together in the Regional bloc (ordered by 2022 seat size as a fallback).
 const IT_LEFT_IDS:     ItPartyId[] = ['AVS','PD','IC','PIU'];
-const IT_RIGHT_IDS:    ItPartyId[] = ['FI','NM','LEGA','FDI'];
-const IT_REGIONAL_IDS: ItPartyId[] = ['M5S','AZIV','SVP'];
+const IT_RIGHT_IDS:    ItPartyId[] = ['FI','NM','LEGA','FDI','FN'];
+const IT_REGIONAL_IDS: ItPartyId[] = ['M5S','AZ','IV','SVP'];
 
 function ItScoreboard({
   natPcts, simSeats, isBaseline, is2026, dark, reportedVoteScale,
@@ -897,7 +901,7 @@ function swungRegLeadColor(pr: Record<string, number>, natPcts: Record<ItPartyId
   }
   return partyColor((best || 'FDI') as ItPartyId);
 }
-const IT_UNI_COAL: Record<string, ItPartyId[]> = { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZIV'] };
+const IT_UNI_COAL: Record<string, ItPartyId[]> = { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZ','IV'] };
 function swungUniCoal(shares: Record<string, number>, natPcts: Record<ItPartyId, number>): string {
   let best = 'NONE', bestV = -1;
   for (const c of ['CDX','CSX','M5S','AZIV','OTH']) {
@@ -1235,7 +1239,7 @@ function ItParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
 const IT_PRESET_COALITIONS: {name:string;emoji:string;parties:ItPartyId[]}[] = [
   {name:'Centre-right',   emoji:'🔵', parties:['FDI','LEGA','FI','NM']},
   {name:'Centre-left',    emoji:'🌹', parties:['PD','AVS','PIU','IC']},
-  {name:'Broad Field',    emoji:'🤝', parties:['PD','M5S','AVS','PIU','IC','AZIV']},
+  {name:'Broad Field',    emoji:'🤝', parties:['PD','M5S','AVS','PIU','IC','AZ','IV']},
   {name:'Grand Coalition',emoji:'🇮🇹', parties:['FDI','PD','FI']},
 ];
 
@@ -1942,7 +1946,7 @@ export default function ItalyApp() {
   const [fptpOverrides,setFptpOverrides]       = useState<Record<string,Record<string,number>>>({});
   const [selectedUni,setSelectedUni]           = useState<string|null>(null);
   useEffect(()=>{ fetch(`${import.meta.env.BASE_URL}italy-uninominali.geojson`).then(r=>r.json()).then((fc:GeoJSON.FeatureCollection)=>{
-    const m:Record<string,ItColl>={}; for(const f of fc.features){ const pr=f.properties as Record<string,unknown>; if(pr.id) m[pr.id as string]={id:pr.id as string,name:String(pr.den||pr.id),shares:(pr.shares as Record<string,number>)||{CDX:0,CSX:0,M5S:0,AZIV:0,OTH:0},votes:(pr.votes as number)||0,coal:(pr.coal as string)||'NONE'}; }
+    const m:Record<string,ItColl>={}; for(const f of fc.features){ const pr=f.properties as Record<string,unknown>; if(pr.id) m[pr.id as string]={id:pr.id as string,name:String(pr.den||pr.id),shares:(pr.shares as Record<string,number>)||{CDX:0,CSX:0,M5S:0,AZ:0,IV:0,OTH:0},votes:(pr.votes as number)||0,coal:(pr.coal as string)||'NONE'}; }
     setUniColl(m);
   }).catch(console.error); },[]);
   const [scoreboardVisible,setScoreboardVisible] = useState(true);
@@ -2032,7 +2036,7 @@ export default function ItalyApp() {
   // FPTP coalition seat counts from the 147 collegi (baseline swung by the vote, edited per-collegio)
   const fptpCounts=useMemo<Record<string,number>|undefined>(()=>{
     const colls=Object.values(uniColl); if(colls.length<140) return undefined; // not loaded yet → national-model fallback
-    const counts:Record<string,number>={CDX:0,CSX:0,M5S:0,AZIV:0,OTH:0};
+    const counts:Record<string,number>={CDX:0,CSX:0,M5S:0,AZ:0,IV:0,OTH:0};
     for(const c of colls){ const sh=fptpOverrides[c.id]??c.shares; const w=fptpOverrides[c.id]?IT_COAL_SLIDERS.reduce((b,k)=>(sh[k]??0)>(sh[b]??0)?k:b,'CDX'):uniWinner(c.shares,displayPcts); counts[w]=(counts[w]||0)+1; }
     return counts;
   },[uniColl,fptpOverrides,displayPcts]);
