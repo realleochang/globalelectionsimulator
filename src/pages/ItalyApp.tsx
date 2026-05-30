@@ -677,16 +677,17 @@ type ProvTooltipState = {
 
 // ── Scoreboard tile ───────────────────────────────────────────────────────────
 function ItScoreboardTile({
-  partyId, seats, pct, rawVotes, isLeader, isWinner, is2026, dark: _dark,
+  partyId, seats, pct, rawVotes, isLeader, isWinner, is2026, dark: _dark, display,
 }: {
   partyId: ItPartyId; seats: number; pct: number; rawVotes?: number;
   isLeader: boolean; isWinner: boolean; is2026?: boolean; dark?: boolean;
+  display?: { name: string; fullName: string; color: string; leader: string; wiki: string };
 }) {
   const party      = IT_PARTY_MAP[partyId];
-  const leaderName = is2026 && party.leader2026 ? party.leader2026 : party.leader;
-  const leaderWiki = is2026 && party.wikiTitle2026 ? party.wikiTitle2026 : party.wikiTitle;
-  const partyName  = is2026 && party.name2026 ? party.name2026 : party.name;
-  const partyFull  = is2026 && party.fullName2026 ? party.fullName2026 : party.fullName;
+  const leaderName = display?.leader   ?? (is2026 && party.leader2026 ? party.leader2026 : party.leader);
+  const leaderWiki = display?.wiki     ?? (is2026 && party.wikiTitle2026 ? party.wikiTitle2026 : party.wikiTitle);
+  const partyName  = display?.name     ?? (is2026 && party.name2026 ? party.name2026 : party.name);
+  const partyFull  = display?.fullName ?? (is2026 && party.fullName2026 ? party.fullName2026 : party.fullName);
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
 
   useEffect(() => {
@@ -697,7 +698,7 @@ function ItScoreboardTile({
   }, [leaderWiki]);
 
   const initials   = leaderName.split(' ').map((w: string) => w[0]).join('').slice(0, 2);
-  const color      = partyColor(partyId);
+  const color      = display?.color ?? partyColor(partyId);
   const colorAlpha = hexToRgba(color, 0.13);
 
   return (
@@ -798,6 +799,18 @@ function ItScoreboard({
       isLeader={isLeader} isWinner={isWinner} is2026={is2026} dark={dark} />;
   };
 
+  // 2022 only: Azione + Italia Viva ran as the joint Azione–Italia Viva list → one card.
+  const AZIV_DISPLAY = { name:'Az–IV', fullName:'Azione–Italia Viva', color: IT_COAL_COLOR.AZIV, leader:'Carlo Calenda', wiki:'Carlo_Calenda' };
+  const makeComboTile = (ids: ItPartyId[], display: typeof AZIV_DISPLAY) => {
+    const s   = ids.reduce((a,id)=>a+(seats[id]??0),0);
+    const pct = ids.reduce((a,id)=>a+(natPcts[id]??0),0);
+    const rawVotes = isBaseline
+      ? Math.round(ids.reduce((a,id)=>a+(IT_VOTE_RAW_2022[id]??0),0)*scale)
+      : Math.round(pct/100*IT_GRAND_TOTAL_VOTES*scale);
+    return <ItScoreboardTile key={display.name} partyId={ids[0]} seats={s} pct={pct} rawVotes={rawVotes}
+      isLeader={false} isWinner={false} is2026={is2026} dark={dark} display={display} />;
+  };
+
   const sortedBloc = (ids: ItPartyId[]) =>
     ids.filter(id=>visible.includes(id)).sort((a,b)=>(seats[b]??0)-(seats[a]??0));
 
@@ -822,7 +835,13 @@ function ItScoreboard({
   const items: ScoreItem[] = [];
   if (sortedBloc(leftIds).length)      items.push({ key:'left',  total:leftSeats,  el: renderBloc(leftIds, 'Centre-left', leftLeading && !leftMajority, leftMajority) });
   if (sortedBloc(IT_RIGHT_IDS).length) items.push({ key:'right', total:rightSeats, el: renderBloc(IT_RIGHT_IDS, 'Centre-right', rightLeading && !rightMajority, rightMajority) });
-  for (const id of sortedBloc(indepIds)) items.push({ key:id, total: seats[id]??0, el: makeTile(id) });
+  const indepShown = sortedBloc(indepIds);
+  if (!is2026 && (indepShown.includes('AZ') || indepShown.includes('IV'))) {
+    items.push({ key:'AZIV', total:(seats.AZ??0)+(seats.IV??0), el: makeComboTile(['AZ','IV'], AZIV_DISPLAY) });
+    for (const id of indepShown) if (id!=='AZ' && id!=='IV') items.push({ key:id, total: seats[id]??0, el: makeTile(id) });
+  } else {
+    for (const id of indepShown) items.push({ key:id, total: seats[id]??0, el: makeTile(id) });
+  }
   items.sort((a,b)=>b.total-a.total);
 
   return (
@@ -1873,8 +1892,9 @@ function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, 
           {label:'Centre-right', color:IT_COAL_COLOR.CDX, ids:['FDI','LEGA','FI','NM']},
           {label:'Centre-left',  color:IT_COAL_COLOR.CSX, ids:is2026?['PD','AVS','PIU','IC','M5S']:['PD','AVS','PIU','IC']},
           ...(is2026?[]:[{label:'M5S', color:IT_COAL_COLOR.M5S, ids:['M5S']}]),
-          {label:'Azione',       color:'#00A3C7',         ids:['AZ']},
-          {label:'Italia Viva',  color:'#E5147D',         ids:['IV']},
+          ...(is2026
+            ? [{label:'Azione', color:'#00A3C7', ids:['AZ']}, {label:'Italia Viva', color:'#E5147D', ids:['IV']}]
+            : [{label:'Az–IV', color:'#00A3C7', ids:['AZ','IV']}]),
           {label:'Forza Nuova',  color:'#3E2723',         ids:['FN']},
           {label:'Others',       color:IT_COAL_COLOR.OTH, ids:['SVP']},
         ] as {label:string;color:string;ids:ItPartyId[]}[]).map(g => ({ ...g, n: g.ids.reduce((s,id)=>s+(natTotals[id]??0),0) })).filter(g => g.n > 0).sort((a,b)=>b.n-a.n);
