@@ -515,6 +515,17 @@ function uniCoalShares(sh: Record<string, number>, is2026?: boolean): { c: strin
   const keys = is2026 ? ['CDX','CSX','AZIV','OTH'] : ['CDX','CSX','M5S','AZIV','OTH'];
   return keys.map(c => ({ c, v: m[c] })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
 }
+// Coalition shares SWUNG to the current national vote (then renormalised to 100%), so
+// the displayed figures move 2022→2026 for EVERY coalition — not just the centre-left.
+// Used for baked baseline tooltips/bubbles (an edited collegio shows its raw override).
+function uniSwungShares(sh: Record<string, number>, natPcts: Record<ItPartyId, number>, is2026?: boolean): { c: string; v: number }[] {
+  const val = uniSwungVals(sh, natPcts, is2026);
+  const keys = is2026 ? ['CDX','CSX','AZIV','OTH'] : ['CDX','CSX','M5S','AZIV','OTH'];
+  const present = keys.filter(c => (val[c] ?? -1) >= 0);
+  const sum = present.reduce((s, c) => s + Math.max(0, val[c]), 0);
+  if (sum <= 0) return [];
+  return present.map(c => ({ c, v: Math.max(0, val[c]) / sum * 100 })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
+}
 
 // ── FPTP representative party ─────────────────────────────────────────────────
 // A collegio is won by a coalition, but the seat goes to one party — the
@@ -918,7 +929,7 @@ function ItBubbleLayer({
 
       if (mapView === 'uni') {
         const sh = (props.shares as Record<string,number>) ?? {}; const coal = props.coal as string;
-        const sorted = uniCoalShares(sh, is2026);
+        const sorted = uniSwungShares(sh, natPcts, is2026);   // swung to the current vote (all coalitions move)
         if (!sorted.length) return;
         rawMargin = (sorted[0].v-(sorted[1]?.v||0))/100*votes;
         color = (coal==='SVP'||coal==='AUT'||coal==='SCN') ? (IT_COAL_COLOR[coal]||'#999') : (IT_COAL_COLOR[sorted[0].c]||'#999');
@@ -1248,10 +1259,12 @@ function ItMapView({
           // Blank Map: a collegio with no projection has no result yet.
           const ov = fptpOvRef.current?.[geoId];
           if (blankModeRef.current && !ov) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; }
-          const sh = (ov ?? (props.shares as Record<string,number>)) ?? {};
           const coal = ov ? '' : (props.coal as string);
           const REG: Record<string, [string,string]> = { AUT:["Aosta Valley list",IT_COAL_COLOR.AUT], SVP:["SVP",IT_COAL_COLOR.SVP], SCN:["Sud chiama Nord",IT_COAL_COLOR.SCN] };
-          const parties = uniCoalShares(sh, is2026Ref.current).map(({ c, v }) => {
+          const eff = simNatPctsRef2.current ?? natPctsRef.current;
+          // baked baseline → swung to the current vote (every coalition moves); an edited collegio shows its raw override
+          const sorted = ov ? uniCoalShares(ov, is2026Ref.current) : uniSwungShares((props.shares as Record<string,number>) ?? {}, eff, is2026Ref.current);
+          const parties = sorted.map(({ c, v }) => {
             const isWinReg = c==='OTH' && REG[coal];
             return { id: c as unknown as ItPartyId, pct: v, rawVotes: Math.round(v/100*votes),
               label: isWinReg ? REG[coal][0] : (c==='CSX' && is2026Ref.current ? 'Centre-left + M5S' : IT_COAL_LABEL[c]),
