@@ -724,8 +724,9 @@ function zoomScale(zoom: number): number { return Math.max(0.15, Math.min(2.0, (
 function ItBubbleLayer({
   geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef,
   declaredProvs, provOverrides, provOverridesRef, blankMode, projectedProvs,
-  simProvFractions, simNatPctsRef,
+  simProvFractions, simNatPctsRef, mapView, onSelectUni,
 }: {
+  mapView: ItMapViewId; onSelectUni?: (geoId:string)=>void;
   geoData: any; natPcts: Record<ItPartyId,number>;
   containerRef: React.RefObject<HTMLDivElement|null>;
   setTooltip: (t:ProvTooltipState)=>void; onSelect: (id:ItProvId)=>void;
@@ -755,51 +756,62 @@ function ItBubbleLayer({
     bubblesRef.current = [];
     const scale = zoomScale(map.getZoom());
 
+    const REG: Record<string,[string,string]> = { AUT:['Aosta Valley list',IT_COAL_COLOR.AUT], SVP:['SVP',IT_COAL_COLOR.SVP], SCN:['Sud chiama Nord',IT_COAL_COLOR.SCN] };
     L.geoJSON(geoData).eachLayer((layer: L.Layer) => {
       const path   = layer as any;
-      const geoId: string = path.feature?.properties?.id ?? '';
-      const provId = IT_GEOID_TO_ID[geoId];
-      if (!provId) return;
-      if (declaredProvs && !declaredProvs.has(provId)) return;
-      if (!declaredProvs && blankMode && !(projectedProvs?.has(provId))) return;
-      const bounds = (layer as any).getBounds?.();
-      if (!bounds?.isValid()) return;
+      const props  = path.feature?.properties ?? {};
+      const geoId: string = props.id ?? '';
+      const bounds = (layer as any).getBounds?.(); if (!bounds?.isValid()) return;
       const center = bounds.getCenter();
+      const votes  = (props.votes as number) ?? 0;
+      let color = '#9AA0A6', rawMargin = 0, pName = '';
+      let parties: { id: ItPartyId; pct: number; rawVotes?: number; label?: string; color?: string }[] = [];
 
-      const pv     = calcProvVotes(natPcts, provId, provOverrides?.[provId]);
-      const sorted = (Object.entries(pv) as [ItPartyId,number][]).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
-      if (sorted.length === 0) return;
-      const [winId, winPct] = sorted[0];
-      const margin     = winPct - (sorted[1]?.[1] ?? 0);
-      const prov       = IT_PROVINCE_MAP[provId];
-      // Bubble radius: margin-based + seat count bonus for large provinces
-      const seatBonus  = Math.min((prov?.seats ?? 1) / 37 * 10, 10);
-      const baseRadius = 8 + Math.min(margin/10,1)*18 + seatBonus;
-      const color      = partyColor(winId);
-
-      const marker = L.circleMarker(center, {
-        radius:baseRadius*scale, color, fillColor:color, fillOpacity:0.72, weight:1, opacity:0.9,
-      }).addTo(map);
-
-      marker.on('click', () => { setTooltip(null); onSelect(provId); });
+      if (mapView === 'uni') {
+        const sh = (props.shares as Record<string,number>) ?? {}; const coal = props.coal as string;
+        const sorted = (['CDX','CSX','M5S','AZIV','OTH'] as const).map(c=>({c,v:sh[c]||0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+        if (!sorted.length) return;
+        rawMargin = (sorted[0].v-(sorted[1]?.v||0))/100*votes;
+        color = (coal==='SVP'||coal==='AUT'||coal==='SCN') ? (IT_COAL_COLOR[coal]||'#999') : (IT_COAL_COLOR[sorted[0].c]||'#999');
+        pName = String(props.den||geoId);
+        parties = sorted.map(x=>({ id:x.c as unknown as ItPartyId, pct:x.v, rawVotes:Math.round(x.v/100*votes),
+          label:(x.c==='OTH'&&REG[coal])?REG[coal][0]:IT_COAL_LABEL[x.c], color:(x.c==='OTH'&&REG[coal])?REG[coal][1]:IT_COAL_COLOR[x.c] }));
+      } else if (mapView === 'reg') {
+        const pr = (props.pr as Record<string,number>) ?? {}; const sorted = IT_PR_KEYS.map(k=>({k,v:pr[k]||0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+        if (!sorted.length) return;
+        rawMargin = (sorted[0].v-(sorted[1]?.v||0))/100*votes;
+        color = partyColor(sorted[0].k); pName = String(props.reg_name||geoId);
+        parties = sorted.slice(0,6).map(x=>({ id:x.k, pct:x.v, rawVotes:Math.round(x.v/100*votes) }));
+      } else {
+        const provId = IT_GEOID_TO_ID[geoId]; if (!provId) return;
+        if (declaredProvs && !declaredProvs.has(provId)) return;
+        if (!declaredProvs && blankMode && !(projectedProvs?.has(provId))) return;
+        const prov = IT_PROVINCE_MAP[provId];
+        const provVotes = IT_GRAND_TOTAL_VOTES * (prov?.weight ?? 0) / IT_TOTAL_PROV_WEIGHT;
+        const pv = calcProvVotes(natPcts, provId, provOverrides?.[provId]);
+        const sorted = (Object.entries(pv) as [ItPartyId,number][]).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
+        if (!sorted.length) return;
+        rawMargin = (sorted[0][1]-(sorted[1]?.[1]||0))/100*provVotes;
+        color = partyColor(sorted[0][0]); pName = prov?.name ?? geoId;
+        const cur = calcProvVotes(simNatPctsRef?.current ?? natPctsRef.current, provId, provOverridesRef.current?.[provId]);
+        const frac = simFracRef.current[provId] ?? 1;
+        parties = (Object.entries(cur) as [ItPartyId,number][]).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8)
+          .map(([id,pct])=>({ id, pct, rawVotes:Math.round(pct/100*provVotes*frac) }));
+      }
+      // radius DIRECTLY proportional to the raw vote margin (area ∝ margin)
+      const baseRadius = Math.max(3, Math.min(42, Math.sqrt(Math.max(0,rawMargin)) * 0.07));
+      const marker = L.circleMarker(center, { radius:baseRadius*scale, color, fillColor:color, fillOpacity:0.72, weight:1, opacity:0.9 }).addTo(map);
+      marker.on('click', () => { setTooltip(null); if (mapView==='pluri'){ const pid=IT_GEOID_TO_ID[geoId]; if(pid)onSelect(pid); } else if (mapView==='uni'){ onSelectUni?.(geoId); } });
       marker.on('mousemove', (e: L.LeafletMouseEvent) => {
         const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
-        const cur      = calcProvVotes(simNatPctsRef?.current ?? natPctsRef.current, provId, provOverridesRef.current?.[provId]);
-        const fraction = simFracRef.current[provId] ?? 1;
-        const provVotes = IT_GRAND_TOTAL_VOTES * (prov?.weight ?? 0) / IT_TOTAL_PROV_WEIGHT;
-        const parties  = (Object.entries(cur) as [ItPartyId,number][])
-          .filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8)
-          .map(([id,pct]) => ({ id:id as ItPartyId, pct, rawVotes:Math.round(pct/100*provVotes*fraction) }));
-        const pName = IT_PROVINCE_MAP[provId]?.name ?? geoId;
-        setTooltip({ x:e.originalEvent.clientX-rect.left, y:e.originalEvent.clientY-rect.top,
-          name:pName, parties, leader:parties[0]?.id??null, reportingPct:Math.round(fraction*100) });
+        setTooltip({ x:e.originalEvent.clientX-rect.left, y:e.originalEvent.clientY-rect.top, name:pName, parties, leader:parties[0]?.id??null, reportingPct:undefined });
       });
       marker.on('mouseout', () => setTooltip(null));
       bubblesRef.current.push({ marker, baseRadius });
     });
     return () => { for (const {marker} of bubblesRef.current) marker.remove(); bubblesRef.current=[]; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs]);
+  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, mapView]);
 
   return null;
 }
@@ -1088,12 +1100,13 @@ function ItMapView({
             style={(f:any)=>getStyle(f)} onEachFeature={onEachFeature}
             {...({ smoothFactor:0 } as any)} />
         )}
-        {geoData && bubbleMap && mapView==='pluri' && (
+        {geoData && bubbleMap && (
           <ItBubbleLayer
+            mapView={mapView} onSelectUni={onSelectUni}
             geoData={geoData} natPcts={simNatPcts??natPcts} containerRef={containerRef}
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
-            declaredProvs={declaredProvs} provOverrides={provOverrides}
-            provOverridesRef={provOverridesRef} blankMode={blankMode}
+            declaredProvs={mapView==='pluri'?declaredProvs:undefined} provOverrides={provOverrides}
+            provOverridesRef={provOverridesRef} blankMode={mapView==='pluri'&&blankMode}
             projectedProvs={projectedProvs} simProvFractions={simProvFractions}
             simNatPctsRef={simNatPctsRef2}
           />
@@ -2103,11 +2116,11 @@ export default function ItalyApp() {
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
           <span className="text-[8px] font-mono uppercase tracking-wider text-ink-3 shrink-0 hidden md:block">View</span>
           {IT_MAP_VIEWS.map(v=>(
-            <button key={v.id} onClick={()=>{ setMapView(v.id); if(v.id!=='pluri'){setSelectedProv(null);setBubbleMap(false);setSeatDots(false);} if(v.id!=='uni')setSelectedUni(null); }}
+            <button key={v.id} onClick={()=>{ setMapView(v.id); if(v.id!=='pluri'){setSelectedProv(null);setSeatDots(false);} if(v.id!=='uni')setSelectedUni(null); }}
               className={mapView===v.id?`${btnBase} bg-[#7C3AED] text-white`:btnMuted}>{v.label}</button>
           ))}
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
-          <button onClick={()=>{if(mapView!=='pluri')setMapView('pluri');setBubbleMap(v=>!v);setSeatDots(false);}}    className={bubbleMap?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Bubble Map</button>
+          <button onClick={()=>{setBubbleMap(v=>!v);setSeatDots(false);}}    className={bubbleMap?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Bubble Map</button>
           <button onClick={()=>{if(mapView!=='pluri')setMapView('pluri');setSeatDots(v=>!v);setBubbleMap(false);}}    className={seatDots?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Seat Dots</button>
           <button onClick={()=>openRight('tutorial')}  className={rightPanel==='tutorial' ?btnActive:btnMuted}>Tutorial</button>
         </div>
