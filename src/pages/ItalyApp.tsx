@@ -988,10 +988,12 @@ function ItMapView({
     if (mapView !== 'pluri') {
       const eff = simNatPcts ?? natPcts;
       const props = feature?.properties ?? {};
-      let fill: string;
+      const ov = mapView==='uni' ? fptpOverrides?.[geoId] : undefined;
       const ovSel = mapView==='uni' && geoId===selectedUni;
+      // Blank Map: start blank (grey) — only projected/edited collegi show a result
+      if (blankMode && !ov) return { fillColor: dark?'#1f2937':'#d1d5db', fillOpacity:0.7, weight: ovSel?2:0.5, color: ovSel?'#c8a020':border, opacity:1 };
+      let fill: string;
       if (mapView === 'uni') {
-        const ov = fptpOverrides?.[geoId];
         const coal = props.coal as string;
         if (ov) { const w = (['CDX','CSX','M5S','AZIV','OTH'] as const).reduce((b,c)=>(ov[c]??0)>(ov[b]??0)?c:b,'CDX'); fill = IT_COAL_COLOR[w]??'#7E57C2'; }
         else if (coal==='SVP'||coal==='AUT'||coal==='SCN') fill = IT_COAL_COLOR[coal];  // regional winners — their own colour
