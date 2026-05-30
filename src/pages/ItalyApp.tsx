@@ -59,7 +59,7 @@ const IT_MAP_VIEWS: { id: ItMapViewId; label: string; file: string }[] = [
 ];
 // Coalition colours for the FPTP (single-member) view
 const IT_COAL_COLOR: Record<string, string> = {
-  CDX:'#214A7B', CSX:'#E63946', M5S:'#F2C200', AZIV:'#00A3C7', SVP:'#B30000', AUT:'#8E44AD', SCN:'#FF6F00', NONE:'#9AA0A6',
+  CDX:'#214A7B', CSX:'#E63946', M5S:'#F2C200', AZIV:'#00A3C7', OTH:'#7E57C2', SVP:'#B30000', AUT:'#8E44AD', SCN:'#FF6F00', NONE:'#9AA0A6',
 };
 
 // 2022 national list (proportional) results — EXACT official figures.
@@ -974,7 +974,9 @@ function ItMapView({
       const ovSel = mapView==='uni' && geoId===selectedUni;
       if (mapView === 'uni') {
         const ov = fptpOverrides?.[geoId];
-        if (ov) { const w = (['CDX','CSX','M5S','AZIV','OTH'] as const).reduce((b,c)=>(ov[c]??0)>(ov[b]??0)?c:b,'CDX'); fill = IT_COAL_COLOR[w]??'#999'; }
+        const coal = props.coal as string;
+        if (ov) { const w = (['CDX','CSX','M5S','AZIV','OTH'] as const).reduce((b,c)=>(ov[c]??0)>(ov[b]??0)?c:b,'CDX'); fill = IT_COAL_COLOR[w]??'#7E57C2'; }
+        else if (coal==='SVP'||coal==='AUT'||coal==='SCN') fill = IT_COAL_COLOR[coal];  // regional winners — their own colour
         else fill = swungUniCoal((props.shares as Record<string,number>) ?? {}, eff);
       } else fill = swungRegLeadColor((props.pr as Record<string,number>) ?? {}, eff);
       return { fillColor: fill, fillOpacity: 0.85, weight: ovSel?2.2:0.5, color: ovSel?'#c8a020':border, opacity: 1 };
