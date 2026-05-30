@@ -1632,9 +1632,10 @@ function ItBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
 
 // ── Distributions panel ───────────────────────────────────────────────────────
 // Left popup: per-province D'Hondt seat allocation for every party.
-function ItDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting, dark }: {
+function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, exiting, dark }: {
   natPcts: Record<ItPartyId,number>;
   provOverrides: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>;
+  seats: Partial<Record<ItPartyId,number>>;
   is2026?: boolean;
   onClose:()=>void; exiting?:boolean; dark?:boolean;
 }) {
@@ -1649,22 +1650,16 @@ function ItDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting
     return is2026 && p.name2026 ? p.name2026 : p.name;
   };
 
-  // Per-province seat allocations + national totals, computed from the current scenario.
-  const { rows, natTotals, totalSeats } = useMemo(() => {
-    const rows = IT_PROVINCES.map(prov => {
-      const votes = calcProvVotes(natPcts, prov.id, provOverrides[prov.id]);
-      const seats = calcDHondtProv(votes, prov.seats);
-      const alloc = (Object.entries(seats) as [ItPartyId,number][])
-        .filter(([,s]) => (s??0) > 0)
-        .sort((a,b) => b[1]-a[1]);
-      return { prov, alloc };
-    });
-    const natTotals: Partial<Record<ItPartyId,number>> = {};
-    let totalSeats = 0;
-    for (const { alloc } of rows)
-      for (const [id,s] of alloc) { natTotals[id] = (natTotals[id]??0)+s; totalSeats += s; }
-    return { rows, natTotals, totalSeats };
-  }, [natPcts, provOverrides]);
+  // National totals = the actual Rosatellum scoreboard seats (consistent with the
+  // main board). Per-district rows show the local PR D'Hondt detail.
+  const natTotals = seats;
+  const totalSeats = (Object.values(seats) as number[]).reduce((a,b)=>a+(b??0),0);
+  const rows = useMemo(() => IT_PROVINCES.map(prov => {
+    const votes = calcProvVotes(natPcts, prov.id, provOverrides[prov.id]);
+    const ps = calcDHondtProv(votes, prov.seats);
+    const alloc = (Object.entries(ps) as [ItPartyId,number][]).filter(([,s]) => (s??0) > 0).sort((a,b) => b[1]-a[1]);
+    return { prov, alloc };
+  }), [natPcts, provOverrides]);
 
   const natSorted = (Object.entries(natTotals) as [ItPartyId,number][])
     .filter(([,s]) => s>0).sort((a,b) => b[1]-a[1]);
@@ -1674,7 +1669,7 @@ function ItDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Seat Distribution</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">D'Hondt allocation · {IT_PROVINCES.length} districts · {totalSeats} seats</div>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Rosatellum · {totalSeats} seats · {IT_PROVINCES.length} PR districts</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
@@ -1696,6 +1691,37 @@ function ItDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting
           ))}
         </div>
       </div>
+
+      {/* By coalition / bloc */}
+      {(() => {
+        const GROUPS = ([
+          {label:'Centre-right', color:IT_COAL_COLOR.CDX, ids:['FDI','LEGA','FI','NM']},
+          {label:'Centre-left',  color:IT_COAL_COLOR.CSX, ids:['PD','AVS','PIU','IC']},
+          {label:'M5S',          color:IT_COAL_COLOR.M5S, ids:['M5S']},
+          {label:'Azione',       color:'#00A3C7',         ids:['AZ']},
+          {label:'Italia Viva',  color:'#E5147D',         ids:['IV']},
+          {label:'Far Right',    color:'#3E2723',         ids:['FN']},
+          {label:'Others',       color:IT_COAL_COLOR.OTH, ids:['SVP']},
+        ] as {label:string;color:string;ids:ItPartyId[]}[]).map(g => ({ ...g, n: g.ids.reduce((s,id)=>s+(natTotals[id]??0),0) })).filter(g => g.n > 0).sort((a,b)=>b.n-a.n);
+        const maj = Math.floor(totalSeats/2)+1;
+        const lead = GROUPS[0];
+        return (
+          <div className="px-3.5 py-2.5 border-b border-default shrink-0">
+            <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.14em] mb-1.5" style={{color:ink3}}>By coalition / bloc</div>
+            <div className="flex w-full h-2.5 rounded-full overflow-hidden" style={{background:trackBg}}>
+              {GROUPS.map(g => <div key={g.label} title={`${g.label} ${g.n}`} style={{width:`${g.n/Math.max(1,totalSeats)*100}%`,background:g.color}}/>)}
+            </div>
+            <div className="flex flex-wrap gap-x-2.5 gap-y-0.5 mt-1.5">
+              {GROUPS.map(g => (
+                <span key={g.label} className="inline-flex items-center gap-1 text-[9px] font-mono" style={{color:ink2}}>
+                  <span className="w-1.5 h-1.5 rounded-sm" style={{background:g.color}}/>{g.label}<b className="text-ink">{g.n}</b>
+                </span>
+              ))}
+            </div>
+            {lead && <div className="text-[8.5px] font-mono mt-1" style={{color: lead.n>=maj?'#16a34a':ink3}}>{lead.label} leads · {lead.n>=maj?'majority':`${maj-lead.n} short of ${maj}`}</div>}
+          </div>
+        );
+      })()}
 
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2">
         {rows.map(({ prov, alloc }) => (
@@ -2249,7 +2275,7 @@ export default function ItalyApp() {
             onClose={()=>setSelectedUni(null)} dark={dark}/>
         )}
 
-        {showDistrib  &&<ItDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} is2026={preset!=='baseline'} onClose={()=>openRight('distributions')} exiting={exitRight==='distributions'} dark={dark}/>}
+        {showDistrib  &&<ItDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} seats={displaySeats} is2026={preset!=='baseline'} onClose={()=>openRight('distributions')} exiting={exitRight==='distributions'} dark={dark}/>}
         {showTutorial &&<ItTutorialPanel  onClose={()=>openRight('tutorial')}  exiting={exitRight==='tutorial'}  dark={dark}/>}
         {showCoalition&&<ItCoalitionPanel seats={displaySeats} onClose={()=>openRight('coalition')} exiting={exitRight==='coalition'} dark={dark}/>}
       </div>
