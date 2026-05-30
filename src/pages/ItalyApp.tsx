@@ -6,1035 +6,709 @@ import 'leaflet/dist/leaflet.css';
 import { hsl } from 'd3';
 import { fetchWikiPhoto } from '../lib/wikiPhotos';
 import { GlobeLogo } from './HomePage';
+import {
+  IT_PARTIES, IT_PARTY_MAP, IT_TOTAL_SEATS, IT_MAJORITY, IT_PR_THRESHOLD, IT_PR_KEYS,
+  IT_COALITIONS, IT_COAL_COLOR, IT_COAL_NAME, itPartyColor,
+} from '../data/italyData';
+import type { ItPartyId } from '../data/italyData';
 
-// ── Party types ────────────────────────────────────────────────────────────────
-type ItPartyId = 'FDI' | 'PD' | 'M5S' | 'LEGA' | 'FI' | 'AZ' | 'AVS' | 'IV' | 'NM';
-
-type ItParty = {
-  id: ItPartyId;
-  name: string;
-  fullName: string;
-  color: string;
-  seats2022: number;
-  leader: string;
-  wikiTitle?: string;
-};
-
-const IT_PARTIES: ItParty[] = [
-  { id: 'FDI',  name: 'FdI',    fullName: 'Fratelli d\'Italia',        color: '#1B3A6B', seats2022: 119, leader: 'Giorgia Meloni',      wikiTitle: 'Giorgia_Meloni' },
-  { id: 'PD',   name: 'PD',     fullName: 'Partito Democratico',       color: '#CC0000', seats2022:  69, leader: 'Elly Schlein',         wikiTitle: 'Elly_Schlein' },
-  { id: 'M5S',  name: 'M5S',    fullName: 'Movimento 5 Stelle',        color: '#D4A013', seats2022:  52, leader: 'Giuseppe Conte',       wikiTitle: 'Giuseppe_Conte' },
-  { id: 'LEGA', name: 'Lega',   fullName: 'Lega',                      color: '#009933', seats2022:  30, leader: 'Matteo Salvini',       wikiTitle: 'Matteo_Salvini' },
-  { id: 'FI',   name: 'FI',     fullName: 'Forza Italia',              color: '#0080C8', seats2022:  29, leader: 'Antonio Tajani',       wikiTitle: 'Antonio_Tajani' },
-  { id: 'AZ',   name: 'Azione', fullName: 'Azione',                    color: '#CC5500', seats2022:  13, leader: 'Carlo Calenda',        wikiTitle: 'Carlo_Calenda' },
-  { id: 'AVS',  name: 'AVS',    fullName: 'Alleanza Verdi-Sinistra',   color: '#2E7D32', seats2022:  12, leader: 'Nicola Fratoianni',    wikiTitle: 'Nicola_Fratoianni' },
-  { id: 'IV',   name: 'IV',     fullName: 'Italia Viva',               color: '#EF233C', seats2022:   9, leader: 'Matteo Renzi',         wikiTitle: 'Matteo_Renzi' },
-  { id: 'NM',   name: 'Noi Mod',fullName: 'Noi Moderati',              color: '#795548', seats2022:   7, leader: 'Maurizio Lupi',        wikiTitle: 'Maurizio_Lupi' },
+// ── Map layers ─────────────────────────────────────────────────────────────────
+type LayerId = 'uni' | 'pluri' | 'reg';
+const LAYERS: { id: LayerId; label: string; sub: string; file: string; nameProp: string }[] = [
+  { id: 'uni',   label: 'Collegi uninominali', sub: 'FPTP · 147 collegi',  file: 'italy-uninominali.geojson', nameProp: 'den' },
+  { id: 'pluri', label: 'Collegi plurinominali', sub: 'Proporzionale · 49', file: 'italy-plurinominali.geojson', nameProp: 'den' },
+  { id: 'reg',   label: 'Regioni',            sub: 'Proporzionale · 20',    file: 'italy-regioni.geojson', nameProp: 'reg_name' },
 ];
 
-const IT_PARTY_MAP = Object.fromEntries(IT_PARTIES.map(p => [p.id, p])) as Record<ItPartyId, ItParty>;
-const IT_TOTAL_SEATS = 400;
-const IT_MAJORITY = 201;
-const IT_THRESHOLD = 4.0; // % — parties below this get no proportional seats
-
-// 2022 national vote percentages (normalised from actual results, summing to 100)
-const IT_VOTE_PCT_2022: Record<ItPartyId, number> = {
-  FDI: 29.0, PD: 21.3, M5S: 17.1, LEGA: 9.8, FI: 9.0, AZ: 5.1, AVS: 4.1, IV: 3.5, NM: 1.1,
+// Region populations (2011 census, for simulation vote weighting)
+const IT_REGION_POP: Record<string, number> = {
+  'Piemonte': 4357905, "Valle d'Aosta/Vallée d'Aoste": 126806, 'Lombardia': 9704151,
+  'Trentino-Alto Adige/Südtirol': 1029585, 'Veneto': 4857210, 'Friuli-Venezia Giulia': 1218985,
+  'Liguria': 1570694, 'Emilia-Romagna': 4342135, 'Toscana': 3672202, 'Umbria': 884268,
+  'Marche': 1541319, 'Lazio': 5502886, 'Abruzzo': 1307309, 'Molise': 313660,
+  'Campania': 5766810, 'Puglia': 4052566, 'Basilicata': 578036, 'Calabria': 1959050,
+  'Sicilia': 5002904, 'Sardegna': 1639362,
 };
 
-// Approximate raw votes — Camera proporzionale, 2022
-const IT_VOTE_RAW_2022: Record<ItPartyId, number> = {
-  FDI:  7_291_000, PD:   5_392_000, M5S:  4_345_000,
-  LEGA: 2_463_000, FI:   2_279_000, AZ:   1_302_000,
-  AVS:  1_024_000, IV:     855_000, NM:     315_000,
-};
-const IT_GRAND_TOTAL_VOTES = 25_266_000;
-
-// 2024 European Parliament (normalised) — alternative scenario preset
-const IT_VOTE_PCT_2024E: Record<ItPartyId, number> = {
-  FDI: 29.7, PD: 24.7, M5S: 10.3, LEGA: 9.2, FI: 9.9, AZ: 3.5, AVS: 7.0, IV: 3.4, NM: 2.3,
-};
-
-// ── Region types ───────────────────────────────────────────────────────────────
-type ItRegionId = 'PIE'|'VDA'|'LOM'|'TAA'|'VEN'|'FVG'|'LIG'|'EMR'|'TOS'|'UMB'
-                |'MAR'|'LAZ'|'ABR'|'MOL'|'CAM'|'PUG'|'BAS'|'CAL'|'SIC'|'SAR';
-
-type ItRegion = { id: ItRegionId; name: string; pop: number };
-
-const IT_REGIONS: ItRegion[] = [
-  { id: 'PIE', name: 'Piemonte',             pop: 4_335_000 },
-  { id: 'VDA', name: "Valle d'Aosta",        pop:   126_000 },
-  { id: 'LOM', name: 'Lombardia',            pop: 10_017_000 },
-  { id: 'TAA', name: 'Trentino-A.A.',        pop: 1_079_000 },
-  { id: 'VEN', name: 'Veneto',               pop: 4_905_000 },
-  { id: 'FVG', name: 'Friuli-V.G.',          pop: 1_211_000 },
-  { id: 'LIG', name: 'Liguria',              pop: 1_524_000 },
-  { id: 'EMR', name: 'Emilia-Romagna',       pop: 4_453_000 },
-  { id: 'TOS', name: 'Toscana',              pop: 3_692_000 },
-  { id: 'UMB', name: 'Umbria',               pop:   882_000 },
-  { id: 'MAR', name: 'Marche',               pop: 1_525_000 },
-  { id: 'LAZ', name: 'Lazio',               pop: 5_736_000 },
-  { id: 'ABR', name: 'Abruzzo',              pop: 1_295_000 },
-  { id: 'MOL', name: 'Molise',               pop:   305_000 },
-  { id: 'CAM', name: 'Campania',             pop: 5_712_000 },
-  { id: 'PUG', name: 'Puglia',              pop: 3_953_000 },
-  { id: 'BAS', name: 'Basilicata',           pop:   553_000 },
-  { id: 'CAL', name: 'Calabria',             pop: 1_894_000 },
-  { id: 'SIC', name: 'Sicilia',              pop: 4_875_000 },
-  { id: 'SAR', name: 'Sardegna',             pop: 1_611_000 },
-];
-const IT_REGION_MAP = Object.fromEntries(IT_REGIONS.map(r => [r.id, r])) as Record<ItRegionId, ItRegion>;
-
-// GeoJSON `reg_name` → region ID
-const IT_REGNAME_TO_ID: Record<string, ItRegionId> = {
-  'Piemonte': 'PIE',                          "Valle d'Aosta/Vallée d'Aoste": 'VDA',
-  'Lombardia': 'LOM',                         'Trentino-Alto Adige/Südtirol': 'TAA',
-  'Veneto': 'VEN',                            'Friuli-Venezia Giulia': 'FVG',
-  'Liguria': 'LIG',                           'Emilia-Romagna': 'EMR',
-  'Toscana': 'TOS',                           'Umbria': 'UMB',
-  'Marche': 'MAR',                            'Lazio': 'LAZ',
-  'Abruzzo': 'ABR',                           'Molise': 'MOL',
-  'Campania': 'CAM',                          'Puglia': 'PUG',
-  'Basilicata': 'BAS',                        'Calabria': 'CAL',
-  'Sicilia': 'SIC',                           'Sardegna': 'SAR',
-};
-
-// ── 2022 regional results (% by region, summing to 100 per region) ─────────────
-const IT_REGION_RESULTS_2022: Record<ItRegionId, Record<ItPartyId, number>> = {
-  PIE: { FDI:27, PD:20, M5S:14, LEGA:12, FI: 9, AZ:6, AVS:5, IV:5, NM:2 },
-  VDA: { FDI:22, PD:22, M5S:12, LEGA:14, FI: 8, AZ:9, AVS:8, IV:4, NM:1 },
-  LOM: { FDI:27, PD:19, M5S:11, LEGA:14, FI:10, AZ:7, AVS:5, IV:5, NM:2 },
-  TAA: { FDI:22, PD:18, M5S:10, LEGA:11, FI: 8, AZ:11,AVS:12,IV:6, NM:2 },
-  VEN: { FDI:27, PD:16, M5S:11, LEGA:15, FI:11, AZ:7, AVS:5, IV:5, NM:3 },
-  FVG: { FDI:29, PD:17, M5S:11, LEGA:11, FI:10, AZ:9, AVS:6, IV:5, NM:2 },
-  LIG: { FDI:28, PD:21, M5S:16, LEGA:10, FI: 9, AZ:6, AVS:5, IV:4, NM:1 },
-  EMR: { FDI:22, PD:28, M5S:13, LEGA:12, FI: 7, AZ:7, AVS:6, IV:4, NM:1 },
-  TOS: { FDI:22, PD:26, M5S:13, LEGA: 9, FI: 8, AZ:8, AVS:8, IV:5, NM:1 },
-  UMB: { FDI:28, PD:21, M5S:15, LEGA:11, FI: 9, AZ:6, AVS:5, IV:4, NM:1 },
-  MAR: { FDI:30, PD:20, M5S:15, LEGA:10, FI: 9, AZ:6, AVS:5, IV:4, NM:1 },
-  LAZ: { FDI:33, PD:19, M5S:17, LEGA: 8, FI: 9, AZ:6, AVS:4, IV:3, NM:1 },
-  ABR: { FDI:29, PD:18, M5S:18, LEGA: 9, FI: 9, AZ:6, AVS:5, IV:4, NM:2 },
-  MOL: { FDI:28, PD:15, M5S:22, LEGA: 8, FI:11, AZ:5, AVS:4, IV:5, NM:2 },
-  CAM: { FDI:20, PD:18, M5S:28, LEGA: 5, FI:10, AZ:6, AVS:5, IV:6, NM:2 },
-  PUG: { FDI:25, PD:19, M5S:24, LEGA: 6, FI: 9, AZ:6, AVS:5, IV:5, NM:1 },
-  BAS: { FDI:32, PD:16, M5S:18, LEGA: 8, FI:10, AZ:5, AVS:5, IV:4, NM:2 },
-  CAL: { FDI:30, PD:14, M5S:19, LEGA: 7, FI:12, AZ:5, AVS:5, IV:6, NM:2 },
-  SIC: { FDI:27, PD:15, M5S:26, LEGA: 7, FI:10, AZ:5, AVS:4, IV:4, NM:2 },
-  SAR: { FDI:22, PD:20, M5S:22, LEGA: 8, FI: 8, AZ:7, AVS:6, IV:5, NM:2 },
-};
-
-// ── Seat allocation: D'Hondt with 4% threshold ─────────────────────────────────
-function calcSeats(
-  votePcts: Partial<Record<ItPartyId, number>>,
-  totalSeats = IT_TOTAL_SEATS,
-  threshold = IT_THRESHOLD,
-): Partial<Record<ItPartyId, number>> {
-  const qualifying: Partial<Record<ItPartyId, number>> = {};
-  let qualSum = 0;
-  for (const [id, v] of Object.entries(votePcts) as [ItPartyId, number][]) {
-    if ((v ?? 0) >= threshold) { qualifying[id] = v; qualSum += v; }
-  }
-  if (qualSum === 0) return {};
-  const quotients: { id: ItPartyId; q: number }[] = [];
-  for (const [id, v] of Object.entries(qualifying) as [ItPartyId, number][]) {
-    for (let d = 1; d <= totalSeats; d++) quotients.push({ id, q: v / d });
-  }
-  quotients.sort((a, b) => b.q - a.q);
-  const seats: Partial<Record<ItPartyId, number>> = {};
-  for (let i = 0; i < Math.min(totalSeats, quotients.length); i++) {
-    seats[quotients[i].id] = (seats[quotients[i].id] ?? 0) + 1;
-  }
-  return seats;
-}
-
-// Partial simulation: weight seats by declared region populations
-function calcPartialSeats(
-  natPcts: Record<ItPartyId, number>,
-  declaredRegions: Set<ItRegionId>,
-): Partial<Record<ItPartyId, number>> {
-  if (declaredRegions.size === 0) return {};
-  const weighted: Partial<Record<ItPartyId, number>> = {};
-  let totalPop = 0;
-  for (const regId of declaredRegions) {
-    const reg = IT_REGION_MAP[regId];
-    if (!reg) continue;
-    const rv = calcRegionVotes(natPcts, regId);
-    for (const p of IT_PARTIES) weighted[p.id] = (weighted[p.id] ?? 0) + (rv[p.id] ?? 0) * reg.pop;
-    totalPop += reg.pop;
-  }
-  if (totalPop === 0) return {};
-  const norm: Partial<Record<ItPartyId, number>> = {};
-  for (const p of IT_PARTIES) norm[p.id] = (weighted[p.id] ?? 0) / totalPop;
-  return calcSeats(norm);
-}
-
-// Uniform national swing model for regional vote estimates
-function calcRegionVotes(
-  natPcts: Record<ItPartyId, number>,
-  regId: ItRegionId,
-): Record<ItPartyId, number> {
-  const base = IT_REGION_RESULTS_2022[regId];
-  const raw: Record<ItPartyId, number> = {} as Record<ItPartyId, number>;
-  let total = 0;
-  for (const p of IT_PARTIES) {
-    const swing = (natPcts[p.id] ?? 0) - (IT_VOTE_PCT_2022[p.id] ?? 0);
-    const v = Math.max(0, (base[p.id] ?? 0) + swing);
-    raw[p.id] = v; total += v;
-  }
-  if (total === 0) return raw;
-  for (const p of IT_PARTIES) raw[p.id] = (raw[p.id] / total) * 100;
-  return raw;
-}
-
-// Redistribute pcts proportionally when one slider changes
-function redistributePcts(
-  current: Record<ItPartyId, number>,
-  changedId: ItPartyId,
-  newRaw: number,
-  locks: Set<ItPartyId>,
-): Record<ItPartyId, number> {
-  const ids = Object.keys(current) as ItPartyId[];
-  const lockedSum = ids.filter(id => locks.has(id) && id !== changedId).reduce((s, id) => s + (current[id] ?? 0), 0);
-  const clamped = Math.min(Math.max(newRaw, 0), 100 - lockedSum);
-  const unlocked = ids.filter(id => !locks.has(id) && id !== changedId);
-  const remaining = 100 - lockedSum - clamped;
-  const unlockedSum = unlocked.reduce((s, id) => s + (current[id] ?? 0), 0);
-  const next: Record<ItPartyId, number> = { ...current, [changedId]: clamped };
-  if (unlockedSum > 0) for (const id of unlocked) next[id] = ((current[id] ?? 0) / unlockedSum) * remaining;
-  else if (unlocked.length > 0) for (const id of unlocked) next[id] = remaining / unlocked.length;
-  return next;
-}
-
-// ── Map colour ─────────────────────────────────────────────────────────────────
-function partyColor(id: ItPartyId): string { return IT_PARTY_MAP[id]?.color ?? '#888'; }
-
-function getRegionFill(natPcts: Record<ItPartyId, number>, regId: ItRegionId, dark: boolean, overrides?: Record<string, Record<ItPartyId, number>>): string {
-  const rv = overrides?.[regId] ?? calcRegionVotes(natPcts, regId);
-  const sorted = (Object.entries(rv) as [ItPartyId, number][]).sort(([, a], [, b]) => b - a);
-  if (!sorted.length) return dark ? '#374151' : '#E5E7EB';
-  const [winner, winPct] = sorted[0];
-  const runnerUp = sorted[1]?.[1] ?? 0;
-  const t = Math.min(Math.max((winPct - runnerUp) / 25, 0), 1);
-  const c = hsl(partyColor(winner));
-  c.l = dark ? 0.52 - t * 0.28 : 0.80 - t * 0.44;
-  return c.formatHex();
-}
-
-// ── Bell-curve simulation timing ───────────────────────────────────────────────
-function itRandNormal(): number {
-  let u = 0, v = 0;
-  while (u === 0) u = Math.random(); while (v === 0) v = Math.random();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
-function itBellCurveTimes(n: number, totalMs: number): number[] {
-  return Array.from({ length: n }, () => Math.max(0.02, Math.min(0.98, 0.5 + itRandNormal() * 0.18)))
-    .sort((a, b) => a - b).map(t => Math.round(t * totalMs));
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-function fmtN(n: number): string {
-  if (n >= 1_000_000) return (n / 1_000_000).toFixed(1) + 'M';
-  if (n >= 1_000) return Math.round(n / 1_000) + 'K';
-  return String(n);
-}
+// ── helpers ──────────────────────────────────────────────────────────────────
 function hexToRgba(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
   const full = h.length === 3 ? h[0]+h[0]+h[1]+h[1]+h[2]+h[2] : h;
   const r = parseInt(full.slice(0,2),16), g = parseInt(full.slice(2,4),16), b = parseInt(full.slice(4,6),16);
+  if (isNaN(r)||isNaN(g)||isNaN(b)) return `rgba(128,128,128,${alpha})`;
   return `rgba(${r},${g},${b},${alpha})`;
 }
+// Shade a base color toward lighter (low margin) → saturated (high margin)
+function shadeByStrength(baseColor: string, strength: number, dark: boolean): string {
+  const t = Math.min(Math.max(strength, 0), 1);
+  const c = hsl(baseColor);
+  c.l = dark ? (0.58 - t*(0.58-0.30)) : (0.84 - t*(0.84-0.40));
+  return c.formatHex();
+}
 
-// ── Tooltip type ───────────────────────────────────────────────────────────────
-type RegTooltipState = {
-  x: number; y: number; name: string;
-  parties: { id: ItPartyId; pct: number }[];
-  leader: ItPartyId | null;
-} | null;
-
-// ── Political left → right order for hemicycle ────────────────────────────────
-const IT_LR_ORDER: ItPartyId[] = ['AVS','PD','M5S','IV','AZ','NM','FI','LEGA','FDI'];
+// Coalition leading from a PR record
+function leadCoalitionOf(pr: Record<string, number>): string {
+  const tot: Record<string, number> = {
+    CDX: (pr.FDI||0)+(pr.LEGA||0)+(pr.FI||0)+(pr.NM||0),
+    CSX: (pr.PD||0)+(pr.AVS||0)+(pr.PIU||0)+(pr.IC||0),
+    M5S: pr.M5S||0, AZIV: pr.AZIV||0,
+  };
+  return Object.keys(tot).reduce((b,k)=>tot[k]>tot[b]?k:b,'CDX');
+}
+function leadPartyOf(pr: Record<string, number>): ItPartyId {
+  return IT_PR_KEYS.reduce((b,p)=>(pr[p]||0)>(pr[b]||0)?p:b, 'FDI');
+}
 
 // ── Scoreboard tile ────────────────────────────────────────────────────────────
-function ItScoreboardTile({ partyId, seats, pct, rawVotes, belowThreshold, isLeader, isWinner, dark: _dark }: {
-  partyId: ItPartyId; seats: number; pct: number; rawVotes: number;
-  belowThreshold: boolean; isLeader: boolean; isWinner: boolean; dark?: boolean;
+function ScoreboardTile({ party, seats, pct, isWinner, hasMajority, dark }: {
+  party: typeof IT_PARTIES[0]; seats: number; pct: number; isWinner: boolean; hasMajority: boolean; dark: boolean;
 }) {
-  const party = IT_PARTY_MAP[partyId];
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photo, setPhoto] = useState<string | null>(null);
   useEffect(() => {
-    if (!party.wikiTitle) { setPhotoUrl(null); return; }
-    let cancelled = false;
-    fetchWikiPhoto(party.wikiTitle).then(url => { if (!cancelled) setPhotoUrl(url); });
-    return () => { cancelled = true; };
+    let live = true;
+    if (party.wikiTitle) fetchWikiPhoto(party.wikiTitle).then(u => { if (live) setPhoto(u); });
+    return () => { live = false; };
   }, [party.wikiTitle]);
-
-  const initials = party.leader.split(' ').map((w: string) => w[0]).join('').slice(0, 2);
-  const color = partyColor(partyId);
-  const colorAlpha = hexToRgba(color, 0.13);
-
+  const initials = party.leader.split(/[ –]/).filter(Boolean).slice(0,2).map(s=>s[0]).join('');
   return (
-    <div
-      className={`cand-col${isLeader ? ' is-leader' : ''}${isWinner ? ' is-winner' : ''}`}
-      style={{
-        '--cand-color': color, '--cand-color-alpha': colorAlpha,
-        borderColor: (isLeader || isWinner) ? color : hexToRgba(color, belowThreshold ? 0.18 : 0.30),
-        opacity: belowThreshold ? 0.55 : 1,
-      } as React.CSSProperties}
-    >
-      <div style={{ position: 'relative' }}>
-        <div className="cand-circle-frame">
-          {photoUrl
-            ? <img src={photoUrl} alt={party.leader} onError={() => setPhotoUrl(null)} />
-            : <span className="cand-initials">{initials}</span>
-          }
+    <div className={`relative shrink-0 rounded-[7px] border px-2.5 py-2 w-[148px] ${dark?'bg-[#10203a] border-white/10':'bg-white border-default'} ${isWinner?'ring-1 ring-[#c8a020]':''}`}>
+      <div className="flex items-center gap-2">
+        <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-[9px] font-bold text-white" style={{ background: party.color }}>
+          {photo ? <img src={photo} alt={party.leader} className="w-full h-full object-cover" /> : initials}
         </div>
-        {isWinner && (
-          <span className="called-tick">
-            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
-              <circle cx="8.5" cy="8.5" r="8.5" fill={color}/>
-              <path d="M4.5 8.5l2.8 2.8L12.5 5.5" stroke="#fff" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </span>
-        )}
-        {belowThreshold && (
-          <span style={{ position:'absolute', bottom:2, right:2, fontSize:8, background:'rgba(0,0,0,0.45)', color:'#fff', borderRadius:2, padding:'0 2px', fontFamily:'monospace' }}>
-            &lt;4%
-          </span>
-        )}
+        <div className="min-w-0 flex-1">
+          <div className="text-[11px] font-black leading-none truncate text-ink">{party.name}</div>
+          <div className="text-[7.5px] font-mono text-ink-3 truncate mt-0.5">{party.leader}</div>
+        </div>
       </div>
-      <span className="cand-leader-name" title={party.leader}>{party.leader.split(' ').pop()}</span>
-      <span className="cand-party-abbrev">{party.name}</span>
-      <span className="cand-seats">{seats}</span>
-      <span className="cand-party-name" title={party.fullName}>{party.fullName}</span>
-
-      <div style={{ width:'100%', display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:1 }}>
-        <span style={{ fontSize:6.5, fontFamily:'"JetBrains Mono",monospace', fontWeight:600, color:hexToRgba(color, 0.48), letterSpacing:'0.10em', textTransform:'uppercase' }}>VOTES</span>
-        <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color }}>{pct.toFixed(1)}%</span>
+      <div className="flex items-end justify-between mt-1.5">
+        <span className="text-[22px] font-black leading-none tabular-nums" style={{ color: party.color }}>{seats}</span>
+        <span className="text-[9px] font-mono text-ink-3 mb-0.5">{pct.toFixed(1)}%</span>
       </div>
-      <div style={{ width:'100%', textAlign:'right', marginBottom:3 }}>
-        <span className="cand-votes-full" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(color,0.65) }}>{rawVotes.toLocaleString()}</span>
-        <span className="cand-votes-compact" style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:hexToRgba(color,0.65) }}>{fmtN(rawVotes)}</span>
+      <div className="mt-1 h-1 rounded-full overflow-hidden" style={{ background: dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.07)' }}>
+        <div style={{ width: `${Math.min(100, pct*2.2)}%`, height:'100%', background: party.color }} />
       </div>
-      <div className="cand-bar-track" style={{ width:'100%', height:3, borderRadius:2, background:'var(--bar-track)' }}>
-        <div style={{ height:'100%', borderRadius:2, background:color, width:`${Math.min(pct/35*100,100)}%`, transition:'width 0.3s ease' }} />
-      </div>
+      {hasMajority && <div className="absolute -top-1.5 -right-1.5 text-[10px]">👑</div>}
     </div>
   );
 }
 
-// ── Scoreboard ─────────────────────────────────────────────────────────────────
-function ItScoreboard({ natPcts, simSeats, isBaseline, dark }: {
-  natPcts: Record<ItPartyId, number>;
-  simSeats?: Partial<Record<ItPartyId, number>>;
-  isBaseline?: boolean;
-  dark?: boolean;
+// ── Scoreboard ───────────────────────────────────────────────────────────────
+function ItalyScoreboard({ seats, pcts, dark }: {
+  seats: Record<ItPartyId, number>; pcts: Record<ItPartyId, number>; dark: boolean;
 }) {
-  const scrollRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const el = scrollRef.current;
-    if (!el) return;
-    const handler = (e: WheelEvent) => {
-      if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return;
-      e.preventDefault(); el.scrollLeft += e.deltaY;
-    };
-    el.addEventListener('wheel', handler, { passive: false });
-    return () => el.removeEventListener('wheel', handler);
-  }, []);
-
-  const seats = useMemo(() => simSeats ?? calcSeats(natPcts), [simSeats, natPcts]);
-  const pctTotal = Object.values(natPcts).reduce((s, v) => s + (v ?? 0), 0);
-
-  const sorted = useMemo(
-    () => IT_PARTIES
-      .filter(p => (seats[p.id] ?? 0) > 0 || (natPcts[p.id] ?? 0) > 0)
-      .sort((a, b) => (seats[b.id] ?? 0) - (seats[a.id] ?? 0) || (natPcts[b.id] ?? 0) - (natPcts[a.id] ?? 0)),
-    [seats, natPcts],
-  );
-
-  const leader = sorted[0]?.id ?? null;
-  const winner = leader && (seats[leader] ?? 0) >= IT_MAJORITY ? leader : null;
-
+  const ordered = useMemo(() =>
+    IT_PARTIES.filter(p => (seats[p.id] ?? 0) > 0 || (pcts[p.id] ?? 0) >= 0.5)
+      .sort((a,b) => (seats[b.id]??0) - (seats[a.id]??0) || (pcts[b.id]??0) - (pcts[a.id]??0)),
+  [seats, pcts]);
+  const top = ordered[0]?.id;
   return (
-    <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
-      <div ref={scrollRef} className="overflow-x-auto scroll-none">
-        <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
-          {sorted.map(party => {
-            const s = seats[party.id] ?? 0;
-            const pct = pctTotal > 0 ? (natPcts[party.id] ?? 0) / pctTotal * 100 : 0;
-            const rawVotes = isBaseline
-              ? IT_VOTE_RAW_2022[party.id]
-              : Math.round((natPcts[party.id] ?? 0) / 100 * IT_GRAND_TOTAL_VOTES);
-            const belowThreshold = (natPcts[party.id] ?? 0) < IT_THRESHOLD;
-            return (
-              <ItScoreboardTile key={party.id} partyId={party.id} seats={s} pct={pct}
-                rawVotes={rawVotes} belowThreshold={belowThreshold}
-                isLeader={party.id === leader && !winner} isWinner={party.id === winner}
-                dark={dark} />
-            );
-          })}
-        </div>
-      </div>
+    <div className="flex gap-2 overflow-x-auto thin-scroll px-3 py-2">
+      {ordered.map(p => (
+        <ScoreboardTile key={p.id} party={p} seats={seats[p.id] ?? 0} pct={pcts[p.id] ?? 0}
+          isWinner={p.id === top} hasMajority={(seats[p.id]??0) >= IT_MAJORITY} dark={dark} />
+      ))}
     </div>
   );
 }
 
-// ── Map controller ─────────────────────────────────────────────────────────────
+// ── Map controller (no-smooth + resize) ───────────────────────────────────────
 function MapController({ layerRef }: { layerRef: React.MutableRefObject<L.GeoJSON | null> }) {
   const map = useMap();
   useEffect(() => {
-    const container = map.getContainer();
+    const h = () => layerRef.current?.eachLayer((l) => { const p = l as unknown as { options?: { smoothFactor?: number } }; if (p.options) p.options.smoothFactor = 0; });
+    map.on('zoomend', h);
     const ro = new ResizeObserver(() => map.invalidateSize());
-    ro.observe(container);
-    return () => ro.disconnect();
-  }, [map]);
-  useEffect(() => {
-    const h = () => layerRef.current?.eachLayer((l: L.Layer) => { (l as any).options && ((l as any).options.smoothFactor = 0); });
-    map.on('zoomend', h); return () => { map.off('zoomend', h); };
+    ro.observe(map.getContainer());
+    return () => { map.off('zoomend', h); ro.disconnect(); };
   }, [map, layerRef]);
   return null;
 }
 
-// ── Bubble overlay ─────────────────────────────────────────────────────────────
-type BubbleEntry = { marker: L.CircleMarker; baseRadius: number };
-function zoomScale(zoom: number): number { return Math.max(0.40, Math.min(1.0, (zoom - 4) / (9 - 4))); }
-
-function ItBubbleLayer({
-  geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef, declaredRegions,
-}: {
-  geoData: any; natPcts: Record<ItPartyId, number>;
-  containerRef: React.RefObject<HTMLDivElement | null>;
-  setTooltip: (t: RegTooltipState) => void;
-  onSelect: (id: ItRegionId) => void;
-  natPctsRef: React.MutableRefObject<Record<ItPartyId, number>>;
-  declaredRegions?: Set<ItRegionId>;
+// ── Bubble overlay (size by leading margin) ────────────────────────────────────
+function zoomScale(z: number) { return Math.max(0.4, Math.min(1, (z-4)/(8-4))); }
+function BubbleLayer({ geoData, layer, onSelect }: {
+  geoData: GeoJSON.FeatureCollection | null; layer: LayerId; onSelect: (f: GeoJSON.Feature) => void;
 }) {
   const map = useMap();
-  const bubblesRef = useRef<BubbleEntry[]>([]);
-
+  const markersRef = useRef<{ m: L.CircleMarker; base: number }[]>([]);
   useEffect(() => {
-    const onZoom = () => {
-      const scale = zoomScale(map.getZoom());
-      for (const { marker, baseRadius } of bubblesRef.current) marker.setRadius(baseRadius * scale);
-    };
+    const onZoom = () => { const s = zoomScale(map.getZoom()); markersRef.current.forEach(({m,base}) => m.setRadius(base*s)); };
     map.on('zoomend', onZoom); return () => { map.off('zoomend', onZoom); };
   }, [map]);
-
   useEffect(() => {
-    for (const { marker } of bubblesRef.current) marker.remove();
-    bubblesRef.current = [];
-    const scale = zoomScale(map.getZoom());
-
-    L.geoJSON(geoData).eachLayer((layer: L.Layer) => {
-      const regName: string = (layer as any).feature?.properties?.reg_name ?? '';
-      const regId = IT_REGNAME_TO_ID[regName];
-      if (!regId) return;
-      if (declaredRegions && !declaredRegions.has(regId)) return;
-      const bounds = (layer as any).getBounds?.();
-      if (!bounds?.isValid()) return;
-      const center = bounds.getCenter();
-      const rv = calcRegionVotes(natPcts, regId);
-      const sorted = (Object.entries(rv) as [ItPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a);
-      if (!sorted.length) return;
-      const [winId, winPct] = sorted[0];
-      const margin = winPct - (sorted[1]?.[1] ?? 0);
-      const baseRadius = 5 + Math.min(margin / 20, 1) * 14;
-      const color = partyColor(winId);
-      const marker = L.circleMarker(center, { radius: baseRadius * scale, color, fillColor: color, fillOpacity: 0.72, weight: 1, opacity: 0.9 }).addTo(map);
-      marker.on('click', () => { setTooltip(null); onSelect(regId); });
-      marker.on('mousemove', (e: L.LeafletMouseEvent) => {
-        const rect = containerRef.current?.getBoundingClientRect();
-        if (!rect) return;
-        const cur = calcRegionVotes(natPctsRef.current, regId);
-        const parties = (Object.entries(cur) as [ItPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 5).map(([id, pct]) => ({ id, pct }));
-        setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: regName, parties, leader: parties[0]?.id ?? null });
-      });
-      marker.on('mouseout', () => setTooltip(null));
-      bubblesRef.current.push({ marker, baseRadius });
+    markersRef.current.forEach(({m}) => m.remove());
+    markersRef.current = [];
+    if (!geoData) return;
+    const s = zoomScale(map.getZoom());
+    const gj = L.geoJSON(geoData as GeoJSON.GeoJsonObject);
+    gj.eachLayer((lyr) => {
+      const feat = (lyr as unknown as { feature?: GeoJSON.Feature }).feature;
+      const b = (lyr as unknown as { getBounds?: () => L.LatLngBounds }).getBounds?.();
+      if (!feat || !b || !b.isValid()) return;
+      const props = feat.properties as Record<string, unknown>;
+      let color = '#9AA0A6', margin = 0.2;
+      if (layer === 'uni') { color = IT_COAL_COLOR[(props.coal as string) || 'NONE'] || '#9AA0A6'; margin = 0.5; }
+      else {
+        const pr = props.pr as Record<string, number> | null; if (!pr) return;
+        const lead = leadPartyOf(pr); color = itPartyColor(lead);
+        const sorted = IT_PR_KEYS.map(k=>pr[k]||0).sort((a,b)=>b-a);
+        margin = Math.max(0.08, ((sorted[0]||0) - (sorted[1]||0))/100);
+      }
+      const c = b.getCenter();
+      const base = Math.max(5, Math.min(26, 5 + margin*55));
+      const m = L.circleMarker([c.lat, c.lng], { radius: base*s, fillColor: color, fillOpacity: 0.82, color: '#fff', weight: 1 });
+      m.on('click', () => onSelect(feat));
+      m.addTo(map); markersRef.current.push({ m, base });
     });
-    return () => { for (const { marker } of bubblesRef.current) marker.remove(); bubblesRef.current = []; };
-  }, [map, geoData, natPcts]);
-
+    return () => { markersRef.current.forEach(({m}) => m.remove()); markersRef.current = []; };
+  }, [geoData, layer, map, onSelect]);
   return null;
 }
 
-// ── Map view ───────────────────────────────────────────────────────────────────
-function ItMapView({ natPcts, selectedRegion, onSelect, dark, bubbleMap, declaredRegions, overrides }: {
-  natPcts: Record<ItPartyId, number>; selectedRegion: ItRegionId | null;
-  onSelect: (id: ItRegionId) => void; dark: boolean; bubbleMap: boolean;
-  declaredRegions?: Set<ItRegionId>;
-  overrides?: Record<string, Record<ItPartyId, number>>;
+// ── Map view (3-layer) ─────────────────────────────────────────────────────────
+function ItalyMapView({ layer, geoData, liveResults, dark, bubble, onSelect, selectedKey }: {
+  layer: LayerId;
+  geoData: GeoJSON.FeatureCollection | null;
+  liveResults: Record<string, Record<string, number>> | null; // sim overrides keyed by feature name
+  dark: boolean;
+  bubble: boolean;
+  onSelect: (f: GeoJSON.Feature) => void;
+  selectedKey: string | null;
 }) {
-  const containerRef    = useRef<HTMLDivElement>(null);
-  const layerRef        = useRef<L.GeoJSON | null>(null);
-  const [geoData, setGeoData] = useState<any>(null);
-  const [tooltip, setTooltip] = useState<RegTooltipState>(null);
+  const layerRef = useRef<L.GeoJSON | null>(null);
+  const [tooltip, setTooltip] = useState<{ x:number;y:number;name:string;rows:{label:string;color:string;val:string}[];win:string } | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const ctx = useRef({ layer, liveResults, dark, selectedKey });
+  useEffect(() => { ctx.current = { layer, liveResults, dark, selectedKey }; }, [layer, liveResults, dark, selectedKey]);
 
-  const natPctsRef      = useRef(natPcts);
-  const selectedRef     = useRef(selectedRegion);
-  const darkRef         = useRef(dark);
-  const bubbleRef       = useRef(bubbleMap);
-  const onSelectRef     = useRef(onSelect);
-  const declaredRef     = useRef(declaredRegions);
-  const overridesRef    = useRef(overrides);
-  useEffect(() => { natPctsRef.current  = natPcts;       }, [natPcts]);
-  useEffect(() => { selectedRef.current = selectedRegion; }, [selectedRegion]);
-  useEffect(() => { darkRef.current     = dark;           }, [dark]);
-  useEffect(() => { bubbleRef.current   = bubbleMap;      }, [bubbleMap]);
-  useEffect(() => { onSelectRef.current = onSelect;       }, [onSelect]);
-  useEffect(() => { declaredRef.current = declaredRegions; }, [declaredRegions]);
-  useEffect(() => { overridesRef.current = overrides;     }, [overrides]);
+  const featKey = useCallback((f: GeoJSON.Feature) => {
+    const p = f.properties as Record<string, unknown>;
+    return String(layer === 'reg' ? p.reg_name : p.den);
+  }, [layer]);
 
-  useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}italy-regions.geojson`)
-      .then(r => r.json()).then(setGeoData).catch(console.error);
-  }, []);
+  const fillFor = useCallback((f: GeoJSON.Feature): string => {
+    const p = f.properties as Record<string, unknown>;
+    const live = ctx.current.liveResults?.[featKey(f)];
+    if (ctx.current.layer === 'uni') {
+      const coal = (live ? leadCoalitionOf(live) : (p.coal as string)) || 'NONE';
+      return shadeByStrength(IT_COAL_COLOR[coal] || '#9AA0A6', 0.62, ctx.current.dark);
+    }
+    const pr = (live as Record<string,number>) || (p.pr as Record<string,number> | null);
+    if (!pr) return ctx.current.dark ? '#33415a' : '#dfe3ea';
+    const lead = leadPartyOf(pr);
+    const sorted = IT_PR_KEYS.map(k=>pr[k]||0).sort((a,b)=>b-a);
+    const margin = ((sorted[0]||0)-(sorted[1]||0))/40;
+    return shadeByStrength(itPartyColor(lead), 0.35+margin, ctx.current.dark);
+  }, [featKey]);
 
-  const getStyle = useCallback((feature: any): L.PathOptions => {
-    const regName: string = feature?.properties?.reg_name ?? '';
-    const regId = IT_REGNAME_TO_ID[regName];
-    const isSelected = regId === selectedRef.current;
-    const borderColor = darkRef.current ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
-    if (bubbleRef.current) return { fillOpacity:0, weight:0.4, color: darkRef.current ? 'rgba(255,255,255,0.18)':'rgba(0,0,0,0.18)', opacity:0.6 };
-    if (!regId) return { fillColor: darkRef.current?'#374151':'#E5E7EB', fillOpacity:0.5, weight:0.4, color:borderColor, opacity:1 };
-    const isDeclared = !declaredRef.current || declaredRef.current.has(regId);
-    if (!isDeclared) return { fillColor: darkRef.current?'#1f2937':'#d1d5db', fillOpacity:0.7, weight:0.4, color:borderColor, opacity:1 };
-    const fill = getRegionFill(natPctsRef.current, regId, darkRef.current, overridesRef.current);
-    return { fillColor:fill, fillOpacity:0.80, weight: isSelected?2:0.5, color: isSelected?'#c8a020':borderColor, opacity:1 };
-  }, []);
+  const style = useCallback((f?: GeoJSON.Feature): L.PathOptions => {
+    if (!f) return {};
+    const sel = featKey(f) === ctx.current.selectedKey;
+    if (bubble) return { fillOpacity: 0, weight: 0.4, color: ctx.current.dark?'rgba(255,255,255,0.15)':'rgba(0,0,0,0.16)', opacity: 0.6 };
+    return { fillColor: fillFor(f), fillOpacity: 0.82, weight: sel?2.2:0.4, color: sel?'#c8a020':(ctx.current.dark?'rgba(255,255,255,0.28)':'rgba(0,0,0,0.3)'), opacity: 1 };
+  }, [featKey, fillFor, bubble]);
 
-  useEffect(() => { layerRef.current?.setStyle((f: any) => getStyle(f)); }, [natPcts, selectedRegion, dark, bubbleMap, declaredRegions, overrides, getStyle]);
+  useEffect(() => { layerRef.current?.setStyle((f) => style(f as GeoJSON.Feature)); }, [layer, liveResults, dark, bubble, selectedKey, style]);
 
-  const onEachFeature = useCallback((feature: any, layer: L.Layer) => {
-    const regName: string = feature?.properties?.reg_name ?? '';
-    const regId = IT_REGNAME_TO_ID[regName];
-    layer.on('click', () => { if (regId) onSelectRef.current(regId); });
-    layer.on('mousemove', (e: L.LeafletMouseEvent) => {
-      if (bubbleRef.current || !regId) { setTooltip(null); return; }
-      const rect = containerRef.current?.getBoundingClientRect();
-      if (!rect) return;
-      const rv = calcRegionVotes(natPctsRef.current, regId);
-      const parties = (Object.entries(rv) as [ItPartyId, number][]).filter(([, v]) => v > 0).sort(([, a], [, b]) => b - a).slice(0, 5).map(([id, pct]) => ({ id, pct }));
-      setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: regName, parties, leader: parties[0]?.id ?? null });
+  const onEach = useCallback((f: GeoJSON.Feature, lyr: L.Layer) => {
+    lyr.on('click', () => onSelect(f));
+    lyr.on('mousemove', (e: L.LeafletMouseEvent) => {
+      if (bubble) { setTooltip(null); return; }
+      const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+      const p = f.properties as Record<string, unknown>;
+      const live = ctx.current.liveResults?.[featKey(f)];
+      const name = String(layer==='reg' ? p.reg_name : (p.den ?? p.reg_name));
+      let rows: {label:string;color:string;val:string}[] = []; let win = '';
+      if (layer === 'uni' && !live) {
+        const coal = (p.coal as string)||'NONE'; win = IT_COAL_NAME[coal]||'—';
+        rows = [{ label: win, color: IT_COAL_COLOR[coal]||'#999', val: 'vincitore' }];
+      } else {
+        const pr = (live as Record<string,number>) || (p.pr as Record<string,number> | null);
+        if (pr) {
+          const lead = leadPartyOf(pr); win = IT_PARTY_MAP[lead]?.name ?? '';
+          rows = IT_PR_KEYS.map(k=>({ id:k, v: pr[k]||0 })).filter(r=>r.v>=1).sort((a,b)=>b.v-a.v).slice(0,5)
+            .map(r => ({ label: IT_PARTY_MAP[r.id as ItPartyId].name, color: itPartyColor(r.id), val: r.v.toFixed(1)+'%' }));
+        }
+      }
+      setTooltip({ x: e.originalEvent.clientX-rect.left, y: e.originalEvent.clientY-rect.top, name, rows, win });
     });
-    layer.on('mouseout', () => setTooltip(null));
-  }, []);
+    lyr.on('mouseout', () => setTooltip(null));
+  }, [featKey, layer, bubble, onSelect]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full">
-      <MapContainer center={[42.5, 12.5]} zoom={6} minZoom={5} maxZoom={13}
-        style={{ width:'100%', height:'100%' }} zoomControl worldCopyJump={false}>
-        <TileLayer key={dark?'dark':'light'}
-          url={dark
-            ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-            : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'}
-          attribution='&copy; OpenStreetMap &copy; CARTO'
-          subdomains="abcd" updateWhenZooming={false} updateWhenIdle maxZoom={20} />
+      <MapContainer center={[42.2, 12.5]} zoom={6} minZoom={5} maxZoom={12} style={{ width:'100%', height:'100%' }} zoomControl worldCopyJump
+        preferCanvas>
+        <TileLayer key={dark?'d':'l'} url={dark
+          ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
+          : 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'}
+          attribution='&copy; OpenStreetMap &copy; CARTO' subdomains="abcd" />
         <MapController layerRef={layerRef} />
-        {geoData && <GeoJSON ref={layerRef as any} data={geoData} style={(f:any)=>getStyle(f)} onEachFeature={onEachFeature} {...({smoothFactor:0} as any)} />}
-        {geoData && bubbleMap && <ItBubbleLayer geoData={geoData} natPcts={natPcts} containerRef={containerRef}
-          setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef} declaredRegions={declaredRegions} />}
+        {geoData && !bubble && (
+          <GeoJSON key={layer} data={geoData} ref={(r) => { layerRef.current = r as unknown as L.GeoJSON; }}
+            style={(f) => style(f as GeoJSON.Feature)} onEachFeature={onEach} />
+        )}
+        {geoData && bubble && <BubbleLayer geoData={geoData} layer={layer} onSelect={onSelect} />}
       </MapContainer>
-      {tooltip && (() => {
-        const cw = containerRef.current?.clientWidth ?? 9999;
-        const TW = 220; const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
-        const tt = { bg: dark?'rgba(18,24,44,0.96)':'rgba(255,255,255,0.97)', border: dark?'rgba(255,255,255,0.09)':'rgba(0,0,0,0.08)',
-          shadow: dark?'0 6px 28px rgba(0,0,0,0.5)':'0 6px 28px rgba(0,0,0,0.12)',
-          title: dark?'rgba(255,255,255,0.92)':'rgba(0,0,0,0.85)', body: dark?'rgba(255,255,255,0.85)':'rgba(0,0,0,0.78)' };
-        return (
-          <div className="absolute pointer-events-none z-[1000]" style={{ left, top: Math.max(6, tooltip.y - 20), width: TW }}>
-            <div style={{ background:tt.bg, borderRadius:10, border:`1px solid ${tt.border}`, boxShadow:tt.shadow, backdropFilter:'blur(10px)', padding:'12px 14px' }}>
-              <div style={{ fontSize:13, fontWeight:700, color:tt.title }}>{tooltip.name}</div>
-              <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color: dark?'rgba(255,255,255,0.40)':'rgba(0,0,0,0.42)', marginTop:2 }}>Est. regional result</div>
-              <div style={{ marginTop:10, display:'flex', flexDirection:'column', gap:6 }}>
-                {tooltip.parties.map(({ id, pct }, i) => {
-                  const pColor = partyColor(id);
-                  return (
-                    <div key={id} style={{ display:'flex', alignItems:'center', gap:7 }}>
-                      <span style={{ width:8, height:8, borderRadius:2, flexShrink:0, background:pColor }} />
-                      <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{IT_PARTY_MAP[id]?.name ?? id}</span>
-                      <span style={{ fontSize:12, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:pColor }}>{pct.toFixed(1)}%</span>
-                    </div>
-                  );
-                })}
-              </div>
+      {tooltip && (
+        <div className="absolute z-[1000] pointer-events-none rounded-[6px] px-2.5 py-1.5 shadow-lg"
+          style={{ left: tooltip.x+14, top: tooltip.y+8, background: dark?'rgba(8,16,40,0.97)':'rgba(255,255,255,0.98)', border:`1px solid ${dark?'rgba(255,255,255,0.12)':'rgba(0,0,0,0.1)'}`, maxWidth: 230 }}>
+          <div className="text-[11px] font-bold mb-1" style={{ color: dark?'#e8eef8':'#111' }}>{tooltip.name}</div>
+          {tooltip.win && <div className="text-[8px] font-mono uppercase tracking-wide mb-1 text-ink-3">▸ {tooltip.win}</div>}
+          {tooltip.rows.map((r,i) => (
+            <div key={i} className="flex items-center gap-1.5 text-[10px]" style={{ color: dark?'#cfd8ea':'#333' }}>
+              <span className="w-2 h-2 rounded-full shrink-0" style={{ background: r.color }} />
+              <span className="flex-1 truncate">{r.label}</span>
+              <span className="font-mono tabular-nums">{r.val}</span>
             </div>
-          </div>
-        );
-      })()}
-      <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono">Scroll to zoom · Click to open</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
 
-// ── Region breakdown panel (editable) ─────────────────────────────────────────
-function ItRegionPanel({ regId, natPcts, onUpdate, onClose, dark, override }: {
-  regId: ItRegionId; natPcts: Record<ItPartyId, number>;
-  onUpdate: (id: ItRegionId, pcts: Record<ItPartyId, number>) => void;
-  onClose: () => void; dark?: boolean;
-  override?: Record<ItPartyId, number>;
+// ── Rosatellum seat model (for the simulation what-if) ─────────────────────────
+function largestRemainder(weights: Record<string, number>, total: number): Record<string, number> {
+  const keys = Object.keys(weights);
+  const sum = keys.reduce((s, k) => s + Math.max(0, weights[k]), 0);
+  const out: Record<string, number> = Object.fromEntries(keys.map(k => [k, 0]));
+  if (sum <= 0 || total <= 0) return out;
+  const exact = keys.map(k => ({ k, e: Math.max(0, weights[k]) / sum * total }));
+  let used = 0;
+  for (const x of exact) { out[x.k] = Math.floor(x.e); used += out[x.k]; }
+  exact.sort((a, b) => (b.e - Math.floor(b.e)) - (a.e - Math.floor(a.e)));
+  let i = 0;
+  while (used < total && exact.length) { out[exact[i % exact.length].k]++; used++; i++; }
+  return out;
+}
+
+const BASELINE_SEATS = Object.fromEntries(IT_PARTIES.map(p => [p.id, p.seats2022])) as Record<ItPartyId, number>;
+const BASELINE_PCT   = Object.fromEntries(IT_PARTIES.map(p => [p.id, p.prPct2022])) as Record<ItPartyId, number>;
+
+function computeSeats(natPct: Record<ItPartyId, number>): Record<ItPartyId, number> {
+  // PR (245): national party threshold 3%, Hare largest remainder
+  const prW: Record<string, number> = {};
+  for (const p of IT_PARTIES) { if (p.id === 'ALTRI') continue; const v = natPct[p.id] || 0; if (v >= IT_PR_THRESHOLD) prW[p.id] = v; }
+  const prSeats = largestRemainder(prW, 245);
+  // FPTP (147): by coalition vote^k (FPTP bonus to plurality), split within coalition by sqrt(pct)
+  const coalPct: Record<string, number> = { CDX: 0, CSX: 0, M5S: 0, AZIV: 0 };
+  for (const c of IT_COALITIONS) coalPct[c.id] = c.parties.reduce((s, pid) => s + (natPct[pid] || 0), 0);
+  const coalW = Object.fromEntries(Object.entries(coalPct).map(([c, v]) => [c, Math.pow(Math.max(v, 0.01), 3.2)]));
+  const coalFptp = largestRemainder(coalW, 147);
+  const fptp: Record<string, number> = {};
+  for (const c of IT_COALITIONS) {
+    const within: Record<string, number> = {};
+    c.parties.forEach(pid => { within[pid] = Math.sqrt(Math.max(0.04, natPct[pid] || 0)); });
+    const w = largestRemainder(within, coalFptp[c.id] || 0);
+    for (const [pid, n] of Object.entries(w)) fptp[pid] = (fptp[pid] || 0) + n;
+  }
+  // Overseas (8): proportional among parties >=1%
+  const ovW: Record<string, number> = {};
+  for (const p of IT_PARTIES) { if (p.id === 'ALTRI') continue; const v = natPct[p.id] || 0; if (v >= 1) ovW[p.id] = v; }
+  const ov = largestRemainder(ovW, 8);
+  const out = {} as Record<ItPartyId, number>;
+  for (const p of IT_PARTIES) out[p.id] = (prSeats[p.id] || 0) + (fptp[p.id] || 0) + (ov[p.id] || 0);
+  return out;
+}
+
+// ── Inspect panel (clicked feature) ─────────────────────────────────────────────
+function InspectPanel({ feature, layer, live, dark, onClose }: {
+  feature: GeoJSON.Feature; layer: LayerId; live: Record<string, number> | null; dark: boolean; onClose: () => void;
 }) {
-  const initPcts = () => {
-    if (override) return { ...override };
-    const rv = calcRegionVotes(natPcts, regId);
-    return Object.fromEntries(IT_PARTIES.map(p => [p.id, rv[p.id] ?? 0])) as Record<ItPartyId, number>;
-  };
-  const [pcts, setPcts] = useState<Record<ItPartyId, number>>(initPcts);
-  const [panelLocks, setPanelLocks] = useState<Set<ItPartyId>>(new Set());
-  const [editId, setEditId] = useState<ItPartyId | null>(null);
-  const [editVal, setEditVal] = useState('');
-  const pctsRef = useRef(pcts);
-  useEffect(() => { pctsRef.current = pcts; }, [pcts]);
-
-  useEffect(() => {
-    if (override) setPcts({ ...override });
-    else {
-      const rv = calcRegionVotes(natPcts, regId);
-      setPcts(Object.fromEntries(IT_PARTIES.map(p => [p.id, rv[p.id] ?? 0])) as Record<ItPartyId, number>);
-    }
-    setPanelLocks(new Set()); setEditId(null);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regId]);
-
-  function applyChange(id: ItPartyId, val: number) {
-    const next = redistributePcts(pctsRef.current, id, val, panelLocks);
-    pctsRef.current = next; setPcts(next); onUpdate(regId, next);
-  }
-  function commitEdit(id: ItPartyId, raw: string) {
-    const n = parseFloat(raw);
-    if (!isNaN(n)) applyChange(id, Math.max(0, Math.min(100, n)));
-    setEditId(null); setEditVal('');
-  }
-
-  const sorted = useMemo(() => IT_PARTIES.map(p => ({ ...p, pct: pcts[p.id] ?? 0 })).sort((a, b) => b.pct - a.pct), [pcts]);
-  const reg = IT_REGION_MAP[regId]; const winner = sorted[0];
+  const p = feature.properties as Record<string, unknown>;
+  const name = String(layer === 'reg' ? p.reg_name : p.den);
+  const isUni = layer === 'uni' && !live;
+  const pr = (live as Record<string, number>) || (p.pr as Record<string, number> | null);
+  const rows = pr ? IT_PR_KEYS.map(k => ({ id: k as ItPartyId, v: pr[k] || 0 })).filter(r => r.v > 0).sort((a, b) => b.v - a.v) : [];
+  const maxV = Math.max(1, ...rows.map(r => r.v));
+  const coal = (p.coal as string) || 'NONE';
   return (
-    <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
-      <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0">
-        <div className="flex items-start gap-2">
-          <div className="flex-1 min-w-0">
-            <h2 className="text-[17px] font-bold text-ink leading-tight truncate">{reg?.name ?? regId}</h2>
-            <p className="text-[10px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">{override ? 'Custom result · click % to edit' : 'Estimated result · click % to edit'}</p>
-          </div>
-          <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
+    <aside className={`w-64 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div className="min-w-0">
+          <h2 className="text-[13px] font-bold text-ink leading-tight truncate">{name}</h2>
+          <div className="text-[8.5px] font-mono text-ink-3 uppercase tracking-wide mt-0.5">{LAYERS.find(l=>l.id===layer)?.sub}</div>
         </div>
-        {winner && (
-          <div className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-[4px] border border-default" style={{ borderColor:`${winner.color}33` }}>
-            <span className="w-2 h-2 rounded-full shrink-0" style={{ background:winner.color }} />
-            <span className="text-[11px] font-medium text-ink flex-1 truncate">{winner.fullName}</span>
-            <span className="text-[9px] font-mono text-ink-3">{winner.pct.toFixed(1)}%</span>
-          </div>
-        )}
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
       </div>
-      <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-2.5">
-        {sorted.filter(p => p.pct >= 0.1 || panelLocks.has(p.id)).map(p => {
-          const pct = pcts[p.id] ?? 0; const isLocked = panelLocks.has(p.id);
+      <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2">
+        {isUni ? (
+          <div className="rounded-[6px] px-3 py-3 text-center" style={{ background: hexToRgba(IT_COAL_COLOR[coal]||'#999', 0.14) }}>
+            <div className="text-[8px] font-mono uppercase tracking-[0.16em] text-ink-3">Collegio vinto da</div>
+            <div className="text-[14px] font-black mt-1" style={{ color: IT_COAL_COLOR[coal]||'#999' }}>{IT_COAL_NAME[coal]||'—'}</div>
+            <div className="text-[8px] font-mono text-ink-3 mt-1">Maggioritario · uninominale FPTP</div>
+          </div>
+        ) : rows.length ? rows.map(r => {
+          const party = IT_PARTY_MAP[r.id];
           return (
-            <div key={p.id}>
-              <div className="flex items-center gap-1 mb-0.5">
-                <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background:p.color }} />
-                <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{p.fullName}</span>
-                {pct < IT_THRESHOLD && pct > 0 && <span className="text-[7px] font-mono text-red-400 shrink-0">&lt;4%</span>}
-                {editId === p.id
-                  ? <input type="number" min={0} max={100} step={0.1} value={editVal} autoFocus
-                      className="w-14 text-[11px] font-mono text-right border border-default rounded px-1 bg-canvas text-ink"
-                      onChange={e => setEditVal(e.target.value)}
-                      onBlur={() => commitEdit(p.id, editVal)}
-                      onKeyDown={e => { if (e.key==='Enter') commitEdit(p.id, editVal); if (e.key==='Escape') { setEditId(null); setEditVal(''); } }} />
-                  : <button onClick={() => { if (!isLocked) { setEditId(p.id); setEditVal(pct.toFixed(1)); } }}
-                      className={`text-[10px] font-mono font-semibold tabular-nums ${isLocked?'cursor-default':'hover:underline cursor-text'}`}
-                      style={{ color:p.color }}>{pct.toFixed(1)}%</button>
-                }
-                <button onClick={() => setPanelLocks(prev => { const n = new Set(prev); n.has(p.id) ? n.delete(p.id) : n.add(p.id); return n; })}
-                  className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked?'text-gold':'text-ink-3 hover:text-ink'}`} title={isLocked?'Unlock':'Lock'}>
-                  {isLocked
-                    ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                    : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                  }
-                </button>
+            <div key={r.id}>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: party.color }} />
+                <span className="text-[10px] text-ink flex-1 truncate">{party.fullName}</span>
+                <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: party.color }}>{r.v.toFixed(1)}%</span>
               </div>
-              <input type="range" min={0} max={60} step={0.1} value={pct} disabled={isLocked}
-                onChange={e => applyChange(p.id, parseFloat(e.target.value))}
-                className="br-party-slider w-full"
-                style={{ '--party-color': p.color, '--pct': `${(pct/60)*100}%` } as React.CSSProperties} />
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: dark?'rgba(255,255,255,0.07)':'rgba(0,0,0,0.06)' }}>
+                <div style={{ width: `${r.v/maxV*100}%`, height:'100%', background: party.color, opacity:0.85 }} />
+              </div>
             </div>
           );
-        })}
-        <div className="pt-2 border-t border-default space-y-2">
-          <div>
-            <div className="text-[8.5px] font-mono text-ink-3 uppercase tracking-wide mb-1">Population (2022 approx.)</div>
-            <div className="text-[11px] font-mono font-semibold text-ink">{reg?.pop.toLocaleString()}</div>
-          </div>
-          {override && (
-            <button onClick={() => {
-              const rv = calcRegionVotes(natPcts, regId);
-              const reset = Object.fromEntries(IT_PARTIES.map(p => [p.id, rv[p.id] ?? 0])) as Record<ItPartyId, number>;
-              setPcts(reset); setPanelLocks(new Set()); onUpdate(regId, reset);
-            }} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">
-              Reset to Estimate
-            </button>
-          )}
-        </div>
+        }) : <div className="text-[10px] font-mono text-ink-3 text-center py-4">No proportional vote in this area</div>}
       </div>
     </aside>
   );
 }
 
-// ── Parliament hemicycle panel ─────────────────────────────────────────────────
-function ItParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: { seats: Partial<Record<ItPartyId, number>>; onClose: () => void; exiting?: boolean; dark?: boolean }) {
-  const seatColors: string[] = [];
-  const legend: { id: ItPartyId; count: number; color: string }[] = [];
-  for (const id of IT_LR_ORDER) {
-    const n = seatsMap[id] ?? 0; if (n === 0) continue;
-    const color = partyColor(id);
-    legend.push({ id, count: n, color });
-    for (let i = 0; i < n; i++) seatColors.push(color);
+// ── Parliament hemicycle (400 seats) ────────────────────────────────────────────
+function ParliamentPanel({ seats, dark, onClose }: { seats: Record<ItPartyId, number>; dark: boolean; onClose: () => void; }) {
+  const total = IT_TOTAL_SEATS;
+  // Order seats left→right by ideology
+  const flat: string[] = [];
+  [...IT_PARTIES].sort((a, b) => a.ideology - b.ideology).forEach(p => {
+    for (let i = 0; i < (seats[p.id] || 0); i++) flat.push(p.color);
+  });
+  // hemicycle layout
+  const rows = 13;
+  const dots: { x: number; y: number; c: string }[] = [];
+  const rowCounts: number[] = [];
+  let remaining = flat.length;
+  const baseR = 1;
+  let weightSum = 0; for (let r = 0; r < rows; r++) weightSum += (baseR + r);
+  for (let r = 0; r < rows; r++) rowCounts.push(Math.max(1, Math.round((baseR + r) / weightSum * flat.length)));
+  let diff = flat.length - rowCounts.reduce((a, b) => a + b, 0);
+  let ri = rows - 1; while (diff !== 0) { rowCounts[ri] += diff > 0 ? 1 : -1; diff += diff > 0 ? -1 : 1; ri = (ri - 1 + rows) % rows; }
+  let idx = 0;
+  for (let r = 0; r < rows; r++) {
+    const n = rowCounts[r]; const radius = 0.42 + (r / rows) * 0.56;
+    for (let i = 0; i < n && idx < flat.length; i++) {
+      const frac = n === 1 ? 0.5 : i / (n - 1);
+      const ang = Math.PI - frac * Math.PI;
+      dots.push({ x: 0.5 + Math.cos(ang) * radius * 0.5, y: 0.95 - Math.sin(ang) * radius * 0.9, c: flat[idx] });
+      idx++;
+    }
+    remaining -= n;
   }
-  const totalSeats = seatColors.length;
-  const W = 310, H = 180, cx = W/2, cy = H - 4, innerR = 52, rowSpacing = 9, rows = 6;
-  const arcLengths = Array.from({ length: rows }, (_, i) => Math.PI * (innerR + i * rowSpacing));
-  const totalArc = arcLengths.reduce((s, v) => s + v, 0);
-  const floors = arcLengths.map(a => Math.floor((a / totalArc) * IT_TOTAL_SEATS));
-  const remainder = IT_TOTAL_SEATS - floors.reduce((s, v) => s + v, 0);
-  arcLengths.map((a, i) => ({ i, frac: (a/totalArc)*IT_TOTAL_SEATS - floors[i] }))
-    .sort((a, b) => b.frac - a.frac).slice(0, remainder).forEach(({ i }) => floors[i]++);
-  const rawPos: { x: number; y: number; θ: number; r: number }[] = [];
-  for (let row = 0; row < rows; row++) {
-    const r = innerR + row * rowSpacing; const n = floors[row];
-    for (let j = 0; j < n; j++) { const θ = Math.PI * (n - j - 0.5) / n; rawPos.push({ x: cx + r*Math.cos(θ), y: cy - r*Math.sin(θ), θ, r }); }
-  }
-  rawPos.sort((a, b) => b.θ - a.θ || a.r - b.r);
+  void remaining;
+  // coalition tallies
+  const coalSeats = IT_COALITIONS.map(c => ({ ...c, n: c.parties.reduce((s, pid) => s + (seats[pid] || 0), 0) }));
+  const leadCoal = coalSeats.reduce((b, c) => c.n > b.n ? c : b, coalSeats[0]);
   return (
-    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-r border-default flex flex-col overflow-hidden ${exiting?'panel-exit-left':'panel-slide-left'}`}>
+    <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">Camera dei Deputati</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeats} seats · majority {IT_MAJORITY} · threshold 4%</div>
+          <h2 className="text-[14px] font-bold text-ink leading-none">Camera dei Deputati</h2>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">{total} seats · majority {IT_MAJORITY}</p>
         </div>
-        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
-      <div className="flex-1 overflow-y-auto thin-scroll">
-        {totalSeats === 0
-          ? <div className="flex items-center justify-center h-40 text-ink-3 text-[11px] font-mono px-4 text-center">Load results or run simulation first</div>
-          : <>
-            <div className="px-2.5 pt-5 pb-1">
-              <svg viewBox={`0 0 ${W} ${H}`} width="100%" style={{ display:'block' }}>
-                <line x1={cx} y1={cy-innerR+4} x2={cx} y2={cy-(innerR+(rows-1)*rowSpacing)-8} stroke="rgba(0,0,0,0.10)" strokeWidth="1" strokeDasharray="3,3" />
-                {rawPos.map(({ x, y }, i) => (
-                  <circle key={i} cx={x} cy={y} r={2.8} fill={i < seatColors.length ? seatColors[i] : (dark?'#374151':'#e5e7eb')} />
-                ))}
-              </svg>
-            </div>
-            <div className="px-3.5 pb-4">
-              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5">
-                {legend.map(({ id, count, color }) => (
-                  <div key={id} className="flex items-center gap-1.5">
-                    <div style={{ width:9, height:9, borderRadius:2, background:color, flexShrink:0 }} />
-                    <span className="text-[9.5px] font-mono text-ink-3 flex-1 truncate">{IT_PARTY_MAP[id].name}</span>
-                    <span className="text-[9.5px] font-mono font-bold text-ink">{count}</span>
-                  </div>
-                ))}
+      <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3">
+        <svg viewBox="0 0 1 1" className="w-full" style={{ aspectRatio: '1 / 0.62' }}>
+          {dots.map((d, i) => <circle key={i} cx={d.x} cy={d.y} r={0.0075} fill={d.c} />)}
+        </svg>
+        <div className="text-center -mt-3 mb-3">
+          <div className="text-[9px] font-mono uppercase tracking-wide text-ink-3">Leading coalition</div>
+          <div className="text-[13px] font-black" style={{ color: leadCoal.color }}>{leadCoal.name} · {leadCoal.n}</div>
+          <div className="text-[8px] font-mono mt-0.5" style={{ color: leadCoal.n >= IT_MAJORITY ? '#16a34a' : '#ef4444' }}>
+            {leadCoal.n >= IT_MAJORITY ? '✓ Absolute majority' : `${IT_MAJORITY - leadCoal.n} short of majority`}
+          </div>
+        </div>
+        <div className="space-y-1.5">
+          {coalSeats.sort((a, b) => b.n - a.n).map(c => (
+            <div key={c.id}>
+              <div className="flex items-center gap-1.5 text-[10px]">
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: c.color }} />
+                <span className="flex-1 text-ink font-medium truncate">{c.name}</span>
+                <span className="font-mono font-bold tabular-nums text-ink">{c.n}</span>
               </div>
             </div>
-          </>
-        }
-      </div>
-    </aside>
-  );
-}
-
-// ── Coalition builder panel ────────────────────────────────────────────────────
-const IT_PRESET_COALITIONS: { name: string; emoji: string; parties: ItPartyId[] }[] = [
-  { name: 'Governo Meloni',  emoji: '🇮🇹', parties: ['FDI','LEGA','FI','NM'] },
-  { name: 'Campo Largo',     emoji: '🌹', parties: ['PD','M5S','AVS','IV'] },
-  { name: 'Centro',          emoji: '⚖️', parties: ['AZ','IV','NM','FI'] },
-  { name: 'Tutti vs FdI',    emoji: '🤝', parties: ['PD','M5S','AVS','IV','AZ'] },
-];
-
-function ItCoalitionPanel({ seats, onClose, exiting, dark }: { seats: Partial<Record<ItPartyId, number>>; onClose: () => void; exiting?: boolean; dark?: boolean }) {
-  const [selected, setSelected] = useState<Set<ItPartyId>>(new Set(['FDI','LEGA','FI','NM']));
-  const toggle = (id: ItPartyId) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  const totalCoalSeats = [...selected].reduce((s, id) => s + (seats[id] ?? 0), 0);
-  const hasMajority = totalCoalSeats >= IT_MAJORITY;
-  return (
-    <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
-      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
-        <div>
-          <h2 className="text-[13px] font-bold text-ink leading-none">Coalition Builder</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">Majority: {IT_MAJORITY} seats · {IT_TOTAL_SEATS} total</div>
-        </div>
-        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
-      </div>
-
-      {/* Presets */}
-      <div className="px-3.5 pt-3 pb-2 border-b border-default shrink-0">
-        <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-2">Presets</div>
-        <div className="grid grid-cols-2 gap-1.5">
-          {IT_PRESET_COALITIONS.map(coal => (
-            <button key={coal.name} onClick={() => setSelected(new Set(coal.parties))}
-              className="text-left px-2 py-1.5 rounded-[4px] border border-default hover:bg-hover transition-colors">
-              <div className="text-[8px] font-bold text-ink truncate">{coal.emoji} {coal.name}</div>
-              <div className="text-[7px] font-mono text-ink-3">{coal.parties.map(id => IT_PARTY_MAP[id]?.name).join(' + ')}</div>
-            </button>
           ))}
         </div>
       </div>
+    </aside>
+  );
+}
 
-      {/* Party toggles */}
-      <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll">
-        <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] text-ink-3 mb-2">Toggle Parties</div>
-        <div className="space-y-1.5">
-          {IT_LR_ORDER.map(id => {
-            const party = IT_PARTY_MAP[id]; const s = seats[id] ?? 0;
-            const isIn = selected.has(id); const color = partyColor(id);
-            return (
-              <button key={id} onClick={() => toggle(id)}
-                className={`w-full flex items-center gap-2 px-2 py-1.5 rounded-[4px] border transition-colors ${isIn ? 'border-transparent' : 'border-default hover:bg-hover'}`}
-                style={isIn ? { background: hexToRgba(color, 0.12), borderColor: hexToRgba(color, 0.40) } : {}}>
-                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ background: color }} />
-                <span className="flex-1 text-[10px] font-medium text-ink truncate text-left">{party.fullName}</span>
-                <span className="text-[9px] font-mono font-bold" style={{ color }}>{s}s</span>
-                {isIn && <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M2 4.5l1.8 1.8L7 2.5" stroke={color} strokeWidth="1.4" strokeLinecap="round"/></svg>}
-              </button>
-            );
-          })}
-        </div>
+// ── Breakdown stats panel ───────────────────────────────────────────────────────
+function BreakdownPanel({ seats, pcts, dark, onClose }: {
+  seats: Record<ItPartyId, number>; pcts: Record<ItPartyId, number>; dark: boolean; onClose: () => void;
+}) {
+  const totalSeats = IT_PARTIES.reduce((s, p) => s + (seats[p.id] || 0), 0);
+  const coalSeats = IT_COALITIONS.map(c => ({ ...c, n: c.parties.reduce((s, pid) => s + (seats[pid] || 0), 0), v: c.parties.reduce((s, pid) => s + (pcts[pid] || 0), 0) }));
+  const top = [...IT_PARTIES].sort((a, b) => (seats[b.id]||0)-(seats[a.id]||0))[0];
+  const mostEfficient = [...IT_PARTIES].filter(p => (pcts[p.id]||0) > 1)
+    .map(p => ({ p, ratio: (seats[p.id]||0) / Math.max(0.1, pcts[p.id]||0) }))
+    .sort((a, b) => b.ratio - a.ratio)[0];
+  const Stat = ({ label, value, color }: { label: string; value: string; color?: string }) => (
+    <div className={`rounded-[6px] px-3 py-2 ${dark?'bg-white/5':'bg-black/[0.03]'}`}>
+      <div className="text-[8px] font-mono uppercase tracking-[0.14em] text-ink-3">{label}</div>
+      <div className="text-[13px] font-bold mt-0.5" style={{ color: color || (dark?'#e8eef8':'#111') }}>{value}</div>
+    </div>
+  );
+  return (
+    <aside className={`w-72 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <h2 className="text-[14px] font-bold text-ink leading-none">Breakdown</h2>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
-
-      {/* Coalition total */}
-      <div className={`px-3.5 py-3 border-t border-default shrink-0 ${hasMajority ? 'bg-emerald-500/10' : ''}`}>
-        <div className="flex items-center justify-between">
-          <span className="text-[11px] font-mono font-bold text-ink">Coalition total</span>
-          <span className="text-[20px] font-black font-mono" style={{ color: hasMajority ? '#16a34a' : '#ef4444' }}>{totalCoalSeats}</span>
-        </div>
-        <div className="mt-1 h-2 rounded-full bg-black/8 overflow-hidden">
-          <div className="h-full rounded-full transition-all duration-300" style={{ width:`${Math.min(totalCoalSeats/IT_TOTAL_SEATS*100, 100)}%`, background: hasMajority ? '#16a34a' : '#ef4444' }} />
-        </div>
-        <div className={`mt-1.5 text-[9px] font-mono text-center font-bold ${hasMajority ? 'text-emerald-600' : 'text-red-500'}`}>
-          {hasMajority ? `✓ MAJORITY (need ${IT_MAJORITY})` : `✗ ${IT_MAJORITY - totalCoalSeats} seats short of majority`}
-        </div>
+      <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2">
+        <Stat label="Total seats" value={`${totalSeats} / 400`} />
+        <Stat label="Largest party" value={`${top.fullName} · ${seats[top.id]||0}`} color={top.color} />
+        <Stat label="Most seat-efficient" value={mostEfficient ? `${mostEfficient.p.name} (${mostEfficient.ratio.toFixed(1)} seats/%)` : '—'} color={mostEfficient?.p.color} />
+        <div className="text-[8px] font-mono uppercase tracking-[0.16em] text-ink-3 pt-2 pb-1">Coalitions · seats vs vote</div>
+        {coalSeats.sort((a,b)=>b.n-a.n).map(c => (
+          <div key={c.id} className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: c.color }} />
+            <span className="text-[10px] text-ink flex-1 truncate">{c.name}</span>
+            <span className="text-[9px] font-mono text-ink-3">{c.v.toFixed(1)}%</span>
+            <span className="text-[11px] font-mono font-bold tabular-nums text-ink w-7 text-right">{c.n}</span>
+          </div>
+        ))}
+        <div className="text-[8px] font-mono uppercase tracking-[0.16em] text-ink-3 pt-2 pb-1">Seats by party</div>
+        {[...IT_PARTIES].filter(p=>(seats[p.id]||0)>0).sort((a,b)=>(seats[b.id]||0)-(seats[a.id]||0)).map(p => (
+          <div key={p.id} className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+            <span className="text-[10px] text-ink flex-1 truncate">{p.fullName}</span>
+            <span className="text-[9px] font-mono text-ink-3">{(pcts[p.id]||0).toFixed(1)}%</span>
+            <span className="text-[11px] font-mono font-bold tabular-nums text-ink w-7 text-right">{seats[p.id]||0}</span>
+          </div>
+        ))}
       </div>
     </aside>
   );
 }
 
-// ── Tutorial panel ─────────────────────────────────────────────────────────────
-function ItTutorialPanel({ onClose, exiting, dark }: { onClose: () => void; exiting?: boolean; dark?: boolean }) {
-  const H2 = ({ children }: { children: React.ReactNode }) => <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-5 mb-1.5 first:mt-0">{children}</div>;
-  const P  = ({ children }: { children: React.ReactNode }) => <p className="text-[11px] text-ink leading-relaxed mb-2">{children}</p>;
-  const Note = ({ children }: { children: React.ReactNode }) => <div className="tutorial-note rounded-[4px] px-2.5 py-2 text-[10px] leading-relaxed mb-2">{children}</div>;
+// ── Tutorial ─────────────────────────────────────────────────────────────────
+function TutorialPanel({ dark, onClose }: { dark: boolean; onClose: () => void; }) {
+  const H = ({ c }: { c: string }) => <div className="text-[8.5px] font-mono font-bold uppercase tracking-[0.18em] text-gold mt-4 mb-1.5 first:mt-0">{c}</div>;
+  const P = ({ c }: { c: string }) => <p className="text-[11px] text-ink leading-relaxed mb-2">{c}</p>;
   return (
-    <aside className={`w-80 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden ${exiting?'panel-exit':'panel-slide'}`}>
+    <aside className={`w-80 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
-          <h1 className="text-[14px] font-bold text-ink leading-none">How to Play</h1>
-          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Italian Elections Guide</p>
+          <h2 className="text-[14px] font-bold text-ink leading-none">How to Play</h2>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Rosatellum · Camera dei Deputati</p>
         </div>
-        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
-      <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
-        <H2>The Rosatellum</H2>
-        <P>Italy uses a <strong>mixed electoral system</strong> (Rosatellum bis, 2017). 36% of Camera seats are won by FPTP in single-member constituencies; 64% by proportional party lists.</P>
-        <Note>This simulator models a <strong>simplified proportional</strong> version with a 4% threshold — parties below this get <strong>zero seats</strong>. Real FPTP bonus seats are not modelled.</Note>
-        <H2>Camera dei Deputati</H2>
-        <P>The lower house has <strong>400 seats</strong> (reduced in 2022 from 630). A majority requires <strong>201 seats</strong>. Elections are held every 5 years.</P>
-        <H2>4% Threshold</H2>
-        <P>Individual parties need at least <strong>4%</strong> nationally to receive proportional seats. In the scoreboard, parties below this threshold appear faded with a "&lt;4%" badge.</P>
-        <H2>Italian Coalitions</H2>
-        <P>Italian politics revolves around coalitions. The current government is the <strong>Governo Meloni</strong> (FdI + Lega + FI + Noi Moderati). The centre-left opposes with PD + M5S + AVS.</P>
-        <H2>Simulation</H2>
-        <P>Click <strong>▶ Simulation</strong> to adjust vote shares. Regions declare one by one, with partial seat counts live-updating.</P>
-        <H2>Coalition Builder</H2>
-        <P>Click <strong>Coalition</strong> to open the builder. Toggle parties to see if they can command a 201-seat majority.</P>
+      <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3.5">
+        <H c="The Rosatellum mixed system" />
+        <P c="The Chamber of Deputies has 400 seats: 147 elected first-past-the-post in single-member collegi (uninominali), 245 by proportional representation in multi-member collegi (plurinominali, 3% party threshold), and 8 by Italians abroad." />
+        <H c="Map layers" />
+        <P c="Toggle between three geographies for the same election: ▸ Collegi uninominali — the FPTP map, each shaded by the winning coalition. ▸ Collegi plurinominali — the proportional districts, shaded by the leading party. ▸ Regioni — the 20 regions, leading party in the proportional vote." />
+        <H c="Coalitions vs parties" />
+        <P c="Uninominali are contested by coalitions (centre-right, centre-left, M5S, Terzo Polo). Proportional seats are won by individual party lists. The scoreboard shows total seats per party; the parliament view groups them into coalitions." />
+        <H c="Simulation" />
+        <P c="Open Simulazione, set each party's national list percentage, and run. Regions report election-night style; the dashboard recomputes seats live via the Rosatellum (PR largest-remainder + an FPTP coalition bonus). The 2022 baseline shows the real, certified result." />
       </div>
     </aside>
   );
 }
 
-// ── Main app ───────────────────────────────────────────────────────────────────
+// ── Simulation panel ─────────────────────────────────────────────────────────
+const SIM_IDS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZIV','AVS','PIU','NM','IC'];
+function randNormal() { let u=0,v=0; while(!u)u=Math.random(); while(!v)v=Math.random(); return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v); }
+function SimulationPanel({ inputs, setInputs, running, onRun, onStop, progress, dark, onClose }: {
+  inputs: Record<ItPartyId, string>; setInputs: (f: (p: Record<ItPartyId,string>)=>Record<ItPartyId,string>)=>void;
+  running: boolean; onRun: () => void; onStop: () => void; progress: number; dark: boolean; onClose: () => void;
+}) {
+  const total = SIM_IDS.reduce((s, id) => s + (parseFloat(inputs[id])||0), 0);
+  // remaining share (below total) implicitly goes to sub-threshold / other parties
+  const valid = total >= 55 && total <= 101;
+  return (
+    <aside className={`w-72 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
+      <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
+        <div>
+          <h2 className="text-[14px] font-bold text-ink leading-none">Simulazione</h2>
+          <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">National list % → seats</p>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+      <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2.5">
+        {SIM_IDS.map(id => {
+          const p = IT_PARTY_MAP[id]; const v = parseFloat(inputs[id])||0;
+          return (
+            <div key={id}>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: p.color }} />
+                <span className="text-[10px] text-ink flex-1 truncate">{p.name}</span>
+                <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: p.color }}>{v.toFixed(1)}%</span>
+              </div>
+              <input type="range" min={0} max={45} step={0.1} value={v} disabled={running}
+                onChange={e => setInputs(prev => ({ ...prev, [id]: e.target.value }))}
+                className="br-party-slider w-full"
+                style={{ '--party-color': p.color, '--pct': `${Math.min(100, v*2.2)}%` } as React.CSSProperties} />
+            </div>
+          );
+        })}
+      </div>
+      <div className="px-3.5 py-3 border-t border-default space-y-2 shrink-0">
+        <div className={`flex justify-between text-[10.5px] font-mono font-bold border rounded px-2.5 py-1.5 ${valid?'text-emerald-600 border-emerald-200 bg-emerald-50':'text-red-500 border-red-200 bg-red-50'}`}>
+          <span>Total</span><span>{total.toFixed(1)}%</span>
+        </div>
+        {running ? (
+          <>
+            <div className="h-2 rounded-full overflow-hidden bg-black/10"><div className="h-full bg-blue-600 transition-all" style={{ width: `${progress}%` }} /></div>
+            <button onClick={onStop} className="w-full h-9 rounded text-[12px] font-mono font-bold uppercase tracking-wide bg-[#B91C1C] text-white hover:bg-[#991B1B]">⏹ Stop</button>
+          </>
+        ) : (
+          <button onClick={onRun} disabled={!valid} className="w-full h-9 rounded text-[12px] font-mono font-bold uppercase tracking-wide bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed">▶ Run election night</button>
+        )}
+      </div>
+    </aside>
+  );
+}
+
+// ── Main app ─────────────────────────────────────────────────────────────────
+type Panel = 'none' | 'parliament' | 'breakdown' | 'tutorial' | 'sim' | 'inspect';
+
 export default function ItalyApp() {
   const navigate = useNavigate();
+  const [dark, setDark] = useState(true);
+  useEffect(() => { document.documentElement.classList.toggle('dark', dark); }, [dark]);
 
-  const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
+  const [layer, setLayer] = useState<LayerId>('uni');
+  const [mode, setMode] = useState<'baseline' | 'sim'>('baseline');
+  const [bubble, setBubble] = useState(false);
+  const [panel, setPanel] = useState<Panel>('none');
+  const [selected, setSelected] = useState<GeoJSON.Feature | null>(null);
+
+  // geojson cache per layer
+  const [geo, setGeo] = useState<Record<LayerId, GeoJSON.FeatureCollection | null>>({ uni: null, pluri: null, reg: null });
   useEffect(() => {
-    document.documentElement.classList.toggle('dark', dark);
-    localStorage.setItem('darkMode', String(dark));
-  }, [dark]);
-
-  const [preset, setPreset]   = useState<'baseline'|'poll2024'|'blank'|'custom'>('baseline');
-  const [natPcts, setNatPcts] = useState<Record<ItPartyId, number>>(() => ({ ...IT_VOTE_PCT_2022 }));
-
-  function loadBaseline() { setNatPcts({ ...IT_VOTE_PCT_2022 }); setPreset('baseline'); resetSim(); }
-  function loadPoll2024()  { setNatPcts({ ...IT_VOTE_PCT_2024E }); setPreset('poll2024'); resetSim(); }
-  function loadBlank()     { setNatPcts(Object.fromEntries(IT_PARTIES.map(p => [p.id, 100/IT_PARTIES.length])) as Record<ItPartyId, number>); setPreset('blank'); resetSim(); }
-
-  const [selectedRegion, setSelectedRegion]     = useState<ItRegionId | null>(null);
-  const [regionOverrides, setRegionOverrides]   = useState<Record<string, Record<ItPartyId, number>>>({});
-  const [bubbleMap, setBubbleMap]               = useState(false);
-  const [scoreboardVisible, setScoreboardVisible] = useState(true);
-  const [locks, setLocks]                         = useState<Set<ItPartyId>>(new Set());
-  const [simOpen, setSimOpen]                     = useState(false);
-  const [parliOpen, setParliOpen]                 = useState(false);
-  const [coalitionOpen, setCoalitionOpen]         = useState(false);
-  const [tutorialOpen, setTutorialOpen]           = useState(false);
-  const [exitPanel, setExitPanel]                 = useState<string | null>(null);
-  const exitTimerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const headerScrollRef = useRef<HTMLDivElement>(null);
-
-  const triggerExit = useCallback((panel: string) => {
-    if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-    setExitPanel(panel);
-    exitTimerRef.current = setTimeout(() => setExitPanel(null), 280);
+    LAYERS.forEach(l => {
+      fetch(`${import.meta.env.BASE_URL}${l.file}`).then(r => r.json())
+        .then((fc: GeoJSON.FeatureCollection) => setGeo(prev => ({ ...prev, [l.id]: fc })))
+        .catch(console.error);
+    });
   }, []);
 
-  const [simSeats, setSimSeats]             = useState<Partial<Record<ItPartyId, number>> | undefined>();
-  const [simProgress, setSimProgress]       = useState(0);
-  const [simRunning, setSimRunning]         = useState(false);
-  const [declaredRegions, setDeclaredRegions] = useState<Set<ItRegionId> | undefined>();
-  const simTimersRef      = useRef<ReturnType<typeof setTimeout>[]>([]);
-  const natPctsAtSimStart = useRef<Record<ItPartyId, number>>(natPcts);
+  // simulation state
+  const [simInputs, setSimInputs] = useState<Record<ItPartyId, string>>(() =>
+    Object.fromEntries(IT_PARTIES.map(p => [p.id, String(p.prPct2022)])) as Record<ItPartyId, string>);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [liveSeats, setLiveSeats] = useState<Record<ItPartyId, number> | null>(null);
+  const [livePct, setLivePct] = useState<Record<ItPartyId, number> | null>(null);
+  const [liveResults, setLiveResults] = useState<Record<string, Record<string, number>> | null>(null);
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
 
-  function stopSim() { simTimersRef.current.forEach(clearTimeout); simTimersRef.current = []; setSimRunning(false); }
-  function resetSim() { stopSim(); setSimSeats(undefined); setDeclaredRegions(undefined); setSimProgress(0); }
+  const seats = mode === 'sim' && liveSeats ? liveSeats : BASELINE_SEATS;
+  const pcts  = mode === 'sim' && livePct ? livePct : BASELINE_PCT;
 
-  useEffect(() => {
-    const el = headerScrollRef.current; if (!el) return;
-    const h = (e: WheelEvent) => { if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; e.preventDefault(); el.scrollLeft += e.deltaY; };
-    el.addEventListener('wheel', h, { passive: false }); return () => el.removeEventListener('wheel', h);
-  }, []);
+  const clearTimers = () => { timersRef.current.forEach(clearTimeout); timersRef.current = []; };
+  const stopSim = useCallback(() => { clearTimers(); setRunning(false); setProgress(0); setLiveResults(null); setLiveSeats(null); setLivePct(null); setMode('baseline'); }, []);
 
-  const displaySeats = useMemo(() => simSeats ?? calcSeats(natPcts), [simSeats, natPcts]);
+  const runSim = useCallback(() => {
+    const regGeo = geo.reg; if (!regGeo) return;
+    const target = Object.fromEntries(SIM_IDS.map(id => [id, parseFloat(simInputs[id]) || 0])) as Record<ItPartyId, number>;
+    // uniform swing vs baseline national
+    const swing = Object.fromEntries(SIM_IDS.map(id => [id, target[id] - BASELINE_PCT[id]])) as Record<ItPartyId, number>;
+    setMode('sim'); setRunning(true); setProgress(0); setLiveResults({});
+    setLiveSeats(Object.fromEntries(IT_PARTIES.map(p => [p.id, 0])) as Record<ItPartyId, number>);
+    setLivePct(Object.fromEntries(IT_PARTIES.map(p => [p.id, 0])) as Record<ItPartyId, number>);
 
-  const btnBase   = 'h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors duration-75 shrink-0 tracking-wide uppercase';
-  const btnGold   = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
-  const btnMuted  = `${btnBase} border border-default text-ink-3 hover:bg-hover hover:text-ink`;
-  const btnActive = `${btnBase} bg-ink/8 border border-default text-ink`;
+    const feats = regGeo.features.filter(f => (f.properties as Record<string,unknown>).pr);
+    const order = [...feats].sort(() => Math.random() - 0.5);
+    const n = order.length;
+    // bell-curve report times over ~14s
+    const totalMs = 14000;
+    const times = order.map(() => Math.max(400, Math.min(totalMs-300, totalMs/2 + (totalMs/6)*randNormal()))).sort((a,b)=>a-b);
+    const acc: Record<string, number> = {}; let accPop = 0; const accLive: Record<string, Record<string, number>> = {};
+    let reported = 0;
+    order.forEach((f, i) => {
+      timersRef.current.push(setTimeout(() => {
+        const props = f.properties as Record<string, unknown>;
+        const base = props.pr as Record<string, number>;
+        const key = String(props.reg_name);
+        const pop = IT_REGION_POP[key] || 1_000_000;
+        // swung region pct
+        const swung: Record<string, number> = {};
+        IT_PR_KEYS.forEach(k => { swung[k] = Math.max(0, (base[k] || 0) + (swing[k as ItPartyId] || 0)); });
+        accLive[key] = swung;
+        setLiveResults({ ...accLive });
+        accPop += pop;
+        IT_PR_KEYS.forEach(k => { acc[k] = (acc[k] || 0) + swung[k] * pop; });
+        // national estimate from reported regions
+        const est = {} as Record<ItPartyId, number>;
+        const sumAll = IT_PR_KEYS.reduce((s, k) => s + (acc[k] || 0), 0);
+        IT_PR_KEYS.forEach(k => { est[k as ItPartyId] = sumAll > 0 ? (acc[k] || 0) / sumAll * 100 : 0; });
+        setLivePct({ ...est } as Record<ItPartyId, number>);
+        setLiveSeats(computeSeats(est));
+        reported++; setProgress(Math.round(reported / n * 100));
+        if (reported === n) {
+          // finalize with exact target
+          setLivePct({ ...(Object.fromEntries(IT_PARTIES.map(p=>[p.id, target[p.id as ItPartyId] ?? 0])) as Record<ItPartyId, number>) });
+          setLiveSeats(computeSeats(target));
+          setRunning(false);
+        }
+      }, times[i]));
+    });
+  }, [geo.reg, simInputs]);
 
-  const showRegion   = !!selectedRegion && !simOpen;
-  const showTutorial = tutorialOpen  || exitPanel === 'tutorial';
-  const showParli    = parliOpen     || exitPanel === 'parli';
-  const showCoal     = coalitionOpen || exitPanel === 'coal';
+  useEffect(() => () => clearTimers(), []);
+
+  const selectedKey = selected ? String(layer === 'reg' ? (selected.properties as Record<string,unknown>).reg_name : (selected.properties as Record<string,unknown>).den) : null;
+  const onSelectFeature = useCallback((f: GeoJSON.Feature) => { setSelected(f); setPanel('inspect'); }, []);
+
+  // when sim runs, force PR layer view (FPTP needs per-collegio shares we don't swing)
+  useEffect(() => { if (running && layer === 'uni') setLayer('reg'); }, [running, layer]);
+
+  const btn = (active: boolean) => `h-7 px-3 text-[11px] font-mono font-medium rounded-[4px] transition-colors uppercase tracking-wide shrink-0 ${active ? 'bg-[#c8a020] text-white' : 'border border-default text-ink-3 hover:bg-hover hover:text-ink'}`;
 
   return (
-    <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="it">
-
-      {/* ── Topbar ─────────────────────────────────────────────────────────── */}
-      <header className={`h-[52px] ${dark?'bg-[rgba(7,13,28,0.94)]':'bg-[rgba(245,244,240,0.92)]'} backdrop-blur-xl border-b border-default shadow-header shrink-0 flex items-center z-50`}>
-        <button onClick={() => navigate('/')} className="flex items-center gap-2.5 hover:opacity-80 transition-opacity cursor-pointer shrink-0 pl-4" title="Home">
-          <GlobeLogo />
-        </button>
-
-        <div ref={headerScrollRef} className="flex-1 min-w-0 flex items-center gap-2 px-2 overflow-x-auto scroll-none">
-          <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={loadBaseline} className={preset==='baseline' ? btnGold : btnMuted}>2022 Results</button>
-          <button onClick={loadPoll2024} className={preset==='poll2024' ? btnGold : btnMuted}>2024 Europee</button>
-          <button onClick={loadBlank}   className={preset==='blank'    ? btnGold : btnMuted}>Blank Map</button>
-          <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={() => setSimOpen(v => !v)} className={simOpen ? btnActive : btnMuted}>▶ Simulation</button>
-          <button onClick={() => setBubbleMap(v => !v)} className={bubbleMap ? `${btnBase} bg-emerald-600 text-white border border-emerald-600 hover:bg-emerald-700` : btnMuted}>Bubble Map</button>
-          <button onClick={() => setScoreboardVisible(v => !v)} className={scoreboardVisible ? btnActive : btnMuted}>Scoreboard</button>
-          <button onClick={() => { if (parliOpen) { setParliOpen(false); triggerExit('parli'); } else { setParliOpen(true); setCoalitionOpen(false); } }} className={parliOpen ? btnActive : btnMuted}>Parliament</button>
-          <button onClick={() => { if (coalitionOpen) { setCoalitionOpen(false); triggerExit('coal'); } else { setCoalitionOpen(true); setParliOpen(false); } }} className={coalitionOpen ? btnActive : btnMuted}>Coalition</button>
-          <button onClick={() => { if (tutorialOpen) { setTutorialOpen(false); triggerExit('tutorial'); } else setTutorialOpen(true); }} className={tutorialOpen ? btnActive : btnMuted}>Tutorial</button>
+    <div className={`h-screen flex flex-col ${dark ? 'dark' : ''}`} style={{ background: dark ? '#0a1426' : '#f3f1ec' }}>
+      {/* Header */}
+      <div className="h-[52px] shrink-0 flex items-center gap-2 px-2 border-b border-default" style={{ background: dark ? '#0d1b2e' : '#fff' }}>
+        <button onClick={() => navigate('/')} className="flex items-center gap-2 hover:opacity-80 pl-2 shrink-0" title="Home"><GlobeLogo /></button>
+        <div className="flex-1 min-w-0 flex items-center gap-2 overflow-x-auto thin-scroll px-1">
+          <div className="w-px h-4 bg-black/10 shrink-0" />
+          <button onClick={() => { stopSim(); }} className={btn(mode==='baseline')}>2022 Baseline</button>
+          <button onClick={() => setPanel('sim')} className={btn(panel==='sim')}>Simulazione</button>
+          <div className="w-px h-4 bg-black/10 shrink-0" />
+          {/* layer toggle */}
+          {LAYERS.map(l => (
+            <button key={l.id} onClick={() => setLayer(l.id)} disabled={running && l.id==='uni'}
+              className={`h-7 px-2.5 text-[10px] font-mono rounded-[4px] transition-colors tracking-wide shrink-0 ${layer===l.id ? 'bg-[#2563EB] text-white' : 'border border-default text-ink-3 hover:bg-hover hover:text-ink'} disabled:opacity-30`}
+              title={l.sub}>{l.label}</button>
+          ))}
+          <div className="w-px h-4 bg-black/10 shrink-0" />
+          <button onClick={() => setBubble(b => !b)} className={btn(bubble)}>Bubble</button>
+          <button onClick={() => setPanel('parliament')} className={btn(panel==='parliament')}>Parliament</button>
+          <button onClick={() => setPanel('breakdown')} className={btn(panel==='breakdown')}>Breakdown</button>
+          <button onClick={() => setPanel('tutorial')} className={btn(panel==='tutorial')}>Tutorial</button>
         </div>
+        <button onClick={() => setDark(d => !d)} className="w-8 h-8 flex items-center justify-center rounded hover:bg-hover text-ink-3 shrink-0">{dark ? '☀' : '🌙'}</button>
+      </div>
 
-        <div className="shrink-0 flex items-center gap-2 pr-4">
-          <button onClick={() => setDark(v => !v)} className="w-7 h-7 flex items-center justify-center rounded-[4px] border border-default text-ink-3 hover:text-ink transition-colors">{dark ? '☀' : '☾'}</button>
+      {/* Scoreboard */}
+      <div className="shrink-0 border-b border-default" style={{ background: dark ? '#0b1730' : '#faf9f6' }}>
+        <ItalyScoreboard seats={seats} pcts={pcts} dark={dark} />
+        {mode === 'sim' && (
+          <div className="px-3 pb-1.5 -mt-1 text-[8.5px] font-mono uppercase tracking-wide flex items-center gap-1.5" style={{ color: running ? '#ef4444' : '#16a34a' }}>
+            <span className={`w-1.5 h-1.5 rounded-full ${running?'animate-pulse':''}`} style={{ background: running?'#ef4444':'#16a34a' }} />
+            {running ? `Counting… ${progress}% of regions reporting` : 'Projection complete · model estimate'}
+          </div>
+        )}
+      </div>
+
+      {/* Map + panels */}
+      <div className="flex-1 min-h-0 flex relative">
+        <div className="flex-1 min-w-0 relative">
+          <ItalyMapView layer={layer} geoData={geo[layer]} liveResults={liveResults} dark={dark} bubble={bubble}
+            onSelect={onSelectFeature} selectedKey={selectedKey} />
+          <div className="absolute bottom-2 left-1/2 -translate-x-1/2 z-[1000] text-[9px] font-mono px-2.5 py-0.5 rounded-full pointer-events-none"
+            style={{ background: dark?'rgba(13,27,46,0.85)':'rgba(255,255,255,0.85)', color: dark?'#9fb0cc':'#666' }}>
+            {LAYERS.find(l=>l.id===layer)?.label} · {LAYERS.find(l=>l.id===layer)?.sub}
+          </div>
         </div>
-      </header>
-
-      {/* ── Scoreboard ─────────────────────────────────────────────────────── */}
-      {scoreboardVisible && <ItScoreboard natPcts={natPcts} simSeats={simSeats} isBaseline={preset==='baseline'} dark={dark} />}
-
-      {/* ── Body ───────────────────────────────────────────────────────────── */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-
-        {/* Parliament — LEFT */}
-        {showParli && <ItParliamentPanel seats={displaySeats} onClose={() => { setParliOpen(false); triggerExit('parli'); }} exiting={exitPanel==='parli'} dark={dark} />}
-
-        {/* Map */}
-        <ItMapView natPcts={natPcts} selectedRegion={selectedRegion}
-          onSelect={id => setSelectedRegion(prev => prev === id ? null : id)}
-          dark={dark} bubbleMap={bubbleMap} declaredRegions={declaredRegions} overrides={regionOverrides} />
-
-        {/* Right panels — first match wins */}
-        {simOpen && (
-          <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
-            <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0 flex items-center justify-between">
-              <div>
-                <h2 className="text-[14px] font-bold text-ink leading-none">Simulation</h2>
-                <p className="text-[8.5px] font-mono text-ink-3 mt-0.5 uppercase tracking-wide">Vote shares · D'Hondt · 4% threshold</p>
-              </div>
-              <button onClick={() => setSimOpen(false)} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
-            </div>
-            <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
-              {([...IT_PARTIES] as ItParty[]).sort((a, b) => (natPcts[b.id]??0) - (natPcts[a.id]??0)).map((party: ItParty) => {
-                const pct = natPcts[party.id] ?? 0; const isLocked = locks.has(party.id); const color = partyColor(party.id);
-                return (
-                  <div key={party.id}>
-                    <div className="flex items-center gap-1 mb-0.5">
-                      <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background:color }} />
-                      <span className="text-[10px] font-medium text-ink flex-1 truncate leading-none">{party.fullName}</span>
-                      {pct < IT_THRESHOLD && pct > 0 && <span className="text-[7px] font-mono text-red-400">&lt;4%</span>}
-                      <button onClick={() => setLocks(prev => { const n = new Set(prev); n.has(party.id) ? n.delete(party.id) : n.add(party.id); return n; })}
-                        className={`w-4 h-4 flex items-center justify-center shrink-0 transition-colors ${isLocked?'text-gold':'text-ink-3 hover:text-ink'}`} title={isLocked?'Unlock':'Lock'}>
-                        {isLocked
-                          ? <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                          : <svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>
-                        }
-                      </button>
-                    </div>
-                    <input type="range" min={0} max={50} step={0.1} value={pct} disabled={isLocked}
-                      onChange={e => { setNatPcts(redistributePcts(natPcts, party.id, parseFloat(e.target.value), locks)); setPreset('custom'); }}
-                      className="br-party-slider w-full"
-                      style={{ '--party-color': color, '--pct': `${(pct/50)*100}%` } as React.CSSProperties} />
-                    <div className="flex justify-between mt-0.5">
-                      <span className="text-[8px] font-mono text-ink-3">{party.name}</span>
-                      <span className="text-[8.5px] font-mono tabular-nums text-ink-3">{pct.toFixed(1)}%</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
-              <button disabled={simRunning} onClick={() => {
-                stopSim(); natPctsAtSimStart.current = { ...natPcts };
-                const allRegs = [...IT_REGIONS].sort(() => Math.random() - 0.5);
-                const NCHUNKS = 10; const chunkTimes = itBellCurveTimes(NCHUNKS, 12_000);
-                const chunks: ItRegion[][] = Array.from({ length: NCHUNKS }, () => []);
-                allRegs.forEach((r, i) => chunks[i % NCHUNKS].push(r));
-                setSimRunning(true); setSimProgress(0); setSimSeats(undefined); setDeclaredRegions(new Set());
-                let declared = new Set<ItRegionId>();
-                const timers: ReturnType<typeof setTimeout>[] = [];
-                for (let ci = 0; ci < NCHUNKS; ci++) {
-                  const chunk = chunks[ci]; const t = chunkTimes[ci];
-                  timers.push(setTimeout(() => {
-                    for (const r of chunk) declared.add(r.id);
-                    const snap = new Set(declared); setDeclaredRegions(snap); setSimProgress(snap.size);
-                    setSimSeats(calcPartialSeats(natPctsAtSimStart.current, snap));
-                    if (snap.size >= IT_REGIONS.length) { setSimSeats(calcSeats(natPctsAtSimStart.current)); setSimRunning(false); }
-                  }, t));
-                }
-                simTimersRef.current = timers;
-              }}
-                className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 transition-colors">
-                {simRunning ? `${simProgress}/${IT_REGIONS.length} regions reporting…` : '▶ Run Simulation'}
-              </button>
-              {(simSeats || declaredRegions) && (
-                <button onClick={resetSim} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">Reset</button>
-              )}
-            </div>
-          </aside>
-        )}
-
-        {showCoal && !simOpen && <ItCoalitionPanel seats={displaySeats} onClose={() => { setCoalitionOpen(false); triggerExit('coal'); }} exiting={exitPanel==='coal'} dark={dark} />}
-        {showRegion && selectedRegion && !simOpen && !showCoal && (
-          <ItRegionPanel regId={selectedRegion} natPcts={natPcts}
-            onUpdate={(id, pcts) => setRegionOverrides(prev => ({ ...prev, [id]: pcts }))}
-            onClose={() => setSelectedRegion(null)} dark={dark}
-            override={regionOverrides[selectedRegion]} />
-        )}
-        {showTutorial && !simOpen && !showCoal && <ItTutorialPanel onClose={() => { setTutorialOpen(false); triggerExit('tutorial'); }} exiting={exitPanel==='tutorial'} dark={dark} />}
+        {panel === 'inspect' && selected && <InspectPanel feature={selected} layer={layer} live={liveResults?.[selectedKey || ''] || null} dark={dark} onClose={() => setPanel('none')} />}
+        {panel === 'parliament' && <ParliamentPanel seats={seats} dark={dark} onClose={() => setPanel('none')} />}
+        {panel === 'breakdown' && <BreakdownPanel seats={seats} pcts={pcts} dark={dark} onClose={() => setPanel('none')} />}
+        {panel === 'tutorial' && <TutorialPanel dark={dark} onClose={() => setPanel('none')} />}
+        {panel === 'sim' && <SimulationPanel inputs={simInputs} setInputs={setSimInputs} running={running} onRun={runSim} onStop={stopSim} progress={progress} dark={dark} onClose={() => setPanel('none')} />}
       </div>
     </div>
   );
 }
+
