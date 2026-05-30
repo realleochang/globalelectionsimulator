@@ -40,7 +40,7 @@ const IT_PARTIES: ItParty[] = [
   { id: 'FI',   name: 'FI',      fullName: 'Forza Italia',             color: '#0F73B9', seats2022:  45, leader: 'Silvio Berlusconi',   wikiTitle: 'Silvio_Berlusconi', leader2026: 'Antonio Tajani', wikiTitle2026: 'Antonio_Tajani' },
   { id: 'AZ',   name: 'Azione',  fullName: 'Azione',                  color: '#00A3C7', seats2022:  13, leader: 'Carlo Calenda',      wikiTitle: 'Carlo_Calenda' },
   { id: 'IV',   name: 'IV',      fullName: 'Italia Viva',             color: '#E5147D', seats2022:   8, leader: 'Matteo Renzi',        wikiTitle: 'Matteo_Renzi' },
-  { id: 'FN',   name: 'FN',      fullName: 'Forza Nuova',             color: '#3E2723', seats2022:   0, leader: 'Roberto Fiore',       wikiTitle: 'Roberto_Fiore' },
+  { id: 'FN',   name: 'FN',      fullName: 'Futuro Nazionale',        color: '#3E2723', seats2022:   0, leader: 'Roberto Vannacci',    wikiTitle: 'Roberto_Vannacci' },
   { id: 'AVS',  name: 'AVS',     fullName: 'Alleanza Verdi e Sinistra',color: '#2E8B57', seats2022:  12, leader: 'Angelo Bonelli',     wikiTitle: 'Angelo_Bonelli' },
   { id: 'PIU',  name: '+Europa', fullName: '+Europa',                  color: '#C4006B', seats2022:   2, leader: 'Emma Bonino',         wikiTitle: 'Emma_Bonino', leader2026: 'Riccardo Magi', wikiTitle2026: 'Riccardo_Magi', regional: false },
   { id: 'NM',   name: 'NM',      fullName: 'Noi Moderati',             color: '#5B6E8C', seats2022:   7, leader: 'Maurizio Lupi',      wikiTitle: 'Maurizio_Lupi' },
@@ -1947,7 +1947,7 @@ function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, 
           ...(is2026
             ? [{label:'Azione', color:'#00A3C7', ids:['AZ']}, {label:'Italia Viva', color:'#E5147D', ids:['IV']}]
             : [{label:'Az–IV', color:'#00A3C7', ids:['AZ','IV']}]),
-          {label:'Forza Nuova',  color:'#3E2723',         ids:['FN']},
+          {label:'Futuro Nazionale', color:'#3E2723',     ids:['FN']},
           {label:'Others',       color:IT_COAL_COLOR.OTH, ids:['SVP']},
         ] as {label:string;color:string;ids:ItPartyId[]}[]).map(g => ({ ...g, n: g.ids.reduce((s,id)=>s+(natTotals[id]??0),0) })).filter(g => g.n > 0).sort((a,b)=>b.n-a.n);
         const maj = Math.floor(totalSeats/2)+1;
@@ -2026,7 +2026,7 @@ function ItTutorialPanel({ onClose, exiting, dark }: { onClose:()=>void; exiting
         <P c="The Circoscrizione Estero elects 8 deputies in four world zones — Europe (4), South America (2), North & Central America (1), Africa-Asia-Oceania (1). They are drawn as bubbles ON their continents and are always visible; zoom the map out to see them. Hover one for its zone result."/>
 
         <H2 c="5 · Coalitions"/>
-        <P c="Centre-right (FdI · Lega · FI · Noi Moderati) and Centre-left (PD · AVS · +Europa · Impegno Civico). In the 2026 scenarios the Five Star Movement has joined the centre-left, so on those pages M5S votes count toward the CSX alliance. Azione, Italia Viva and the far-right Forza Nuova run alone. In 2022 only, Azione+Italia Viva ran as one joint Az–IV list."/>
+        <P c="Centre-right (FdI · Lega · FI · Noi Moderati) and Centre-left (PD · AVS · +Europa · Impegno Civico). In the 2026 scenarios the Five Star Movement has joined the centre-left, so on those pages M5S votes count toward the CSX alliance. Azione, Italia Viva and the far-right Futuro Nazionale (Vannacci) run alone. In 2022 only, Azione+Italia Viva ran as one joint Az–IV list."/>
 
         <H2 c="6 · The three data pages (top-left)"/>
         <P c="2022 Baseline = the exact official 2022 result. 2026 Polling = current polling, with M5S in the centre-left. Blank Map = an empty canvas you fill in yourself. The ↻ Refresh button reloads whichever page you are on, throwing away every edit."/>
