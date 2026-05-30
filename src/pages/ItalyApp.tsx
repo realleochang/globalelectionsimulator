@@ -61,6 +61,8 @@ const IT_MAP_VIEWS: { id: ItMapViewId; label: string; file: string }[] = [
 const IT_COAL_COLOR: Record<string, string> = {
   CDX:'#214A7B', CSX:'#E63946', M5S:'#F2C200', AZIV:'#00A3C7', OTH:'#7E57C2', SVP:'#B30000', AUT:'#8E44AD', SCN:'#FF6F00', NONE:'#9AA0A6',
 };
+const IT_COAL_SLIDERS = ['CDX','CSX','M5S','AZIV','OTH'] as const;
+const IT_COAL_LABEL: Record<string, string> = { CDX:'Centre-right', CSX:'Centre-left', M5S:'M5S', AZIV:'Az–IV / Third Pole', OTH:'Others / regional' };
 
 // 2022 national list (proportional) results — EXACT official figures.
 // Source: Wikipedia "Results of the 2022 Italian general election" (Camera,
@@ -534,7 +536,7 @@ function getProvFill(
 // ── Tooltip state ─────────────────────────────────────────────────────────────
 type ProvTooltipState = {
   x: number; y: number; name: string;
-  parties: { id: ItPartyId; pct: number; rawVotes?: number }[];
+  parties: { id: ItPartyId; pct: number; rawVotes?: number; label?: string; color?: string }[];
   leader: ItPartyId | null;
   reportingPct?: number;
 } | null;
@@ -1022,15 +1024,21 @@ function ItMapView({
         const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
         const props = feature?.properties ?? {};
         const nm = String(props.den ?? props.reg_name ?? '');
-        let parties: { id: ItPartyId; pct: number; rawVotes?: number }[] = [];
+        const votes = (props.votes as number) ?? 0;
+        let parties: { id: ItPartyId; pct: number; rawVotes?: number; label?: string; color?: string }[] = [];
         if (mapViewRef.current === 'uni') {
+          // coalition vote in this single-member collegio (raw votes alongside %)
           const sh = (props.shares as Record<string,number>) ?? {};
-          const REP: Record<string, ItPartyId> = { CDX:'FDI', CSX:'PD', M5S:'M5S', AZIV:'AZIV', OTH:'NM' };
-          parties = (['CDX','CSX','M5S','AZIV','OTH'] as const).map(c => ({ id: REP[c], pct: sh[c] ?? 0 }))
-            .filter(p => p.pct > 0).sort((a,b)=>b.pct-a.pct);
+          const coal = props.coal as string;
+          const REG: Record<string, [string,string]> = { AUT:["Aosta Valley list",IT_COAL_COLOR.AUT], SVP:["SVP",IT_COAL_COLOR.SVP], SCN:["Sud chiama Nord",IT_COAL_COLOR.SCN] };
+          parties = (['CDX','CSX','M5S','AZIV','OTH'] as const).map(c => {
+            const isWinReg = c==='OTH' && REG[coal];
+            return { id: c as unknown as ItPartyId, pct: sh[c] ?? 0, rawVotes: Math.round((sh[c] ?? 0)/100*votes),
+              label: isWinReg ? REG[coal][0] : IT_COAL_LABEL[c], color: isWinReg ? REG[coal][1] : IT_COAL_COLOR[c] };
+          }).filter(p => p.pct > 0).sort((a,b)=>b.pct-a.pct);
         } else {
           const pr = (props.pr as Record<string,number>) ?? {};
-          parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0 })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
+          parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0, rawVotes: Math.round((pr[id] ?? 0)/100*votes) })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
         }
         setTooltip({ x:e.originalEvent.clientX-rect.left, y:e.originalEvent.clientY-rect.top, name:nm, parties, leader:parties[0]?.id??null, reportingPct:undefined });
         return;
@@ -1111,12 +1119,12 @@ function ItMapView({
                 {tooltip.reportingPct!=null ? `${tooltip.reportingPct}% reporting` : 'Estimated district result'}
               </div>
               <div style={{ marginTop:9, display:'flex', flexDirection:'column', gap:5 }}>
-                {tooltip.parties.map(({ id, pct, rawVotes },i) => {
-                  const pColor=partyColor(id);
+                {tooltip.parties.map(({ id, pct, rawVotes, label, color },i) => {
+                  const pColor=color??partyColor(id);
                   return (
-                    <div key={id} style={{ display:'flex', alignItems:'center', gap:6 }}>
+                    <div key={id+'-'+i} style={{ display:'flex', alignItems:'center', gap:6 }}>
                       <span style={{ width:7, height:7, borderRadius:2, flexShrink:0, background:pColor }} />
-                      <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{IT_PARTY_MAP[id]?.name??id}</span>
+                      <span style={{ flex:1, fontSize:11, fontWeight:i===0?600:400, color:tt.body, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{label??IT_PARTY_MAP[id]?.name??id}</span>
                       <span style={{ fontSize:11, fontFamily:'"JetBrains Mono",monospace', fontWeight:700, color:pColor }}>{pct.toFixed(1)}%</span>
                       {rawVotes!=null && <span style={{ fontSize:8.5, fontFamily:'"JetBrains Mono",monospace', color:tt.sub, marginLeft:2 }}>{rawVotes.toLocaleString()}</span>}
                     </div>
@@ -1766,9 +1774,8 @@ function ItReportingWidget({ projectedProvs,provReportingPct,simProvFractions,is
 }
 
 // ── FPTP (single-member collegio) editor — coalition sliders ──────────────────
-type ItColl = { id: string; name: string; shares: Record<string, number>; votes: number };
-const IT_COAL_SLIDERS = ['CDX','CSX','M5S','AZIV','OTH'] as const;
-const IT_COAL_LABEL: Record<string, string> = { CDX:'Centre-right', CSX:'Centre-left', M5S:'M5S', AZIV:'Az–IV / Third Pole', OTH:'Others / regional' };
+type ItColl = { id: string; name: string; shares: Record<string, number>; votes: number; coal: string };
+const IT_REG_LABEL: Record<string, string> = { AUT:'Aosta Valley list', SVP:'SVP (South Tyrol)', SCN:'Sud chiama Nord' };
 function ItFptpPanel({ coll, natPcts, override, onApply, onReset, onClose, dark }: {
   coll: ItColl; natPcts: Record<ItPartyId,number>; override?: Record<string,number>;
   onApply: (shares: Record<string,number>) => void; onReset: () => void; onClose: () => void; dark: boolean;
@@ -1804,10 +1811,17 @@ function ItFptpPanel({ coll, natPcts, override, onApply, onReset, onClose, dark 
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
       </div>
-      <div className="px-3.5 py-2 border-b border-default text-center" style={{ background: hexToRgba(IT_COAL_COLOR[winner]||'#999', 0.12) }}>
-        <div className="text-[8px] font-mono uppercase tracking-[0.15em] text-ink-3">Seat won by</div>
-        <div className="text-[13px] font-black" style={{ color: IT_COAL_COLOR[winner]||'#999' }}>{IT_COAL_LABEL[winner]||winner}</div>
-      </div>
+      {(() => {
+        const reg = !override && IT_REG_LABEL[coll.coal];   // regional-list winner (Aosta / SVP / SCN)
+        const wColor = reg ? (IT_COAL_COLOR[coll.coal]||'#999') : (IT_COAL_COLOR[winner]||'#999');
+        const wLabel = reg ? IT_REG_LABEL[coll.coal] : (IT_COAL_LABEL[winner]||winner);
+        return (
+          <div className="px-3.5 py-2 border-b border-default text-center" style={{ background: hexToRgba(wColor, 0.12) }}>
+            <div className="text-[8px] font-mono uppercase tracking-[0.15em] text-ink-3">Seat won by</div>
+            <div className="text-[13px] font-black" style={{ color: wColor }}>{wLabel}</div>
+          </div>
+        );
+      })()}
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-3">
         {IT_COAL_SLIDERS.map(c => {
           const v = draft[c] ?? 0; const col = IT_COAL_COLOR[c] || '#999';
@@ -1928,7 +1942,7 @@ export default function ItalyApp() {
   const [fptpOverrides,setFptpOverrides]       = useState<Record<string,Record<string,number>>>({});
   const [selectedUni,setSelectedUni]           = useState<string|null>(null);
   useEffect(()=>{ fetch(`${import.meta.env.BASE_URL}italy-uninominali.geojson`).then(r=>r.json()).then((fc:GeoJSON.FeatureCollection)=>{
-    const m:Record<string,ItColl>={}; for(const f of fc.features){ const pr=f.properties as Record<string,unknown>; if(pr.id) m[pr.id as string]={id:pr.id as string,name:String(pr.den||pr.id),shares:(pr.shares as Record<string,number>)||{CDX:0,CSX:0,M5S:0,AZIV:0,OTH:0},votes:(pr.votes as number)||0}; }
+    const m:Record<string,ItColl>={}; for(const f of fc.features){ const pr=f.properties as Record<string,unknown>; if(pr.id) m[pr.id as string]={id:pr.id as string,name:String(pr.den||pr.id),shares:(pr.shares as Record<string,number>)||{CDX:0,CSX:0,M5S:0,AZIV:0,OTH:0},votes:(pr.votes as number)||0,coal:(pr.coal as string)||'NONE'}; }
     setUniColl(m);
   }).catch(console.error); },[]);
   const [scoreboardVisible,setScoreboardVisible] = useState(true);
