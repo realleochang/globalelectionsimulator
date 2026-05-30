@@ -289,29 +289,6 @@ const IT_PARTY_VOTE_CAP: Record<ItPartyId, number> = (() => {
   return caps;
 })();
 
-// ── D'Hondt — applied per province with 3 % provincial threshold ──────────────
-function calcDHondtProv(
-  votes:  Partial<Record<ItPartyId, number>>,
-  seats:  number,
-  thresh: number = 0,
-): Partial<Record<ItPartyId, number>> {
-  const total = Object.values(votes).reduce((s, v) => s + (v ?? 0), 0);
-  if (total === 0 || seats === 0) return {};
-  const qualifying = (Object.entries(votes) as [ItPartyId, number][])
-    .filter(([, v]) => (v ?? 0) / total * 100 >= thresh && (v ?? 0) > 0);
-  if (qualifying.length === 0) return {};
-  const quotients: { id: ItPartyId; q: number }[] = [];
-  for (const [id, v] of qualifying) {
-    for (let d = 1; d <= seats; d++) quotients.push({ id, q: v / d });
-  }
-  quotients.sort((a, b) => b.q - a.q);
-  const result: Partial<Record<ItPartyId, number>> = {};
-  for (let i = 0; i < Math.min(seats, quotients.length); i++) {
-    result[quotients[i].id] = (result[quotients[i].id] ?? 0) + 1;
-  }
-  return result;
-}
-
 // Proportional swing: prov_pct = base_2023 × (new_nat / old_nat), normalised
 function calcProvVotes(
   natPcts:  Record<ItPartyId, number>,
@@ -334,8 +311,12 @@ function calcProvVotes(
     const newNat = natPcts[p.id] ?? 0;
     const oldNat = IT_VOTE_PCT_2022[p.id] ?? 0;
     const basePct = base[p.id] ?? 0;
-    // Regional parties stay landlocked + proportional within their territory; national parties swing nationally
-    raw[p.id] = !itContests(p.id, provId) ? 0 : basePct === 0 ? 0 : oldNat === 0 ? basePct : basePct * (newNat / oldNat);
+    // Regional parties stay landlocked + proportional within their territory; national
+    // parties swing nationally. A brand-new party (no 2022 base or national share, e.g.
+    // FN) is assumed uniform at its national % so it earns district representation.
+    raw[p.id] = !itContests(p.id, provId) ? 0
+      : basePct === 0 ? (oldNat === 0 ? newNat : 0)
+      : oldNat === 0 ? basePct : basePct * (newNat / oldNat);
     total += raw[p.id];
   }
   if (total === 0) return raw;
@@ -369,56 +350,129 @@ const IT_COAL_DEF_2026: Record<string, ItPartyId[]> = {
   CDX: ['FDI','LEGA','FI','NM'], CSX: ['PD','AVS','PIU','IC','M5S'], AZ: ['AZ'], IV: ['IV'], FN: ['FN'],
 };
 const coalDefFor = (is2026?: boolean) => (is2026 ? IT_COAL_DEF_2026 : IT_COAL_DEF);
-// fptpCounts: seats won per coalition in the 147 single-member collegi (editable
-// FPTP view). When omitted, FPTP is modelled from national coalition strength.
+// ── Per-district PR magnitudes ────────────────────────────────────────────────
+// The 245 proportional seats are split across the 49 plurinominal districts in
+// proportion to each district's share of the electorate (largest remainder), so
+// the per-district allocations reconcile EXACTLY to the 245 national total.
+const IT_PR_MAG: Record<ItProvId, number> = (() => {
+  const w: Record<string, number> = {};
+  for (const p of IT_PROVINCES) w[p.id] = p.weight;
+  return hareLR(w, 245) as Record<ItProvId, number>;
+})();
+
+// Parties qualifying for PR nationally: ≥3% (party) and, if in a multi-party
+// coalition, that coalition ≥10%. SVP is exempt (minority) and handled per-district.
+function prQualSet(natPcts: Partial<Record<ItPartyId, number>>, is2026?: boolean): Set<ItPartyId> {
+  const COAL = coalDefFor(is2026);
+  const coalPct: Record<string, number> = {};
+  for (const [c, ps] of Object.entries(COAL)) coalPct[c] = ps.reduce((a, id) => a + (natPcts[id] ?? 0), 0);
+  const out = new Set<ItPartyId>();
+  for (const pty of IT_PARTIES) {
+    if (pty.id === 'SVP') continue;
+    if ((natPcts[pty.id] ?? 0) < 3) continue;
+    const coal = Object.entries(COAL).find(([, ps]) => ps.includes(pty.id));
+    if (coal && coal[1].length > 1 && coalPct[coal[0]] < 10) continue;
+    out.add(pty.id);
+  }
+  return out;
+}
+
+// TIER 1 — national PR totals (245 seats): proportional largest-remainder among the
+// qualifying parties at the NATIONAL level, so a party over the 3% threshold keeps
+// its fair national share (no small-district squeeze-out). SVP's South Tyrol
+// minority seats are set aside first.
+function prNationalTotals(natPcts: Partial<Record<ItPartyId, number>>, is2026?: boolean): Record<string, number> {
+  const qual = prQualSet(natPcts, is2026);
+  const w: Record<string, number> = {};
+  for (const id of qual) w[id] = natPcts[id] ?? 0;
+  const svpPR = (natPcts.SVP ?? 0) > 0 ? 2 : 0;          // South Tyrol minority PR seats
+  const tot = hareLR(w, 245 - svpPR);
+  if (svpPR) tot.SVP = svpPR;
+  return tot;
+}
+// TIER 2 — spread each party's national PR total across the 49 districts (largest
+// remainder on the party's district votes). National row totals stay EXACT, so the
+// per-district figures reconcile to the national result while showing where each
+// party actually wins its seats. SVP's seats land in its home district only.
+function distributePRtoDistricts(
+  natPcts: Record<ItPartyId, number>, prNat: Record<string, number>,
+  provOverrides?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
+): Record<ItProvId, Record<string, number>> {
+  const dv: Record<string, Record<ItPartyId, number>> = {};
+  for (const prov of IT_PROVINCES) dv[prov.id] = calcProvVotes(natPcts, prov.id, provOverrides?.[prov.id]);
+  const out = {} as Record<ItProvId, Record<string, number>>;
+  for (const prov of IT_PROVINCES) out[prov.id] = {};
+  for (const party of Object.keys(prNat)) {
+    const T = prNat[party]; if (T <= 0) continue;
+    const w: Record<string, number> = {};
+    for (const prov of IT_PROVINCES) w[prov.id] = (dv[prov.id][party as ItPartyId] ?? 0) * prov.weight;
+    const dist = hareLR(w, T);
+    for (const pid in dist) if (dist[pid] > 0) out[pid as ItProvId][party] = dist[pid];
+  }
+  return out;
+}
+// National PR total used by the scoreboard engine (proportional, 245 seats).
+function nationalPRSeats(natPcts: Partial<Record<ItPartyId, number>>, is2026?: boolean, _provOverrides?: unknown): Record<string, number> {
+  return prNationalTotals(natPcts, is2026);
+}
+
+// ── Overseas constituency (Circoscrizione Estero) — 8 Chamber seats, 4 zones ──
+// Europe 4 · South America 2 · North & Central America 1 · Africa-Asia-Oceania 1.
+// Per-zone vote split is an estimate (overseas Italians lean centre-left + M5S,
+// with a centre-right minority). Each zone has its own seat count and a bubble
+// placed on its continent.
+type ItOverseas = { id: string; name: string; short: string; seats: number; lat: number; lng: number; v: Partial<Record<ItPartyId, number>> };
+const IT_OVERSEAS: ItOverseas[] = [
+  { id:'EU',  name:'Europe',                              short:'Europe',     seats:4, lat:50,  lng:14,  v:{ PD:26, M5S:15, FDI:16, FI:9,  LEGA:8, AZ:6, IV:5, AVS:6, PIU:4 } },
+  { id:'SA',  name:'South America',                       short:'S. America', seats:2, lat:-23, lng:-61, v:{ PD:28, M5S:16, FDI:15, FI:12, LEGA:6, AZ:5, IV:5, AVS:4, PIU:3 } },
+  { id:'NCA', name:'North & Central America',             short:'N. America', seats:1, lat:40,  lng:-97, v:{ PD:27, FDI:18, M5S:13, FI:11, LEGA:7, AZ:7, IV:6, AVS:5, PIU:4 } },
+  { id:'AAO', name:'Africa, Asia, Oceania & Antarctica',  short:'Afr-Asia',   seats:1, lat:6,   lng:36,  v:{ PD:25, M5S:17, FDI:16, FI:10, LEGA:7, AZ:7, IV:5, AVS:5, PIU:4 } },
+];
+// Seats won in one overseas zone (largest remainder, no threshold) + sorted vote.
+function overseasZoneSeats(z: ItOverseas): { seats: Record<string, number>; sorted: { id: ItPartyId; pct: number }[] } {
+  const w: Record<string, number> = {};
+  for (const id of Object.keys(z.v) as ItPartyId[]) if ((z.v[id] ?? 0) > 0) w[id] = z.v[id]!;
+  const sorted = (Object.entries(z.v) as [ItPartyId, number][]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, pct]) => ({ id, pct }));
+  return { seats: hareLR(w, z.seats), sorted };
+}
+function overseasSeats(): Record<string, number> {
+  const tot: Record<string, number> = {};
+  for (const z of IT_OVERSEAS) { const { seats } = overseasZoneSeats(z); for (const id in seats) tot[id] = (tot[id] ?? 0) + seats[id]; }
+  return tot;
+}
+
+// ── Rosatellum total — Camera dei Deputati (400) ──────────────────────────────
+// 245 PR (sum of the 49 per-district allocations) + 147 FPTP (each collegio's
+// coalition win assigned to its representative party) + 8 overseas (4 zones).
+// fptpCounts is keyed PER PARTY (the winning representative of each collegio). When
+// omitted, FPTP is modelled nationally from coalition strength (√-split fallback).
 function calcRosatellum(
   natPcts: Partial<Record<ItPartyId, number>>,
   fptpCounts?: Record<string, number>,
   is2026?: boolean,
+  provOverrides?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
 ): Partial<Record<ItPartyId, number>> {
-  const COAL = coalDefFor(is2026);
-  const useCounts = !!fptpCounts;
-  const svpV = natPcts.SVP ?? 0;
-  const svpSeats = (!useCounts && svpV >= 0.3) ? 3 : 0;  // SVP South Tyrol (only in the national-model fallback)
-  const PR = 245 - svpSeats, FPTP = 147, OV = 8;
-  const coalPct: Record<string, number> = {};
-  for (const [c, ps] of Object.entries(COAL)) coalPct[c] = ps.reduce((a, id) => a + (natPcts[id] ?? 0), 0);
-  // PR — parties over 3% nationally whose coalition cleared 10% (lone parties: own 3%)
-  const qual: Record<string, number> = {};
-  for (const pty of IT_PARTIES) {
-    if (pty.id === 'SVP') continue;
-    const v = natPcts[pty.id] ?? 0; if (v < 3) continue;
-    const coal = Object.entries(COAL).find(([, ps]) => ps.includes(pty.id));
-    if (coal && coal[1].length > 1 && coalPct[coal[0]] < 10) continue;  // 10% rule: multi-party coalitions only
-    qual[pty.id] = v;
-  }
-  const pr = hareLR(qual, PR);
-  // FPTP — from edited per-collegio coalition wins, or modelled from coalition strength
+  const pr = nationalPRSeats(natPcts, is2026, provOverrides);
   const fptp: Record<string, number> = {};
-  const distribute = (coalSeats: Record<string, number>, def: Record<string, ItPartyId[]>) => {
-    for (const [c, ps] of Object.entries(def)) {
-      const within: Record<string, number> = {}; ps.forEach(id => within[id] = Math.sqrt(Math.max(0.04, natPcts[id] ?? 0)));
-      const a = hareLR(within, coalSeats[c] || 0);
-      for (const [id, n] of Object.entries(a)) fptp[id] = (fptp[id] || 0) + n;
-    }
-  };
-  if (useCounts) {
-    // counts are keyed by the single-member coalitions (AZIV = Az–IV, OTH = regional).
-    // In 2026 the centre-left absorbs M5S, so CSX collegi split across its members.
-    const cdef: Record<string, ItPartyId[]> = is2026
-      ? { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC','M5S'], AZIV:['AZ','IV'] }
-      : { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZ','IV'] };
-    distribute(fptpCounts!, cdef);
-    if ((fptpCounts!.OTH || 0) > 0) fptp.SVP = (fptp.SVP || 0) + (fptpCounts!.OTH || 0); // South Tyrol / regional collegi
+  if (fptpCounts) {
+    for (const id in fptpCounts) fptp[id] = (fptp[id] ?? 0) + (fptpCounts[id] ?? 0);
   } else {
+    const COAL = coalDefFor(is2026);
+    const coalPct: Record<string, number> = {};
+    for (const [c, ps] of Object.entries(COAL)) coalPct[c] = ps.reduce((a, id) => a + (natPcts[id] ?? 0), 0);
     const coalW: Record<string, number> = {};
     for (const c in coalPct) coalW[c] = Math.pow(Math.max(coalPct[c], 0.01), 3.2);
-    distribute(hareLR(coalW, FPTP), COAL);
+    const coalFptp = hareLR(coalW, 147);
+    for (const [c, ps] of Object.entries(COAL)) {
+      const within: Record<string, number> = {}; ps.forEach(id => within[id] = Math.sqrt(Math.max(0.04, natPcts[id] ?? 0)));
+      const a = hareLR(within, coalFptp[c] || 0);
+      for (const [id, n] of Object.entries(a)) fptp[id] = (fptp[id] || 0) + n;
+    }
   }
-  const ov = hareLR(qual, OV);
+  const ov = overseasSeats();
   const out: Partial<Record<ItPartyId, number>> = {};
   for (const pty of IT_PARTIES) {
-    const t = (pr[pty.id] || 0) + (fptp[pty.id] || 0) + (ov[pty.id] || 0) + (pty.id === 'SVP' ? svpSeats : 0);
+    const t = (pr[pty.id] || 0) + (fptp[pty.id] || 0) + (ov[pty.id] || 0);
     if (t > 0) out[pty.id] = t;
   }
   return out;
@@ -429,8 +483,9 @@ function calcAllProvinceSeats(
   natPcts: Partial<Record<ItPartyId, number>>,
   fptpCounts?: Record<string, number>,
   is2026?: boolean,
+  provOverrides?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
 ): Partial<Record<ItPartyId, number>> {
-  return calcRosatellum(natPcts, fptpCounts, is2026);
+  return calcRosatellum(natPcts, fptpCounts, is2026, provOverrides);
 }
 
 // Coalition of a uninominale's shares (max), with optional national swing applied
@@ -463,6 +518,46 @@ function uniCoalShares(sh: Record<string, number>, is2026?: boolean): { c: strin
   if (is2026) { m.CSX += m.M5S; m.M5S = 0; }
   const keys = is2026 ? ['CDX','CSX','AZIV','OTH'] : ['CDX','CSX','M5S','AZIV','OTH'];
   return keys.map(c => ({ c, v: m[c] })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
+}
+
+// ── FPTP representative party ─────────────────────────────────────────────────
+// A collegio is won by a coalition, but the seat goes to one party — the
+// candidate's. We model that as the coalition's strongest member in that
+// circoscrizione (2022 regional strength, swung to the current vote). So a
+// centre-right win in Lombardy goes to Lega, one in the south to FdI, etc.
+const itCirco = (den: string) => den.replace(/\s*-\s*[UP]\d+.*$/i, '').trim();
+const IT_CIRCO_STRENGTH: Record<string, Partial<Record<ItPartyId, number>>> = (() => {
+  const acc: Record<string, { w: number; v: Record<string, number> }> = {};
+  for (const prov of IT_PROVINCES) {
+    const k = itCirco(prov.name); (acc[k] ??= { w: 0, v: {} });
+    acc[k].w += prov.weight;
+    for (const [id, pct] of Object.entries(prov.v2022)) acc[k].v[id] = (acc[k].v[id] ?? 0) + (pct as number) * prov.weight;
+  }
+  const out: Record<string, Partial<Record<ItPartyId, number>>> = {};
+  for (const [k, { w, v }] of Object.entries(acc)) { out[k] = {}; for (const id in v) (out[k] as Record<string, number>)[id] = v[id] / (w || 1); }
+  return out;
+})();
+function coalMembers(coal: string, is2026?: boolean): ItPartyId[] {
+  return coal === 'CDX'  ? ['FDI','LEGA','FI','NM']
+    : coal === 'CSX'  ? (is2026 ? ['PD','M5S','AVS','PIU','IC'] : ['PD','AVS','PIU','IC'])
+    : coal === 'M5S'  ? ['M5S']
+    : coal === 'AZIV' ? ['AZ','IV']
+    :                   ['SVP'];   // OTH / regional collegi → modelled minority party
+}
+// A party's regional over-performance in a circoscrizione (2022 local % ÷ its 2022
+// national %): >1 where it punches above its weight — Lega in the north, FI/M5S in
+// the south, PD in the red belt.
+const IT_CIRCO_RATIO = (circoKey: string, id: ItPartyId): number =>
+  (IT_CIRCO_STRENGTH[circoKey]?.[id] ?? 0) / Math.max(0.5, IT_VOTE_PCT_2022[id] ?? 0.5);
+// The party that takes a collegio for its winning coalition — the regional champion
+// among the coalition's major members (Lega in the north, FI in the south, FdI the
+// rest). Shown on the FPTP panel; the seat totals use the same regional logic.
+function collegioRep(circo: string, coal: string, natPcts: Record<ItPartyId, number>, is2026?: boolean): ItPartyId {
+  const all = coalMembers(coal, is2026);
+  let pool = all.filter(id => (natPcts[id] ?? 0) > 0.3 && ((IT_CIRCO_STRENGTH[circo]?.[id] ?? 0) >= 6 || (natPcts[id] ?? 0) >= 8));
+  if (!pool.length) pool = all.filter(id => (natPcts[id] ?? 0) > 0.3);
+  if (!pool.length) pool = all;
+  return pool.reduce((b, id) => IT_CIRCO_RATIO(circo, id) > IT_CIRCO_RATIO(circo, b) ? id : b, pool[0]);
 }
 
 // Partial seats: Rosatellum on the reported-so-far national vote, scaled to the
@@ -847,6 +942,24 @@ function ItBubbleLayer({
       marker.on('mouseout', () => setTooltip(null));
       bubblesRef.current.push({ marker, baseRadius });
     });
+
+    // Overseas constituency (Circoscrizione Estero) — one bubble per zone, placed
+    // on its continent; sized by its seat count, coloured by the winning party.
+    for (const z of IT_OVERSEAS) {
+      const { seats, sorted } = overseasZoneSeats(z);
+      if (!sorted.length) continue;
+      const winner = sorted[0].id;
+      const baseRadius = 7 + z.seats * 4.5;
+      const m = L.circleMarker([z.lat, z.lng], { radius: baseRadius * scale, color: partyColor(winner), fillColor: partyColor(winner), fillOpacity: 0.62, weight: 1.6, opacity: 0.92, dashArray: '4,2' }).addTo(map);
+      const tipParties = (Object.entries(seats) as [ItPartyId, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])
+        .map(([id, n]) => ({ id, pct: z.v[id] ?? 0, rawVotes: undefined as number | undefined, label: `${IT_PARTY_MAP[id]?.name ?? id} · ${n} seat${n > 1 ? 's' : ''}`, color: partyColor(id) }));
+      m.on('mousemove', (e: L.LeafletMouseEvent) => {
+        const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+        setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: `Overseas — ${z.name} (${z.seats} seats)`, parties: tipParties, leader: tipParties[0]?.id ?? null, reportingPct: undefined });
+      });
+      m.on('mouseout', () => setTooltip(null));
+      bubblesRef.current.push({ marker: m, baseRadius });
+    }
     return () => { for (const {marker} of bubblesRef.current) marker.remove(); bubblesRef.current=[]; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, mapView, is2026]);
@@ -859,8 +972,9 @@ function ItBubbleLayer({
 function ItSeatDotsLayer({
   geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef,
   declaredProvs, provOverrides, provOverridesRef, blankMode, projectedProvs,
-  simProvFractions, simNatPctsRef,
+  simProvFractions, simNatPctsRef, is2026,
 }: {
+  is2026?: boolean;
   geoData: any; natPcts: Record<ItPartyId,number>;
   containerRef: React.RefObject<HTMLDivElement|null>;
   setTooltip: (t:ProvTooltipState)=>void; onSelect: (id:ItProvId)=>void;
@@ -884,6 +998,7 @@ function ItSeatDotsLayer({
       const z = map.getZoom();
       const dotR = Math.max(1.8, Math.min(5.5, (z-5)/(9-5)*4 + 1.8));
       const gap  = dotR * 2.3;
+      const perDist = distributePRtoDistricts(natPcts, prNationalTotals(natPcts, is2026), provOverrides);
       L.geoJSON(geoData).eachLayer((layer: L.Layer) => {
         const path = layer as any;
         const geoId: string = path.feature?.properties?.id ?? '';
@@ -894,8 +1009,7 @@ function ItSeatDotsLayer({
         const bounds = (layer as any).getBounds?.(); if (!bounds?.isValid()) return;
         const center = bounds.getCenter();
         const prov = IT_PROVINCE_MAP[provId];
-        const pv = calcProvVotes(natPcts, provId, provOverrides?.[provId]);
-        const alloc = calcDHondtProv(pv, prov?.seats ?? 0);
+        const alloc = perDist[provId] ?? {};
         const colors: string[] = [];
         for (const id of IT_LR_ORDER) { const n = alloc[id] ?? 0; for (let i=0;i<n;i++) colors.push(partyColor(id)); }
         if (colors.length === 0) return;
@@ -931,7 +1045,7 @@ function ItSeatDotsLayer({
     map.on('zoomend', layout);
     return () => { map.off('zoomend', layout); for (const m of dotsRef.current) m.remove(); dotsRef.current=[]; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, provOverrides]);
+  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, provOverrides, is2026]);
 
   return null;
 }
@@ -1166,6 +1280,7 @@ function ItMapView({
         )}
         {geoData && seatDots && mapView==='pluri' && (
           <ItSeatDotsLayer
+            is2026={is2026}
             geoData={geoData} natPcts={simNatPcts??natPcts} containerRef={containerRef}
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
             declaredProvs={declaredProvs} provOverrides={provOverrides}
@@ -1478,7 +1593,7 @@ function ItProvPanel({
         <div className="mt-2 flex items-center gap-2 px-2 py-1.5 rounded-[4px]" style={{borderLeft:`3px solid ${winner.color}`,background:dark?'rgba(255,255,255,0.04)':'#f8f7f4'}}>
           <span className="text-[11px] font-medium text-ink flex-1 truncate">{winner.fullName}</span>
           <span className="text-[9px] font-mono text-ink-3">{(displayPv[winner.id]??0).toFixed(1)}%</span>
-          <span className="text-[8px] font-mono text-ink-3">{prov?.seats??0} seats</span>
+          <span className="text-[8px] font-mono text-ink-3">{IT_PR_MAG[provId]??0} PR seats</span>
         </div>
       </div>
 
@@ -1711,12 +1826,15 @@ function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, 
   // main board). Per-district rows show the local PR D'Hondt detail.
   const natTotals = seats;
   const totalSeats = (Object.values(seats) as number[]).reduce((a,b)=>a+(b??0),0);
-  const rows = useMemo(() => IT_PROVINCES.map(prov => {
-    const votes = calcProvVotes(natPcts, prov.id, provOverrides[prov.id]);
-    const ps = calcDHondtProv(votes, prov.seats);
-    const alloc = (Object.entries(ps) as [ItPartyId,number][]).filter(([,s]) => (s??0) > 0).sort((a,b) => b[1]-a[1]);
-    return { prov, alloc };
-  }), [natPcts, provOverrides]);
+  const rows = useMemo(() => {
+    const perDist = distributePRtoDistricts(natPcts, prNationalTotals(natPcts, is2026), provOverrides);
+    return IT_PROVINCES.map(prov => {
+      const ps = perDist[prov.id] ?? {};
+      const alloc = (Object.entries(ps) as [ItPartyId,number][]).filter(([,s]) => (s??0) > 0).sort((a,b) => b[1]-a[1]);
+      const mag = alloc.reduce((s,[,n]) => s + n, 0);   // seats actually allocated here (reconciles to 245)
+      return { prov, alloc, mag };
+    });
+  }, [natPcts, provOverrides, is2026]);
 
   const natSorted = (Object.entries(natTotals) as [ItPartyId,number][])
     .filter(([,s]) => s>0).sort((a,b) => b[1]-a[1]);
@@ -1781,15 +1899,16 @@ function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, 
       })()}
 
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2">
-        {rows.map(({ prov, alloc }) => (
+        <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.14em] mb-1" style={{color:ink3}}>Proportional seats by district · 245 total</div>
+        {rows.map(({ prov, alloc, mag }) => (
           <div key={prov.id} style={{background:cardBg,borderRadius:5,padding:'6px 8px'}}>
             <div className="flex items-center justify-between mb-1">
               <span className="text-[10.5px] font-semibold text-ink truncate">{prov.name}</span>
-              <span className="text-[8.5px] font-mono shrink-0 ml-2" style={{color:ink3}}>{prov.seats} {prov.seats===1?'seat':'seats'}</span>
+              <span className="text-[8.5px] font-mono shrink-0 ml-2" style={{color:ink3}}>{mag} {mag===1?'PR seat':'PR seats'}</span>
             </div>
             <div className="flex w-full h-2 rounded-full overflow-hidden" style={{background:trackBg}}>
               {alloc.map(([id,s]) => (
-                <div key={id} title={`${dispName(id)} ${s}`} style={{width:`${s/prov.seats*100}%`,background:partyColor(id)}}/>
+                <div key={id} title={`${dispName(id)} ${s}`} style={{width:`${s/(mag||1)*100}%`,background:partyColor(id)}}/>
               ))}
             </div>
             <div className="flex flex-wrap gap-x-2 gap-y-0.5 mt-1">
@@ -1921,10 +2040,12 @@ function ItFptpPanel({ coll, natPcts, override, onApply, onReset, onClose, dark,
         const reg = !override && IT_REG_LABEL[coll.coal];   // regional-list winner (Aosta / SVP / SCN)
         const wColor = reg ? (IT_COAL_COLOR[coll.coal]||'#999') : (IT_COAL_COLOR[winner]||'#999');
         const wLabel = reg ? IT_REG_LABEL[coll.coal] : (IT_COAL_LABEL[winner]||winner);
+        const rep = !reg && (winner==='CDX'||winner==='CSX'||winner==='AZIV') ? collegioRep(itCirco(coll.name), winner, natPcts, is2026) : null;
         return (
           <div className="px-3.5 py-2 border-b border-default text-center" style={{ background: hexToRgba(wColor, 0.12) }}>
             <div className="text-[8px] font-mono uppercase tracking-[0.15em] text-ink-3">Seat won by</div>
             <div className="text-[13px] font-black" style={{ color: wColor }}>{wLabel}</div>
+            {rep && <div className="text-[9px] font-mono mt-0.5" style={{ color: partyColor(rep) }}>seat → {IT_PARTY_MAP[rep]?.name ?? rep}</div>}
           </div>
         );
       })()}
@@ -2140,14 +2261,41 @@ export default function ItalyApp() {
   // FPTP coalition seat counts from the 147 collegi (baseline swung by the vote, edited per-collegio)
   const fptpCounts=useMemo<Record<string,number>|undefined>(()=>{
     const colls=Object.values(uniColl); if(colls.length<140) return undefined; // not loaded yet → national-model fallback
-    const counts:Record<string,number>={CDX:0,CSX:0,M5S:0,AZ:0,IV:0,OTH:0};
-    for(const c of colls){ const sh=fptpOverrides[c.id]??c.shares; let w=fptpOverrides[c.id]?IT_COAL_SLIDERS.reduce((b,k)=>(sh[k]??0)>(sh[b]??0)?k:b,'CDX'):uniWinner(c.shares,displayPcts,is2026); if(is2026&&w==='M5S')w='CSX'; counts[w]=(counts[w]||0)+1; }
+    // 1. winning coalition per collegio (grouped, with each collegio's circoscrizione)
+    const byCoal:Record<string,{circo:string}[]>={};
+    for(const c of colls){
+      const sh=fptpOverrides[c.id]??c.shares;
+      const coal=fptpOverrides[c.id] ? (uniCoalShares(sh,is2026)[0]?.c ?? 'CDX') : uniWinner(c.shares,displayPcts,is2026);
+      (byCoal[coal]??=[]).push({circo:itCirco(c.name)});
+    }
+    // 2. split each coalition's seats among its members — totals proportional to the
+    //    members' vote, each member's seats placed in its strongest regions (so Lega
+    //    takes the northern CDX wins, FI the southern, FdI the rest).
+    const counts:Record<string,number>={};
+    for(const [coal,list] of Object.entries(byCoal)){
+      const all=coalMembers(coal,is2026);
+      const members=all.filter(id=>(displayPcts[id]??0)>0.3);
+      if(!members.length){ counts[all[0]]=(counts[all[0]]||0)+list.length; continue; }
+      const w:Record<string,number>={}; members.forEach(id=>w[id]=displayPcts[id]??0);
+      const target=hareLR(w,list.length);                       // collegi per member (∝ vote)
+      const pool=list.map(x=>({circo:x.circo,taken:false}));
+      // regional specialists (smaller parties) claim their strongholds first; the
+      // dominant member mops up the remainder
+      const order=members.slice().sort((a,b)=>(displayPcts[a]??0)-(displayPcts[b]??0));
+      for(const id of order){
+        const need=target[id]??0; if(need<=0) continue;
+        const ranked=pool.filter(p=>!p.taken).sort((a,b)=>IT_CIRCO_RATIO(b.circo,id)-IT_CIRCO_RATIO(a.circo,id));
+        for(let k=0;k<need&&k<ranked.length;k++){ ranked[k].taken=true; counts[id]=(counts[id]||0)+1; }
+      }
+      const left=pool.filter(p=>!p.taken).length;
+      if(left>0){ const dom=members.reduce((b,id)=>(displayPcts[id]??0)>(displayPcts[b]??0)?id:b,members[0]); counts[dom]=(counts[dom]||0)+left; }
+    }
     return counts;
   },[uniColl,fptpOverrides,displayPcts,is2026]);
   const displaySeats=useMemo(()=>{
     // pristine 2022 baseline → exact official per-party seats; once a district is edited, switch to the live engine
     if(preset==='baseline'&&!simSeats&&Object.keys(fptpOverrides).length===0&&Object.keys(provOverrides).length===0) return IT_SEATS_2022;
-    return simSeats??blankSeats??calcAllProvinceSeats(displayPcts,fptpCounts,is2026);
+    return simSeats??blankSeats??calcAllProvinceSeats(displayPcts,fptpCounts,is2026,provOverrides);
   },[preset,simSeats,blankSeats,displayPcts,fptpCounts,is2026,fptpOverrides,provOverrides]);
 
   const simPartialPcts=useMemo<Record<ItPartyId,number>|null>(()=>{
