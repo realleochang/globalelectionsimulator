@@ -10,7 +10,8 @@ import { GlobeLogo } from './HomePage';
 // ── Party types ───────────────────────────────────────────────────────────────
 type ItPartyId =
   | 'FDI' | 'PD' | 'M5S' | 'LEGA' | 'FI' | 'AZ' | 'IV'
-  | 'AVS' | 'PIU' | 'NM' | 'IC' | 'SVP' | 'FN';
+  | 'AVS' | 'PIU' | 'NM' | 'IC' | 'SVP' | 'FN'
+  | 'SCN' | 'AUT' | 'MAIE';   // Sud chiama Nord · Vallée d'Aoste · MAIE (overseas Italians)
 
 type ItParty = {
   id:             ItPartyId;
@@ -28,7 +29,7 @@ type ItParty = {
 };
 
 // Ideological order left → right for the parliament hemicycle
-const IT_LR_ORDER: ItPartyId[] = ['AVS','M5S','PD','IC','PIU','IV','AZ','SVP','FI','NM','LEGA','FDI','FN'];
+const IT_LR_ORDER: ItPartyId[] = ['AVS','M5S','PD','IC','PIU','IV','AZ','MAIE','AUT','SVP','SCN','FI','NM','LEGA','FDI','FN'];
 // Party keys present in the geojson `pr` objects (PR list shares)
 const IT_PR_KEYS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZ','IV','AVS','PIU','NM','IC'];
 
@@ -46,6 +47,9 @@ const IT_PARTIES: ItParty[] = [
   { id: 'NM',   name: 'NM',      fullName: 'Noi Moderati',             color: '#5B6E8C', seats2022:   7, leader: 'Maurizio Lupi',      wikiTitle: 'Maurizio_Lupi' },
   { id: 'IC',   name: 'IC',      fullName: 'Impegno Civico',           color: '#1A8FB5', seats2022:   1, leader: 'Luigi Di Maio',      wikiTitle: 'Luigi_Di_Maio' },
   { id: 'SVP',  name: 'SVP',     fullName: 'Südtiroler Volkspartei',   color: '#B30000', seats2022:   3, leader: 'Philipp Achammer',   wikiTitle: 'Philipp_Achammer', regional: true },
+  { id: 'SCN',  name: 'ScN',     fullName: 'Sud chiama Nord',          color: '#FF6F00', seats2022:   1, leader: 'Cateno De Luca',     wikiTitle: 'Cateno_De_Luca',   regional: true },
+  { id: 'AUT',  name: 'VdA',     fullName: "Vallée d'Aoste",           color: '#8E44AD', seats2022:   1, leader: 'Franco Manes',       wikiTitle: 'Franco_Manes',     regional: true },
+  { id: 'MAIE', name: 'MAIE',    fullName: 'Italians Abroad (MAIE)',   color: '#16A085', seats2022:   1, leader: 'Ricardo Merlo',      wikiTitle: 'Ricardo_Merlo',    regional: true },
 ];
 
 const IT_PARTY_MAP = Object.fromEntries(IT_PARTIES.map(p => [p.id, p])) as Record<ItPartyId, ItParty>;
@@ -75,6 +79,7 @@ const IT_COAL_LABEL: Record<string, string> = { CDX:'Centre-right', CSX:'Centre-
 const IT_VOTE_RAW_2022: Record<ItPartyId, number> = {
   FDI: 7_302_517, PD: 5_356_180, M5S: 4_333_972, LEGA: 2_464_005, FI: 2_278_217, AZ: 1_235_468, IV: 951_201, FN: 0,
   AVS: 1_018_669, PIU: 793_961, NM: 255_505, IC: 169_165, SVP: 117_010,
+  SCN: 119_000, AUT: 12_000, MAIE: 0,
 };
 // Az–IV ran as a single joint list (2,186,669 votes, 7.79%); the AZ/IV split is a
 // proportional estimate. All other figures are the exact official Chamber results.
@@ -82,12 +87,14 @@ const IT_GRAND_TOTAL_VOTES = 28_087_782;
 const IT_VOTE_PCT_2022: Record<ItPartyId, number> = {
   FDI: 26.00, PD: 19.07, M5S: 15.43, LEGA: 8.77, FI: 8.11, AZ: 4.40, IV: 3.39, FN: 0,
   AVS: 3.63, PIU: 2.83, NM: 0.91, IC: 0.60, SVP: 0.42,
+  SCN: 0.42, AUT: 0.04, MAIE: 0,
 };
 
 // 2026 polling — illustrative May 2026 estimate
 const IT_VOTE_PCT_2026: Record<ItPartyId, number> = {
   FDI: 28.4, PD: 22.2, M5S: 12.3, LEGA: 7.0, FI: 8.2, AZ: 3.0, IV: 2.5,
   AVS: 6.5, PIU: 1.4, NM: 1.3, FN: 4.0, IC: 0.5, SVP: 0.4,
+  SCN: 0, AUT: 0, MAIE: 0,
 };
 
 // ── Province types ────────────────────────────────────────────────────────────
@@ -267,7 +274,10 @@ const IT_TOTAL_PROV_WEIGHT = IT_PROVINCES.reduce((s, p) => s + p.weight, 0);
 // listed here (enforced in calcProvVotes). National parties have no entry → they
 // contest everywhere.
 const IT_REGIONAL_HOME: Partial<Record<ItPartyId, ItProvId[]>> = {
-  SVP: ['C40001'],   // Südtiroler Volkspartei — landlocked to South Tyrol
+  SVP:  ['C40001'],                                              // Südtiroler Volkspartei — South Tyrol
+  SCN:  ['C190101','C190102','C190201','C190202','C190203'],     // Sud chiama Nord — Sicily
+  AUT:  ['C200001'],                                             // Vallée d'Aoste — Aosta Valley
+  MAIE: [],                                                      // overseas only — never contests a domestic district
 };
 function itContests(partyId: ItPartyId, provId: ItProvId): boolean {
   const home = IT_REGIONAL_HOME[partyId];
@@ -412,28 +422,25 @@ function nationalPRSeats(natPcts: Partial<Record<ItPartyId, number>>, is2026?: b
   return prNationalTotals(natPcts, is2026);
 }
 
-// ── Overseas constituency (Circoscrizione Estero) — 8 Chamber seats, 4 zones ──
-// Europe 4 · South America 2 · North & Central America 1 · Africa-Asia-Oceania 1.
-// Per-zone vote split is an estimate (overseas Italians lean centre-left + M5S,
-// with a centre-right minority). Each zone has its own seat count and a bubble
-// placed on its continent.
-type ItOverseas = { id: string; name: string; short: string; seats: number; lat: number; lng: number; v: Partial<Record<ItPartyId, number>> };
+// ── Overseas constituency (Circoscrizione Estero) — 8 Chamber seats, by zone ──
+// Official 2022 result: North America 1 PD + 1 Lega · South America 1 PD + 1 MAIE ·
+// Europe 1 PD + 1 FdI · Africa 1 M5S · Asia 1 PD. A bubble per zone, on its continent.
+type ItOverseas = { id: string; name: string; short: string; seats: number; lat: number; lng: number; seatsBy: Partial<Record<ItPartyId, number>> };
 const IT_OVERSEAS: ItOverseas[] = [
-  { id:'EU',  name:'Europe',                              short:'Europe',     seats:4, lat:50,  lng:14,  v:{ PD:26, M5S:15, FDI:16, FI:9,  LEGA:8, AZ:6, IV:5, AVS:6, PIU:4 } },
-  { id:'SA',  name:'South America',                       short:'S. America', seats:2, lat:-23, lng:-61, v:{ PD:28, M5S:16, FDI:15, FI:12, LEGA:6, AZ:5, IV:5, AVS:4, PIU:3 } },
-  { id:'NCA', name:'North & Central America',             short:'N. America', seats:1, lat:40,  lng:-97, v:{ PD:27, FDI:18, M5S:13, FI:11, LEGA:7, AZ:7, IV:6, AVS:5, PIU:4 } },
-  { id:'AAO', name:'Africa, Asia, Oceania & Antarctica',  short:'Afr-Asia',   seats:1, lat:6,   lng:36,  v:{ PD:25, M5S:17, FDI:16, FI:10, LEGA:7, AZ:7, IV:5, AVS:5, PIU:4 } },
+  { id:'EU', name:'Europe',        short:'Europe',     seats:2, lat:50,  lng:14,  seatsBy:{ PD:1, FDI:1 } },
+  { id:'SA', name:'South America', short:'S. America', seats:2, lat:-23, lng:-61, seatsBy:{ PD:1, MAIE:1 } },
+  { id:'NA', name:'North America', short:'N. America', seats:2, lat:42,  lng:-96, seatsBy:{ PD:1, LEGA:1 } },
+  { id:'AF', name:'Africa',        short:'Africa',     seats:1, lat:2,   lng:21,  seatsBy:{ M5S:1 } },
+  { id:'AS', name:'Asia',          short:'Asia',       seats:1, lat:30,  lng:88,  seatsBy:{ PD:1 } },
 ];
-// Seats won in one overseas zone (largest remainder, no threshold) + sorted vote.
-function overseasZoneSeats(z: ItOverseas): { seats: Record<string, number>; sorted: { id: ItPartyId; pct: number }[] } {
-  const w: Record<string, number> = {};
-  for (const id of Object.keys(z.v) as ItPartyId[]) if ((z.v[id] ?? 0) > 0) w[id] = z.v[id]!;
-  const sorted = (Object.entries(z.v) as [ItPartyId, number][]).filter(([, v]) => v > 0).sort((a, b) => b[1] - a[1]).map(([id, pct]) => ({ id, pct }));
-  return { seats: hareLR(w, z.seats), sorted };
+// Fixed per-zone winners (the official 2022 overseas allocation) + sorted by seats.
+function overseasZoneSeats(z: ItOverseas): { seats: Record<string, number>; sorted: { id: ItPartyId; n: number }[] } {
+  const sorted = (Object.entries(z.seatsBy) as [ItPartyId, number][]).filter(([, n]) => (n ?? 0) > 0).sort((a, b) => b[1] - a[1]).map(([id, n]) => ({ id, n }));
+  return { seats: { ...z.seatsBy } as Record<string, number>, sorted };
 }
 function overseasSeats(): Record<string, number> {
   const tot: Record<string, number> = {};
-  for (const z of IT_OVERSEAS) { const { seats } = overseasZoneSeats(z); for (const id in seats) tot[id] = (tot[id] ?? 0) + seats[id]; }
+  for (const z of IT_OVERSEAS) for (const [id, n] of Object.entries(z.seatsBy)) tot[id] = (tot[id] ?? 0) + (n ?? 0);
   return tot;
 }
 
@@ -564,6 +571,14 @@ function coalMembers(coal: string, is2026?: boolean): ItPartyId[] {
     : coal === 'AZIV' ? ['AZ','IV']
     :                   ['SVP'];   // OTH / regional collegi → modelled minority party
 }
+// An OTH (regional) collegio's winner depends on its territory: South Tyrol → SVP,
+// Sicily → Sud chiama Nord, Aosta Valley → Vallée d'Aoste.
+function othRegionalParty(circo: string): ItPartyId {
+  const k = itCircoKey(circo);
+  if (k.startsWith('SICILIA')) return 'SCN';
+  if (k.startsWith('VALLEDAOSTA')) return 'AUT';
+  return 'SVP';
+}
 // A party's regional over-performance in a circoscrizione (2022 local % ÷ its 2022
 // national %): >1 where it punches above its weight — Lega in the north, FI/M5S in
 // the south, PD in the red belt.
@@ -573,6 +588,7 @@ const IT_CIRCO_RATIO = (circoKey: string, id: ItPartyId): number =>
 // among the coalition's major members (Lega in the north, FI in the south, FdI the
 // rest). Shown on the FPTP panel; the seat totals use the same regional logic.
 function collegioRep(circo: string, coal: string, natPcts: Record<ItPartyId, number>, is2026?: boolean): ItPartyId {
+  if (coal === 'OTH') return othRegionalParty(circo);
   const all = coalMembers(coal, is2026);
   let pool = all.filter(id => (natPcts[id] ?? 0) > 0.3 && ((IT_CIRCO_STRENGTH[circo]?.[id] ?? 0) >= 6 || (natPcts[id] ?? 0) >= 8));
   if (!pool.length) pool = all.filter(id => (natPcts[id] ?? 0) > 0.3);
@@ -789,7 +805,7 @@ function ItScoreboard({
 
   // 2026 alignment: M5S sits inside the centre-left; FN and Az/IV stand alone.
   const leftIds  = is2026 ? ([...IT_LEFT_IDS, 'M5S'] as ItPartyId[]) : IT_LEFT_IDS;
-  const indepIds = is2026 ? (['AZ','IV','FN','SVP'] as ItPartyId[]) : (['M5S','AZ','IV','FN','SVP'] as ItPartyId[]);
+  const indepIds = is2026 ? (['AZ','IV','FN','SVP','SCN','AUT','MAIE'] as ItPartyId[]) : (['M5S','AZ','IV','FN','SVP','SCN','AUT','MAIE'] as ItPartyId[]);
   const leftSeats  = leftIds.reduce((s,id)=>s+(seats[id]??0), 0);
   const rightSeats = IT_RIGHT_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
 
@@ -1004,12 +1020,11 @@ function ItOverseasLayer({ containerRef, setTooltip }: {
       for (const m of ref.current) m.remove(); ref.current = [];
       const scale = zoomScale(map.getZoom());
       for (const z of IT_OVERSEAS) {
-        const { seats, sorted } = overseasZoneSeats(z);
+        const { sorted } = overseasZoneSeats(z);
         if (!sorted.length) continue;
         const winner = sorted[0].id;
         const m = L.circleMarker([z.lat, z.lng], { radius:(7 + z.seats*4.5)*scale, color:partyColor(winner), fillColor:partyColor(winner), fillOpacity:0.62, weight:1.6, opacity:0.92, dashArray:'4,2' }).addTo(map);
-        const tipParties = (Object.entries(seats) as [ItPartyId, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])
-          .map(([id, n]) => ({ id, pct: z.v[id] ?? 0, rawVotes: undefined as number | undefined, label: `${IT_PARTY_MAP[id]?.name ?? id} · ${n} seat${n > 1 ? 's' : ''}`, color: partyColor(id) }));
+        const tipParties = sorted.map(({ id, n }) => ({ id, pct: z.seats>0 ? n/z.seats*100 : 0, rawVotes: undefined as number | undefined, label: `${IT_PARTY_MAP[id]?.name ?? id} · ${n} seat${n > 1 ? 's' : ''}`, color: partyColor(id) }));
         m.on('mousemove', (e: L.LeafletMouseEvent) => {
           const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
           setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: `Overseas — ${z.name} (${z.seats} seats)`, parties: tipParties, leader: tipParties[0]?.id ?? null, reportingPct: undefined });
@@ -1490,7 +1505,7 @@ function ItParliamentPanel({ seats: seatsMap, onClose, exiting, dark, is2026 }: 
               {(() => {
                 const dot=dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.25)';
                 const lIds=is2026?([...IT_LEFT_IDS,'M5S'] as ItPartyId[]):IT_LEFT_IDS;
-                const iIds=is2026?(['AZ','IV','FN','SVP'] as ItPartyId[]):(['M5S','AZ','IV','FN','SVP'] as ItPartyId[]);
+                const iIds=is2026?(['AZ','IV','FN','SVP','SCN','AUT','MAIE'] as ItPartyId[]):(['M5S','AZ','IV','FN','SVP','SCN','AUT','MAIE'] as ItPartyId[]);
                 const blocs=[
                   {label:'C-left',  seats:lIds.reduce((s,id)=>s+(seatsMap[id]??0),0),         color:'#E4003B'},
                   {label:'Indep',   seats:iIds.reduce((s,id)=>s+(seatsMap[id]??0),0),         color:'#007442'},
@@ -1787,7 +1802,7 @@ function ItBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
   const totalS=IT_LR_ORDER.reduce((s,id)=>s+(seats[id]??0),0);
   const totalV=IT_PARTIES.reduce((s,p)=>s+(natPcts[p.id]??0),0);
   const bLeftIds  = isBaseline ? IT_LEFT_IDS : ([...IT_LEFT_IDS,'M5S'] as ItPartyId[]);
-  const bIndepIds = isBaseline ? (['M5S','AZ','IV','FN','SVP'] as ItPartyId[]) : (['AZ','IV','FN','SVP'] as ItPartyId[]);
+  const bIndepIds = isBaseline ? (['M5S','AZ','IV','FN','SVP','SCN','AUT','MAIE'] as ItPartyId[]) : (['AZ','IV','FN','SVP','SCN','AUT','MAIE'] as ItPartyId[]);
   const leftS   =bLeftIds.reduce((s,id)=>s+(seats[id]??0),0);
   const rightS  =IT_RIGHT_IDS.reduce((s,id)=>s+(seats[id]??0),0);
   const regS    =bIndepIds.reduce((s,id)=>s+(seats[id]??0),0);
@@ -1984,6 +1999,9 @@ function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, 
             ? [{label:'Azione', color:'#00A3C7', ids:['AZ']}, {label:'Italia Viva', color:'#E5147D', ids:['IV']}]
             : [{label:'Az–IV', color:'#00A3C7', ids:['AZ','IV']}]),
           {label:'Futuro Nazionale', color:'#C0703C',     ids:['FN']},
+          {label:'SCN',          color:'#FF6F00',         ids:['SCN']},
+          {label:'Vallée d’Aoste', color:'#8E44AD',  ids:['AUT']},
+          {label:'MAIE',         color:'#16A085',         ids:['MAIE']},
           {label:'Others',       color:IT_COAL_COLOR.OTH, ids:['SVP']},
         ] as {label:string;color:string;ids:ItPartyId[]}[]).map(g => ({ ...g, n: g.ids.reduce((s,id)=>s+(natTotals[id]??0),0) })).filter(g => g.n > 0).sort((a,b)=>b.n-a.n);
         const maj = Math.floor(totalSeats/2)+1;
@@ -2424,6 +2442,7 @@ export default function ItalyApp() {
     //    takes the northern CDX wins, FI the southern, FdI the rest).
     const counts:Record<string,number>={};
     for(const [coal,list] of Object.entries(byCoal)){
+      if(coal==='OTH'){ for(const x of list){ const r=othRegionalParty(x.circo); counts[r]=(counts[r]||0)+1; } continue; }   // SVP / SCN / Vallée d'Aoste by territory
       const all=coalMembers(coal,is2026);
       const members=all.filter(id=>(displayPcts[id]??0)>0.3);
       if(!members.length){ counts[all[0]]=(counts[all[0]]||0)+list.length; continue; }
@@ -2605,7 +2624,7 @@ export default function ItalyApp() {
               </div>
             </div>
             <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
-              {simSortOrder.filter(id=>!hiddenParties.has(id)).map(id=>{
+              {simSortOrder.filter(id=>!hiddenParties.has(id)&&id!=='SCN'&&id!=='AUT'&&id!=='MAIE').map(id=>{
                 const party=IT_PARTY_MAP[id]; const pct=simDraftPcts[id]??0; const isLocked=simDraftLocks.has(id); const color=partyColor(id);
                 const rawVotes=Math.round(pct/100*IT_GRAND_TOTAL_VOTES);
                 return (
