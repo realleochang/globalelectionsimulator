@@ -40,7 +40,7 @@ const IT_PARTIES: ItParty[] = [
   { id: 'FI',   name: 'FI',      fullName: 'Forza Italia',             color: '#0F73B9', seats2022:  45, leader: 'Silvio Berlusconi',   wikiTitle: 'Silvio_Berlusconi', leader2026: 'Antonio Tajani', wikiTitle2026: 'Antonio_Tajani' },
   { id: 'AZ',   name: 'Azione',  fullName: 'Azione',                  color: '#00A3C7', seats2022:  13, leader: 'Carlo Calenda',      wikiTitle: 'Carlo_Calenda' },
   { id: 'IV',   name: 'IV',      fullName: 'Italia Viva',             color: '#E5147D', seats2022:   8, leader: 'Matteo Renzi',        wikiTitle: 'Matteo_Renzi' },
-  { id: 'FN',   name: 'FN',      fullName: 'Far Right (new)',         color: '#3E2723', seats2022:   0, leader: 'New far-right list',  wikiTitle: '' },
+  { id: 'FN',   name: 'FN',      fullName: 'Forza Nuova',             color: '#3E2723', seats2022:   0, leader: 'Roberto Fiore',       wikiTitle: 'Roberto_Fiore' },
   { id: 'AVS',  name: 'AVS',     fullName: 'Alleanza Verdi e Sinistra',color: '#2E8B57', seats2022:  12, leader: 'Angelo Bonelli',     wikiTitle: 'Angelo_Bonelli' },
   { id: 'PIU',  name: '+Europa', fullName: '+Europa',                  color: '#C4006B', seats2022:   2, leader: 'Emma Bonino',         wikiTitle: 'Emma_Bonino', leader2026: 'Riccardo Magi', wikiTitle2026: 'Riccardo_Magi', regional: false },
   { id: 'NM',   name: 'NM',      fullName: 'Noi Moderati',             color: '#5B6E8C', seats2022:   7, leader: 'Maurizio Lupi',      wikiTitle: 'Maurizio_Lupi' },
@@ -1744,7 +1744,7 @@ function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, 
           ...(is2026?[]:[{label:'M5S', color:IT_COAL_COLOR.M5S, ids:['M5S']}]),
           {label:'Azione',       color:'#00A3C7',         ids:['AZ']},
           {label:'Italia Viva',  color:'#E5147D',         ids:['IV']},
-          {label:'Far Right',    color:'#3E2723',         ids:['FN']},
+          {label:'Forza Nuova',  color:'#3E2723',         ids:['FN']},
           {label:'Others',       color:IT_COAL_COLOR.OTH, ids:['SVP']},
         ] as {label:string;color:string;ids:ItPartyId[]}[]).map(g => ({ ...g, n: g.ids.reduce((s,id)=>s+(natTotals[id]??0),0) })).filter(g => g.n > 0).sort((a,b)=>b.n-a.n);
         const maj = Math.floor(totalSeats/2)+1;
