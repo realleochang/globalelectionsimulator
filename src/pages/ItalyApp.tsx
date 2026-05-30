@@ -2546,7 +2546,6 @@ export default function ItalyApp() {
           <button onClick={()=>openRight('coalition')} className={rightPanel==='coalition'?btnActive:btnMuted}>Coalition</button>
           <button onClick={()=>openLeft('parli')}      className={leftPanel==='parli'     ?btnActive:btnMuted}>Parliament</button>
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
-          <span className="text-[8px] font-mono uppercase tracking-wider text-ink-3 shrink-0 hidden md:block">View</span>
           {IT_MAP_VIEWS.map(v=>(
             <button key={v.id} onClick={()=>{ setMapView(v.id); if(v.id!=='pluri'){setSelectedProv(null);setSeatDots(false);} if(v.id!=='uni')setSelectedUni(null); }}
               className={mapView===v.id?`${btnBase} bg-[#7C3AED] text-white`:btnMuted}>{v.label}</button>
