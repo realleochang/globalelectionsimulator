@@ -62,16 +62,18 @@ const IT_COAL_COLOR: Record<string, string> = {
   CDX:'#214A7B', CSX:'#E63946', M5S:'#F2C200', AZIV:'#00A3C7', SVP:'#B30000', AUT:'#8E44AD', SCN:'#FF6F00', NONE:'#9AA0A6',
 };
 
-// 2022 national list results — source: Ministero dell'Interno (Camera)
-const IT_VOTE_PCT_2022: Record<ItPartyId, number> = {
-  FDI: 26.00, PD: 19.07, M5S: 15.43, LEGA: 8.77, FI: 8.11, AZIV: 7.79,
-  AVS: 3.63, PIU: 2.83, NM: 0.91, IC: 0.60, SVP: 0.42,
-};
+// 2022 national list (proportional) results — EXACT official figures.
+// Source: Wikipedia "Results of the 2022 Italian general election" (Camera,
+// quota proporzionale). Total valid Chamber votes: 28,098,196.
 const IT_VOTE_RAW_2022: Record<ItPartyId, number> = {
-  FDI: 7_302_517, PD: 5_356_180, M5S: 4_333_972, LEGA: 2_464_005, FI: 2_278_217, AZIV: 2_186_669,
-  AVS: 1_018_669, PIU: 793_961, NM: 255_505, IC: 169_165, SVP: 117_010,
+  FDI: 7_301_303, PD: 5_348_676, M5S: 4_335_494, LEGA: 2_470_318, FI: 2_279_266, AZIV: 2_186_505,
+  AVS: 1_021_808, PIU: 796_057, NM: 254_127, IC: 173_555, SVP: 117_032,
 };
-const IT_GRAND_TOTAL_VOTES = 25_266_000;
+const IT_GRAND_TOTAL_VOTES = 28_098_196;
+const IT_VOTE_PCT_2022: Record<ItPartyId, number> = {
+  FDI: 25.98, PD: 19.04, M5S: 15.43, LEGA: 8.79, FI: 8.11, AZIV: 7.78,
+  AVS: 3.64, PIU: 2.83, NM: 0.91, IC: 0.62, SVP: 0.42,
+};
 
 // 2026 polling — illustrative May 2026 estimate
 const IT_VOTE_PCT_2026: Record<ItPartyId, number> = {
@@ -353,11 +355,16 @@ function hareLR(weights: Record<string, number>, total: number): Record<string, 
 const IT_COAL_DEF: Record<string, ItPartyId[]> = {
   CDX: ['FDI','LEGA','FI','NM'], CSX: ['PD','AVS','PIU','IC'], M5S: ['M5S'], AZIV: ['AZIV'],
 };
-function calcRosatellum(natPcts: Partial<Record<ItPartyId, number>>): Partial<Record<ItPartyId, number>> {
+// fptpCounts: seats won per coalition in the 147 single-member collegi (editable
+// FPTP view). When omitted, FPTP is modelled from national coalition strength.
+function calcRosatellum(
+  natPcts: Partial<Record<ItPartyId, number>>,
+  fptpCounts?: Record<string, number>,
+): Partial<Record<ItPartyId, number>> {
+  const useCounts = !!fptpCounts;
   const svpV = natPcts.SVP ?? 0;
-  const svpSeats = svpV >= 0.3 ? 3 : 0;                  // SVP's South Tyrol seats (minority exemption)
+  const svpSeats = (!useCounts && svpV >= 0.3) ? 3 : 0;  // SVP South Tyrol (only in the national-model fallback)
   const PR = 245 - svpSeats, FPTP = 147, OV = 8;
-  // coalition national strength + qualifying check (coalition needs 10%, party 3%)
   const coalPct: Record<string, number> = {};
   for (const [c, ps] of Object.entries(IT_COAL_DEF)) coalPct[c] = ps.reduce((a, id) => a + (natPcts[id] ?? 0), 0);
   // PR — parties over 3% nationally whose coalition cleared 10% (lone parties: own 3%)
@@ -370,16 +377,22 @@ function calcRosatellum(natPcts: Partial<Record<ItPartyId, number>>): Partial<Re
     qual[pty.id] = v;
   }
   const pr = hareLR(qual, PR);
-  // FPTP — majoritarian coalition bonus, then √share within the coalition
-  const coalW: Record<string, number> = {};
-  for (const c in coalPct) coalW[c] = Math.pow(Math.max(coalPct[c], 0.01), 3.2);
-  const coalFptp = hareLR(coalW, FPTP);
+  // FPTP — from edited per-collegio coalition wins, or modelled from coalition strength
+  const coalFptp: Record<string, number> = {};
+  if (useCounts) {
+    for (const c of ['CDX','CSX','M5S','AZIV']) coalFptp[c] = fptpCounts![c] || 0;
+  } else {
+    const coalW: Record<string, number> = {};
+    for (const c in coalPct) coalW[c] = Math.pow(Math.max(coalPct[c], 0.01), 3.2);
+    Object.assign(coalFptp, hareLR(coalW, FPTP));
+  }
   const fptp: Record<string, number> = {};
   for (const [c, ps] of Object.entries(IT_COAL_DEF)) {
     const within: Record<string, number> = {}; ps.forEach(id => within[id] = Math.sqrt(Math.max(0.04, natPcts[id] ?? 0)));
     const a = hareLR(within, coalFptp[c] || 0);
     for (const [id, n] of Object.entries(a)) fptp[id] = (fptp[id] || 0) + n;
   }
+  if (useCounts && (fptpCounts!.OTH || 0) > 0) fptp.SVP = (fptp.SVP || 0) + (fptpCounts!.OTH || 0); // South Tyrol / regional collegi
   const ov = hareLR(qual, OV);
   const out: Partial<Record<ItPartyId, number>> = {};
   for (const pty of IT_PARTIES) {
@@ -392,9 +405,24 @@ function calcRosatellum(natPcts: Partial<Record<ItPartyId, number>>): Partial<Re
 // National Rosatellum seats from the (province-aggregated) national vote
 function calcAllProvinceSeats(
   natPcts: Partial<Record<ItPartyId, number>>,
-  _ov?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
+  fptpCounts?: Record<string, number>,
 ): Partial<Record<ItPartyId, number>> {
-  return calcRosatellum(natPcts);
+  return calcRosatellum(natPcts, fptpCounts);
+}
+
+// Coalition of a uninominale's shares (max), with optional national swing applied
+const IT_UNI_COAL_DEF: Record<string, ItPartyId[]> = { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZIV'] };
+function uniWinner(shares: Record<string, number>, natPcts: Record<ItPartyId, number>): string {
+  let best = 'NONE', bestV = -1;
+  for (const c of ['CDX','CSX','M5S','AZIV','OTH']) {
+    const base = shares[c] ?? 0; if (base <= 0) continue;
+    const members = IT_UNI_COAL_DEF[c];
+    let factor = 1;
+    if (members) { const now = members.reduce((s,id)=>s+(natPcts[id]??0),0); const then = members.reduce((s,id)=>s+(IT_VOTE_PCT_2022[id]??0),0); factor = then>0?now/then:1; }
+    const v = base * factor;
+    if (v > bestV) { bestV = v; best = c; }
+  }
+  return best;
 }
 
 // Partial seats: Rosatellum on the reported-so-far national vote, scaled to the
@@ -884,10 +912,11 @@ function swungUniCoal(shares: Record<string, number>, natPcts: Record<ItPartyId,
 function ItMapView({
   natPcts, selectedProv, onSelect, dark, bubbleMap, seatDots, mapView,
   declaredProvs, provOverrides, blankMode, projectedProvs, simProvFractions,
-  provDraft, simNatPcts,
+  provDraft, simNatPcts, onSelectUni, selectedUni, fptpOverrides,
 }: {
   natPcts: Record<ItPartyId,number>; selectedProv: ItProvId|null; mapView: ItMapViewId;
   onSelect: (id:ItProvId)=>void; dark: boolean; bubbleMap: boolean; seatDots: boolean;
+  onSelectUni?: (geoId:string)=>void; selectedUni?: string|null; fptpOverrides?: Record<string,Record<string,number>>;
   declaredProvs?: Set<ItProvId>;
   provOverrides?: Partial<Record<ItProvId,Partial<Record<ItPartyId,number>>>>;
   blankMode?: boolean; projectedProvs?: Set<ItProvId>;
@@ -925,6 +954,8 @@ function ItMapView({
 
   const mapViewRef = useRef(mapView);
   useEffect(() => { mapViewRef.current = mapView; }, [mapView]);
+  const onSelectUniRef = useRef(onSelectUni); useEffect(()=>{ onSelectUniRef.current=onSelectUni; },[onSelectUni]);
+  const fptpOvRef = useRef(fptpOverrides); useEffect(()=>{ fptpOvRef.current=fptpOverrides; },[fptpOverrides]);
   useEffect(() => {
     const file = IT_MAP_VIEWS.find(v => v.id === mapView)?.file ?? 'italy-plurinominali.geojson';
     setGeoData(null);
@@ -935,14 +966,18 @@ function ItMapView({
     const geoId  = feature?.properties?.id ?? '';
     const border = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
 
-    // Single-member (FPTP) and Regions views: colour by the swung result, read-only
+    // Single-member (FPTP, editable) and Regions views
     if (mapView !== 'pluri') {
       const eff = simNatPcts ?? natPcts;
       const props = feature?.properties ?? {};
-      const fill = mapView === 'uni'
-        ? swungUniCoal((props.shares as Record<string,number>) ?? {}, eff)
-        : swungRegLeadColor((props.pr as Record<string,number>) ?? {}, eff);
-      return { fillColor: fill, fillOpacity: 0.82, weight: 0.5, color: border, opacity: 1 };
+      let fill: string;
+      const ovSel = mapView==='uni' && geoId===selectedUni;
+      if (mapView === 'uni') {
+        const ov = fptpOverrides?.[geoId];
+        if (ov) { const w = (['CDX','CSX','M5S','AZIV','OTH'] as const).reduce((b,c)=>(ov[c]??0)>(ov[b]??0)?c:b,'CDX'); fill = IT_COAL_COLOR[w]??'#999'; }
+        else fill = swungUniCoal((props.shares as Record<string,number>) ?? {}, eff);
+      } else fill = swungRegLeadColor((props.pr as Record<string,number>) ?? {}, eff);
+      return { fillColor: fill, fillOpacity: 0.85, weight: ovSel?2.2:0.5, color: ovSel?'#c8a020':border, opacity: 1 };
     }
 
     const provId = IT_GEOID_TO_ID[geoId];
@@ -966,7 +1001,7 @@ function ItMapView({
     const fill    = getProvFill(effectiveNatPcts, provId, dark, provOverrides?.[provId]);
     const opacity = isDeclared ? 0.78 : Math.max(0.35, 0.78*(simFrac??1));
     return { fillColor:fill, fillOpacity:opacity, weight:isSel?2:0.4, color:isSel?'#c8a020':border, opacity:1 };
-  }, [natPcts, selectedProv, dark, bubbleMap, seatDots, mapView, declaredProvs, provOverrides, blankMode, simProvFractions, simNatPcts]);
+  }, [natPcts, selectedProv, dark, bubbleMap, seatDots, mapView, declaredProvs, provOverrides, blankMode, simProvFractions, simNatPcts, selectedUni, fptpOverrides]);
 
   useEffect(() => { layerRef.current?.setStyle((f:any)=>getStyle(f)); }, [getStyle]);
 
@@ -974,7 +1009,11 @@ function ItMapView({
     const geoId  = feature?.properties?.id ?? '';
     const provId = IT_GEOID_TO_ID[geoId];
 
-    layer.on('click', () => { if (provId) onSelectRef.current(provId); });
+    layer.on('click', () => {
+      if (mapViewRef.current === 'uni') { if (geoId) onSelectUniRef.current?.(geoId); return; }
+      if (mapViewRef.current !== 'pluri') return;
+      if (provId) onSelectRef.current(provId);
+    });
     layer.on('mousemove', (e: L.LeafletMouseEvent) => {
       // uni / regions views: tooltip from the baked result (read-only)
       if (mapViewRef.current !== 'pluri') {
@@ -1724,6 +1763,78 @@ function ItReportingWidget({ projectedProvs,provReportingPct,simProvFractions,is
   );
 }
 
+// ── FPTP (single-member collegio) editor — coalition sliders ──────────────────
+type ItColl = { id: string; name: string; shares: Record<string, number>; votes: number };
+const IT_COAL_SLIDERS = ['CDX','CSX','M5S','AZIV','OTH'] as const;
+const IT_COAL_LABEL: Record<string, string> = { CDX:'Centre-right', CSX:'Centre-left', M5S:'M5S', AZIV:'Az–IV / Third Pole', OTH:'Others / regional' };
+function ItFptpPanel({ coll, natPcts, override, onApply, onReset, onClose, dark }: {
+  coll: ItColl; natPcts: Record<ItPartyId,number>; override?: Record<string,number>;
+  onApply: (shares: Record<string,number>) => void; onReset: () => void; onClose: () => void; dark: boolean;
+}) {
+  // baseline shares swung by the current national coalition vote
+  const swung = useMemo(() => {
+    const out: Record<string,number> = {}; let tot = 0;
+    for (const c of IT_COAL_SLIDERS) {
+      const base = coll.shares[c] ?? 0;
+      const m = IT_UNI_COAL_DEF[c];
+      let f = 1; if (m) { const now=m.reduce((s,id)=>s+(natPcts[id]??0),0); const then=m.reduce((s,id)=>s+(IT_VOTE_PCT_2022[id]??0),0); f=then>0?now/then:1; }
+      out[c] = Math.max(0, base*f); tot += out[c];
+    }
+    if (tot>0) for (const c of IT_COAL_SLIDERS) out[c] = out[c]/tot*100;
+    return out;
+  }, [coll, natPcts]);
+  const [draft, setDraft] = useState<Record<string,number>>(() => override ? { ...override } : { ...swung });
+  const [touched, setTouched] = useState(false);
+  useEffect(() => { setDraft(override ? { ...override } : { ...swung }); setTouched(false); }, [coll.id, override, swung]);
+  const winner = IT_COAL_SLIDERS.reduce((b,c)=>(draft[c]??0)>(draft[b]??0)?c:b, 'CDX');
+  const setSlider = (c: string, v: number) => {
+    const others = IT_COAL_SLIDERS.filter(x=>x!==c); const oldOther = others.reduce((s,x)=>s+(draft[x]??0),0);
+    const room = 100 - v; const next: Record<string,number> = { [c]: Math.max(0,Math.min(100,v)) };
+    others.forEach(x => next[x] = oldOther>0 ? (draft[x]??0)/oldOther*room : room/others.length);
+    setDraft(next); setTouched(true);
+  };
+  return (
+    <aside className={`w-72 shrink-0 ${dark?'bg-[#0d1b2e]':'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
+      <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default shrink-0 flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h2 className="text-[13px] font-bold text-ink leading-tight truncate">{coll.name}</h2>
+          <div className="text-[8.5px] font-mono text-ink-3 uppercase tracking-wide mt-0.5">Single-member collegio · FPTP</div>
+        </div>
+        <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded hover:bg-hover text-ink-3 hover:text-ink text-base shrink-0">×</button>
+      </div>
+      <div className="px-3.5 py-2 border-b border-default text-center" style={{ background: hexToRgba(IT_COAL_COLOR[winner]||'#999', 0.12) }}>
+        <div className="text-[8px] font-mono uppercase tracking-[0.15em] text-ink-3">Seat won by</div>
+        <div className="text-[13px] font-black" style={{ color: IT_COAL_COLOR[winner]||'#999' }}>{IT_COAL_LABEL[winner]||winner}</div>
+      </div>
+      <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-3">
+        {IT_COAL_SLIDERS.map(c => {
+          const v = draft[c] ?? 0; const col = IT_COAL_COLOR[c] || '#999';
+          return (
+            <div key={c}>
+              <div className="flex items-center gap-1.5 mb-0.5">
+                <span className="w-2 h-2 rounded-full shrink-0" style={{ background: col }} />
+                <span className="text-[10px] text-ink flex-1 truncate">{IT_COAL_LABEL[c]}</span>
+                <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: col }}>{v.toFixed(1)}%</span>
+              </div>
+              <input type="range" min={0} max={100} step={0.1} value={v}
+                onChange={e => setSlider(c, parseFloat(e.target.value))}
+                className="br-party-slider w-full" style={{ '--party-color': col, '--pct': `${v}%` } as React.CSSProperties} />
+              <div className="text-right text-[8px] font-mono text-ink-3 mt-0.5">{Math.round((v/100)*coll.votes).toLocaleString()} votes</div>
+            </div>
+          );
+        })}
+      </div>
+      <div className="px-3.5 py-3 border-t border-default shrink-0 space-y-1.5">
+        <button onClick={()=>onApply(draft)} disabled={!touched && !override}
+          className={`w-full h-8 rounded-[4px] text-[11px] font-mono font-semibold uppercase tracking-wide transition-colors ${(!touched&&!override)?'border border-default text-ink-3 opacity-50 cursor-not-allowed':'bg-emerald-600 text-white hover:bg-emerald-700'}`}>
+          {override ? '↻ Update seat' : '📍 Set seat winner'}
+        </button>
+        {override && <button onClick={onReset} className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover">Reset to actual</button>}
+      </div>
+    </aside>
+  );
+}
+
 // ── Main app ──────────────────────────────────────────────────────────────────
 export default function ItalyApp() {
   const navigate = useNavigate();
@@ -1810,6 +1921,14 @@ export default function ItalyApp() {
   const [bubbleMap,setBubbleMap]               = useState(false);
   const [seatDots,setSeatDots]                 = useState(false);
   const [mapView,setMapView]                   = useState<ItMapViewId>('pluri');
+  // ── FPTP single-member editing (uninominali view) ──
+  const [uniColl,setUniColl]                   = useState<Record<string,ItColl>>({});
+  const [fptpOverrides,setFptpOverrides]       = useState<Record<string,Record<string,number>>>({});
+  const [selectedUni,setSelectedUni]           = useState<string|null>(null);
+  useEffect(()=>{ fetch(`${import.meta.env.BASE_URL}italy-uninominali.geojson`).then(r=>r.json()).then((fc:GeoJSON.FeatureCollection)=>{
+    const m:Record<string,ItColl>={}; for(const f of fc.features){ const pr=f.properties as Record<string,unknown>; if(pr.id) m[pr.id as string]={id:pr.id as string,name:String(pr.den||pr.id),shares:(pr.shares as Record<string,number>)||{CDX:0,CSX:0,M5S:0,AZIV:0,OTH:0},votes:(pr.votes as number)||0}; }
+    setUniColl(m);
+  }).catch(console.error); },[]);
   const [scoreboardVisible,setScoreboardVisible] = useState(true);
   const [hiddenParties,setHiddenParties]       = useState<Set<ItPartyId>>(new Set());
 
@@ -1894,7 +2013,14 @@ export default function ItalyApp() {
     simTimersRef.current=timers;
   }
 
-  const displaySeats=useMemo(()=>simSeats??blankSeats??calcAllProvinceSeats(displayPcts),[simSeats,blankSeats,displayPcts]);
+  // FPTP coalition seat counts from the 147 collegi (baseline swung by the vote, edited per-collegio)
+  const fptpCounts=useMemo<Record<string,number>|undefined>(()=>{
+    const colls=Object.values(uniColl); if(colls.length<140) return undefined; // not loaded yet → national-model fallback
+    const counts:Record<string,number>={CDX:0,CSX:0,M5S:0,AZIV:0,OTH:0};
+    for(const c of colls){ const sh=fptpOverrides[c.id]??c.shares; const w=fptpOverrides[c.id]?IT_COAL_SLIDERS.reduce((b,k)=>(sh[k]??0)>(sh[b]??0)?k:b,'CDX'):uniWinner(c.shares,displayPcts); counts[w]=(counts[w]||0)+1; }
+    return counts;
+  },[uniColl,fptpOverrides,displayPcts]);
+  const displaySeats=useMemo(()=>simSeats??blankSeats??calcAllProvinceSeats(displayPcts,fptpCounts),[simSeats,blankSeats,displayPcts,fptpCounts]);
 
   const simPartialPcts=useMemo<Record<ItPartyId,number>|null>(()=>{
     if(!simNatPcts) return null;
@@ -1957,7 +2083,7 @@ export default function ItalyApp() {
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
           <span className="text-[8px] font-mono uppercase tracking-wider text-ink-3 shrink-0 hidden md:block">View</span>
           {IT_MAP_VIEWS.map(v=>(
-            <button key={v.id} onClick={()=>{ setMapView(v.id); if(v.id!=='pluri'){setSelectedProv(null);setBubbleMap(false);setSeatDots(false);} }}
+            <button key={v.id} onClick={()=>{ setMapView(v.id); if(v.id!=='pluri'){setSelectedProv(null);setBubbleMap(false);setSeatDots(false);} if(v.id!=='uni')setSelectedUni(null); }}
               className={mapView===v.id?`${btnBase} bg-[#7C3AED] text-white`:btnMuted}>{v.label}</button>
           ))}
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
@@ -1995,6 +2121,8 @@ export default function ItalyApp() {
           <ItMapView
             natPcts={natPcts} selectedProv={selectedProv} mapView={mapView}
             onSelect={p=>setSelectedProv(prev=>prev===p?null:p)}
+            onSelectUni={geoId=>setSelectedUni(prev=>prev===geoId?null:geoId)}
+            selectedUni={selectedUni} fptpOverrides={fptpOverrides}
             dark={dark} bubbleMap={bubbleMap} seatDots={seatDots}
             declaredProvs={declaredProvs} provOverrides={provOverrides}
             blankMode={preset==='blank'} projectedProvs={projectedProvs}
@@ -2078,6 +2206,14 @@ export default function ItalyApp() {
             onReportingPctChange={pct=>setProvReportingPct(prev=>({...prev,[selectedProv]:pct}))}
             onDraftChange={preset==='blank'?(pcts,rpt)=>setProvDraft({provId:selectedProv,pcts,rptPct:rpt}):undefined}
             hiddenParties={hiddenParties} dark={dark}/>
+        )}
+
+        {mapView==='uni'&&selectedUni&&uniColl[selectedUni]&&(
+          <ItFptpPanel key={selectedUni} coll={uniColl[selectedUni]} natPcts={simNatPcts??displayPcts}
+            override={fptpOverrides[selectedUni]}
+            onApply={shares=>setFptpOverrides(prev=>({...prev,[selectedUni]:shares}))}
+            onReset={()=>{setFptpOverrides(prev=>{const n={...prev};delete n[selectedUni];return n;});}}
+            onClose={()=>setSelectedUni(null)} dark={dark}/>
         )}
 
         {showDistrib  &&<ItDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} is2026={preset!=='baseline'} onClose={()=>openRight('distributions')} exiting={exitRight==='distributions'} dark={dark}/>}
