@@ -40,7 +40,7 @@ const IT_PARTIES: ItParty[] = [
   { id: 'FI',   name: 'FI',      fullName: 'Forza Italia',             color: '#0F73B9', seats2022:  45, leader: 'Silvio Berlusconi',   wikiTitle: 'Silvio_Berlusconi', leader2026: 'Antonio Tajani', wikiTitle2026: 'Antonio_Tajani' },
   { id: 'AZ',   name: 'Azione',  fullName: 'Azione',                  color: '#00A3C7', seats2022:  13, leader: 'Carlo Calenda',      wikiTitle: 'Carlo_Calenda' },
   { id: 'IV',   name: 'IV',      fullName: 'Italia Viva',             color: '#E5147D', seats2022:   8, leader: 'Matteo Renzi',        wikiTitle: 'Matteo_Renzi' },
-  { id: 'FN',   name: 'FN',      fullName: 'Futuro Nazionale',        color: '#3E2723', seats2022:   0, leader: 'Roberto Vannacci',    wikiTitle: 'Roberto_Vannacci' },
+  { id: 'FN',   name: 'FN',      fullName: 'Futuro Nazionale',        color: '#C0703C', seats2022:   0, leader: 'Roberto Vannacci',    wikiTitle: 'Roberto_Vannacci' },
   { id: 'AVS',  name: 'AVS',     fullName: 'Alleanza Verdi e Sinistra',color: '#2E8B57', seats2022:  12, leader: 'Angelo Bonelli',     wikiTitle: 'Angelo_Bonelli' },
   { id: 'PIU',  name: '+Europa', fullName: '+Europa',                  color: '#C4006B', seats2022:   2, leader: 'Emma Bonino',         wikiTitle: 'Emma_Bonino', leader2026: 'Riccardo Magi', wikiTitle2026: 'Riccardo_Magi', regional: false },
   { id: 'NM',   name: 'NM',      fullName: 'Noi Moderati',             color: '#5B6E8C', seats2022:   7, leader: 'Maurizio Lupi',      wikiTitle: 'Maurizio_Lupi' },
@@ -533,6 +533,19 @@ function uniSwungShares(sh: Record<string, number>, natPcts: Record<ItPartyId, n
 // circoscrizione (2022 regional strength, swung to the current vote). So a
 // centre-right win in Lombardy goes to Lega, one in the south to FdI, etc.
 const itCirco = (den: string) => den.replace(/\s*-\s*[UP]\d+.*$/i, '').trim();
+const itCircoKey = (s: string) => s.toUpperCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^A-Z0-9]/g, '');
+// Weighted reporting fraction of the PR districts under a circoscrizione (uni) or
+// region prefix — lets FPTP collegi / regions fill in during the sim in step with
+// the PR map (a collegio reports once its circoscrizione's PR districts report).
+function simReportFrac(prefix: string, frac: Partial<Record<ItProvId, number>>): number {
+  const pre = itCircoKey(prefix); if (!pre) return 0;
+  let w = 0, rep = 0;
+  for (const p of IT_PROVINCES) {
+    if (!itCircoKey(itCirco(p.name)).startsWith(pre)) continue;
+    w += p.weight; rep += p.weight * (frac[p.id] ?? 0);
+  }
+  return w > 0 ? rep / w : 0;
+}
 const IT_CIRCO_STRENGTH: Record<string, Partial<Record<ItPartyId, number>>> = (() => {
   const acc: Record<string, { w: number; v: Record<string, number> }> = {};
   for (const prov of IT_PROVINCES) {
@@ -1196,8 +1209,21 @@ function ItMapView({
       const props = feature?.properties ?? {};
       const ov = mapView==='uni' ? fptpOverrides?.[geoId] : undefined;
       const ovSel = mapView==='uni' && geoId===selectedUni;
-      // Blank Map: start blank (grey) — only projected/edited collegi show a result
-      if (blankMode && !ov) return { fillColor: dark?'#1f2937':'#d1d5db', fillOpacity:0.7, weight: ovSel?2:0.5, color: ovSel?'#c8a020':border, opacity:1 };
+      const grey = { fillColor: dark?'#1f2937':'#d1d5db', fillOpacity:0.7, weight: ovSel?2:0.5, color: ovSel?'#c8a020':border, opacity:1 };
+      // Simulation: FPTP collegi (and regions) trickle in IN STEP with the PR districts —
+      // a collegio fills once its circoscrizione's PR districts start reporting.
+      const simming = !!simProvFractions && Object.keys(simProvFractions).length > 0;
+      let op = 0.85;
+      if (!ov) {
+        if (simming) {
+          const key = mapView==='uni' ? itCirco(String(props.den ?? '')) : String(props.reg_name ?? '');
+          const f = simReportFrac(key, simProvFractions);
+          if (f <= 0) return grey;                 // this region hasn't started reporting yet
+          op = Math.max(0.4, 0.85 * f);            // fade in as it reports
+        } else if (blankMode) {
+          return grey;                             // Blank Map (no sim): grey until edited
+        }
+      }
       let fill: string;
       if (mapView === 'uni') {
         const coal = props.coal as string;
@@ -1210,7 +1236,7 @@ function ItMapView({
         else if (coal==='SVP'||coal==='AUT'||coal==='SCN') fill = IT_COAL_COLOR[coal];  // regional winners — their own colour
         else fill = swungUniCoal((props.shares as Record<string,number>) ?? {}, eff, dark, is2026);
       } else fill = swungRegLeadColor((props.pr as Record<string,number>) ?? {}, eff, dark);
-      return { fillColor: fill, fillOpacity: 0.85, weight: ovSel?2.2:0.5, color: ovSel?'#c8a020':border, opacity: 1 };
+      return { fillColor: fill, fillOpacity: op, weight: ovSel?2.2:0.5, color: ovSel?'#c8a020':border, opacity: 1 };
     }
 
     const provId = IT_GEOID_TO_ID[geoId];
@@ -1947,7 +1973,7 @@ function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, 
           ...(is2026
             ? [{label:'Azione', color:'#00A3C7', ids:['AZ']}, {label:'Italia Viva', color:'#E5147D', ids:['IV']}]
             : [{label:'Az–IV', color:'#00A3C7', ids:['AZ','IV']}]),
-          {label:'Futuro Nazionale', color:'#3E2723',     ids:['FN']},
+          {label:'Futuro Nazionale', color:'#C0703C',     ids:['FN']},
           {label:'Others',       color:IT_COAL_COLOR.OTH, ids:['SVP']},
         ] as {label:string;color:string;ids:ItPartyId[]}[]).map(g => ({ ...g, n: g.ids.reduce((s,id)=>s+(natTotals[id]??0),0) })).filter(g => g.n > 0).sort((a,b)=>b.n-a.n);
         const maj = Math.floor(totalSeats/2)+1;
