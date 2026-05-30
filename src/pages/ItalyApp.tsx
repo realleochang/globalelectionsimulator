@@ -31,13 +31,12 @@ type ItParty = {
 // Ideological order left → right for the parliament hemicycle
 const IT_LR_ORDER: ItPartyId[] = ['AVS','M5S','PD','IC','PIU','IV','AZ','MAIE','AUT','SVP','SCN','FI','NM','LEGA','FDI','FN'];
 // Party keys present in the geojson `pr` objects (PR list shares)
-const IT_PR_KEYS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZ','IV','AVS','PIU','NM','IC','SVP','SCN','AUT'];
 
 const IT_PARTIES: ItParty[] = [
   { id: 'FDI',  name: 'FdI',     fullName: "Fratelli d'Italia",        color: '#214A7B', seats2022: 119, leader: 'Giorgia Meloni',     wikiTitle: 'Giorgia_Meloni' },
   { id: 'PD',   name: 'PD',      fullName: 'Partito Democratico',      color: '#E63946', seats2022:  69, leader: 'Enrico Letta',        wikiTitle: 'Enrico_Letta', leader2026: 'Elly Schlein', wikiTitle2026: 'Elly_Schlein' },
   { id: 'M5S',  name: 'M5S',     fullName: 'Movimento 5 Stelle',       color: '#F2C200', seats2022:  52, leader: 'Giuseppe Conte',     wikiTitle: 'Giuseppe_Conte' },
-  { id: 'LEGA', name: 'Lega',    fullName: 'Lega',                     color: '#1B9E4B', seats2022:  66, leader: 'Matteo Salvini',     wikiTitle: 'Matteo_Salvini' },
+  { id: 'LEGA', name: 'Lega',    fullName: 'Lega',                     color: '#1B9E4B', seats2022:  67, leader: 'Matteo Salvini',     wikiTitle: 'Matteo_Salvini' },
   { id: 'FI',   name: 'FI',      fullName: 'Forza Italia',             color: '#0F73B9', seats2022:  45, leader: 'Silvio Berlusconi',   wikiTitle: 'Silvio_Berlusconi', leader2026: 'Antonio Tajani', wikiTitle2026: 'Antonio_Tajani' },
   { id: 'AZ',   name: 'Azione',  fullName: 'Azione',                  color: '#00A3C7', seats2022:  13, leader: 'Carlo Calenda',      wikiTitle: 'Carlo_Calenda' },
   { id: 'IV',   name: 'IV',      fullName: 'Italia Viva',             color: '#E5147D', seats2022:   8, leader: 'Matteo Renzi',        wikiTitle: 'Matteo_Renzi' },
@@ -48,23 +47,22 @@ const IT_PARTIES: ItParty[] = [
   { id: 'IC',   name: 'IC',      fullName: 'Impegno Civico',           color: '#1A8FB5', seats2022:   1, leader: 'Luigi Di Maio',      wikiTitle: 'Luigi_Di_Maio' },
   { id: 'SVP',  name: 'SVP',     fullName: 'Südtiroler Volkspartei',   color: '#B30000', seats2022:   3, leader: 'Philipp Achammer',   wikiTitle: 'Philipp_Achammer', regional: true },
   { id: 'SCN',  name: 'ScN',     fullName: 'Sud chiama Nord',          color: '#FF6F00', seats2022:   1, leader: 'Cateno De Luca',     wikiTitle: 'Cateno_De_Luca',   regional: true },
-  { id: 'AUT',  name: 'VdA',     fullName: "Vallée d'Aoste",           color: '#8E44AD', seats2022:   1, leader: 'Franco Manes',       wikiTitle: 'Franco_Manes',     regional: true },
+  { id: 'AUT',  name: 'VdA',     fullName: "Vallée d'Aoste",           color: '#8E44AD', seats2022:   0, leader: 'Patrik Vesan',       wikiTitle: 'Patrik_Vesan',     regional: true },   // 2022: 2nd in Aosta (33.6%), lost the seat to Lega's Spelgatti
   { id: 'MAIE', name: 'MAIE',    fullName: 'Italians Abroad (MAIE)',   color: '#16A085', seats2022:   1, leader: 'Ricardo Merlo',      wikiTitle: 'Ricardo_Merlo',    regional: true },
 ];
 
 const IT_PARTY_MAP = Object.fromEntries(IT_PARTIES.map(p => [p.id, p])) as Record<ItPartyId, ItParty>;
-// Exact official 2022 Chamber seats per party (sum = 397; the remaining 3 went to
-// micro-regional/overseas lists — Aosta Valley, South Calls North — not modelled here).
+// Exact official 2022 Chamber seats per party (sum = 400, incl. SVP, Sud chiama Nord and
+// the MAIE overseas seat; the Aosta Valley collegio was won by Lega/centre-right, not VdA).
 const IT_SEATS_2022 = Object.fromEntries(IT_PARTIES.map(p => [p.id, p.seats2022])) as Partial<Record<ItPartyId, number>>;
 const IT_TOTAL_SEATS = 400;
 const IT_MAJORITY    = 201;
 
 // ── Map views: the same election on three geographies ─────────────────────────
-type ItMapViewId = 'uni' | 'pluri' | 'reg';
+type ItMapViewId = 'uni' | 'pluri';
 const IT_MAP_VIEWS: { id: ItMapViewId; label: string; file: string }[] = [
   { id: 'uni',   label: 'Single-member', file: 'italy-uninominali.geojson' },
   { id: 'pluri', label: 'PR districts',  file: 'italy-plurinominali.geojson' },
-  { id: 'reg',   label: 'Regions',       file: 'italy-regioni.geojson' },
 ];
 // Coalition colours for the FPTP (single-member) view
 const IT_COAL_COLOR: Record<string, string> = {
@@ -79,7 +77,7 @@ const IT_COAL_LABEL: Record<string, string> = { CDX:'Centre-right', CSX:'Centre-
 const IT_VOTE_RAW_2022: Record<ItPartyId, number> = {
   FDI: 7_302_517, PD: 5_356_180, M5S: 4_333_972, LEGA: 2_464_005, FI: 2_278_217, AZ: 1_235_468, IV: 951_201, FN: 0,
   AVS: 1_018_669, PIU: 793_961, NM: 255_505, IC: 169_165, SVP: 117_010,
-  SCN: 119_000, AUT: 12_000, MAIE: 0,
+  SCN: 119_000, AUT: 20_763, MAIE: 141_440,   // VdA = Manes (Aosta); MAIE = overseas (1,085,552-vote estero)
 };
 // Az–IV ran as a single joint list (2,186,669 votes, 7.79%); the AZ/IV split is a
 // proportional estimate. All other figures are the exact official Chamber results.
@@ -87,14 +85,14 @@ const IT_GRAND_TOTAL_VOTES = 28_087_782;
 const IT_VOTE_PCT_2022: Record<ItPartyId, number> = {
   FDI: 26.00, PD: 19.07, M5S: 15.43, LEGA: 8.77, FI: 8.11, AZ: 4.40, IV: 3.39, FN: 0,
   AVS: 3.63, PIU: 2.83, NM: 0.91, IC: 0.60, SVP: 0.42,
-  SCN: 0.42, AUT: 0.04, MAIE: 0,
+  SCN: 0.42, AUT: 0.07, MAIE: 0.50,
 };
 
 // 2026 polling — illustrative May 2026 estimate
 const IT_VOTE_PCT_2026: Record<ItPartyId, number> = {
   FDI: 28.4, PD: 22.2, M5S: 12.3, LEGA: 7.0, FI: 8.2, AZ: 3.0, IV: 2.5,
   AVS: 6.5, PIU: 1.4, NM: 1.3, FN: 4.0, IC: 0.5, SVP: 0.4,
-  SCN: 0, AUT: 0, MAIE: 0,
+  SCN: 0.42, AUT: 0.07, MAIE: 0.50,   // regional/overseas — shown on the dashboard; not tunable in the sim
 };
 
 // ── Province types ────────────────────────────────────────────────────────────
@@ -587,8 +585,15 @@ const IT_CIRCO_RATIO = (circoKey: string, id: ItPartyId): number =>
 // The party that takes a collegio for its winning coalition — the regional champion
 // among the coalition's major members (Lega in the north, FI in the south, FdI the
 // rest). Shown on the FPTP panel; the seat totals use the same regional logic.
+// Known single-member winners the coalition→party heuristic would otherwise miss.
+// Aosta Valley 2022: the centre-right seat was Nicoletta Spelgatti (LEGA), not FdI.
+function pinnedFptpRep(circo: string, coal: string): ItPartyId | null {
+  if (coal === 'CDX' && itCircoKey(circo).startsWith('VALLEDAOSTA')) return 'LEGA';
+  return null;
+}
 function collegioRep(circo: string, coal: string, natPcts: Record<ItPartyId, number>, is2026?: boolean): ItPartyId {
   if (coal === 'OTH') return othRegionalParty(circo);
+  const pin = pinnedFptpRep(circo, coal); if (pin) return pin;
   const all = coalMembers(coal, is2026);
   let pool = all.filter(id => (natPcts[id] ?? 0) > 0.3 && ((IT_CIRCO_STRENGTH[circo]?.[id] ?? 0) >= 6 || (natPcts[id] ?? 0) >= 8));
   if (!pool.length) pool = all.filter(id => (natPcts[id] ?? 0) > 0.3);
@@ -603,6 +608,7 @@ function calcPartialSeats(
   provFractions:  Partial<Record<ItProvId, number>>,
   provOverrides?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
   is2026?:        boolean,
+  fptpCounts?:    Record<string, number>,   // per-collegio FPTP winners (incl. regional OTH seats)
 ): Partial<Record<ItPartyId, number>> {
   const entries = Object.entries(provFractions) as [ItProvId, number][];
   if (entries.length === 0) return {};
@@ -617,7 +623,7 @@ function calcPartialSeats(
   if (reportedW <= 0) return {};
   const nat = {} as Record<ItPartyId, number>;
   for (const pty of IT_PARTIES) nat[pty.id] = (weighted[pty.id] ?? 0) / reportedW;
-  const full = calcRosatellum(nat, undefined, is2026) as Record<string, number>;
+  const full = calcRosatellum(nat, fptpCounts, is2026) as Record<string, number>;
   const frac = Math.min(1, reportedW / IT_TOTAL_PROV_WEIGHT);
   return hareLR(full, Math.round(400 * frac));
 }
@@ -965,12 +971,6 @@ function ItBubbleLayer({
         pName = String(props.den||geoId);
         parties = sorted.map(x=>({ id:x.c as unknown as ItPartyId, pct:x.v, rawVotes:Math.round(x.v/100*votes),
           label:(x.c==='OTH'&&REG[coal])?REG[coal][0]:IT_COAL_LABEL[x.c], color:(x.c==='OTH'&&REG[coal])?REG[coal][1]:IT_COAL_COLOR[x.c] }));
-      } else if (mapView === 'reg') {
-        const pr = (props.pr as Record<string,number>) ?? {}; const sorted = IT_PR_KEYS.map(k=>({k,v:pr[k]||0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
-        if (!sorted.length) return;
-        rawMargin = (sorted[0].v-(sorted[1]?.v||0))/100*votes;
-        color = partyColor(sorted[0].k); pName = String(props.reg_name||geoId);
-        parties = sorted.slice(0,6).map(x=>({ id:x.k, pct:x.v, rawVotes:Math.round(x.v/100*votes) }));
       } else {
         const provId = IT_GEOID_TO_ID[geoId]; if (!provId) return;
         if (declaredProvs && !declaredProvs.has(provId)) return;
@@ -1137,18 +1137,7 @@ function shadeByMargin(hex: string, margin: number, dark: boolean): string {
   c.l = dark ? 0.60 - t * 0.32 : 0.84 - t * 0.48;
   return c.formatHex();
 }
-function swungRegLeadColor(pr: Record<string, number>, natPcts: Record<ItPartyId, number>, dark: boolean): string {
-  const sw: { id: ItPartyId; v: number }[] = [];
-  for (const id of IT_PR_KEYS) {
-    const base = pr[id] ?? 0; if (base <= 0) continue;
-    const v = (IT_VOTE_PCT_2022[id] ?? 0) > 0 ? base * ((natPcts[id] ?? 0) / (IT_VOTE_PCT_2022[id] ?? 1)) : base;
-    sw.push({ id: id as ItPartyId, v });
-  }
-  sw.sort((a, b) => b.v - a.v);
-  if (sw.length === 0) return partyColor('FDI');
-  const margin = sw[0].v - (sw[1]?.v ?? 0);
-  return shadeByMargin(partyColor(sw[0].id), margin, dark);
-}
+
 function swungUniCoal(shares: Record<string, number>, natPcts: Record<ItPartyId, number>, dark: boolean, is2026?: boolean): string {
   const val = uniSwungVals(shares, natPcts, is2026);
   const order = ['CDX','CSX','M5S','AZIV','OTH'].filter(c => (val[c] ?? -1) >= 0).sort((a, b) => val[b] - val[a]);
@@ -1225,32 +1214,29 @@ function ItMapView({
       const ov = mapView==='uni' ? fptpOverrides?.[geoId] : undefined;
       const ovSel = mapView==='uni' && geoId===selectedUni;
       const grey = { fillColor: dark?'#1f2937':'#d1d5db', fillOpacity:0.7, weight: ovSel?2:0.5, color: ovSel?'#c8a020':border, opacity:1 };
-      // Simulation: FPTP collegi (and regions) trickle in IN STEP with the PR districts —
+      // Simulation: FPTP collegi trickle in IN STEP with the PR districts —
       // a collegio fills once its circoscrizione's PR districts start reporting.
       const simming = !!simProvFractions && Object.keys(simProvFractions).length > 0;
       let op = 0.85;
       if (!ov) {
         if (simming) {
-          const key = mapView==='uni' ? itCirco(String(props.den ?? '')) : String(props.reg_name ?? '');
-          const f = simReportFrac(key, simProvFractions);
-          if (f <= 0) return grey;                 // this region hasn't started reporting yet
-          op = Math.max(0.4, 0.85 * f);            // fade in as it reports
+          const f = simReportFrac(itCirco(String(props.den ?? '')), simProvFractions);
+          if (f <= 0) return grey;
+          op = Math.max(0.4, 0.85 * f);
         } else if (blankMode) {
-          return grey;                             // Blank Map (no sim): grey until edited
+          return grey;
         }
       }
+      const coal = props.coal as string;
       let fill: string;
-      if (mapView === 'uni') {
-        const coal = props.coal as string;
-        if (ov) {
-          const sorted = uniCoalShares(ov as Record<string,number>, is2026);
-          const top = sorted[0]?.c ?? 'CDX';
-          const margin = (sorted[0]?.v ?? 0) - (sorted[1]?.v ?? 0);
-          fill = shadeByMargin(IT_COAL_COLOR[top] ?? '#7E57C2', margin, dark);
-        }
-        else if (coal==='SVP'||coal==='AUT'||coal==='SCN') fill = IT_COAL_COLOR[coal];  // regional winners — their own colour
-        else fill = swungUniCoal((props.shares as Record<string,number>) ?? {}, eff, dark, is2026);
-      } else fill = swungRegLeadColor((props.pr as Record<string,number>) ?? {}, eff, dark);
+      if (ov) {
+        const sorted = uniCoalShares(ov as Record<string,number>, is2026);
+        const top = sorted[0]?.c ?? 'CDX';
+        const margin = (sorted[0]?.v ?? 0) - (sorted[1]?.v ?? 0);
+        fill = shadeByMargin(IT_COAL_COLOR[top] ?? '#7E57C2', margin, dark);
+      }
+      else if (coal==='SVP'||coal==='AUT'||coal==='SCN') fill = IT_COAL_COLOR[coal];
+      else fill = swungUniCoal((props.shares as Record<string,number>) ?? {}, eff, dark, is2026);
       return { fillColor: fill, fillOpacity: op, weight: ovSel?2.2:0.5, color: ovSel?'#c8a020':border, opacity: 1 };
     }
 
@@ -1285,15 +1271,14 @@ function ItMapView({
 
     layer.on('click', () => {
       if (mapViewRef.current === 'uni') { if (geoId) onSelectUniRef.current?.(geoId); return; }
-      if (mapViewRef.current !== 'pluri') return;
       if (provId) onSelectRef.current(provId);
     });
     layer.on('mousemove', (e: L.LeafletMouseEvent) => {
-      // uni / regions views: tooltip from the baked result (read-only)
-      if (mapViewRef.current !== 'pluri') {
+      // single-member (uni) view: tooltip from the baked result (read-only)
+      if (mapViewRef.current === 'uni') {
         const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
         const props = feature?.properties ?? {};
-        const nm = String(props.den ?? props.reg_name ?? '');
+        const nm = String(props.den ?? '');
         const votes = (props.votes as number) ?? 0;
         const tx = e.originalEvent.clientX-rect.left, ty = e.originalEvent.clientY-rect.top;
         const simFrac = simFracRef2.current;
@@ -1309,27 +1294,21 @@ function ItMapView({
           }
           const coal = ov ? '' : (props.coal as string);
           const REG: Record<string, [string,string]> = { AUT:["Aosta Valley list",IT_COAL_COLOR.AUT], SVP:["SVP",IT_COAL_COLOR.SVP], SCN:["Sud chiama Nord",IT_COAL_COLOR.SCN] };
+          const isAosta = /aosta|vall[eé]e/i.test(nm);   // CDX (Lega) won; VdA 2nd; minor lists shown jointly as "Other"
           const eff = simNatPctsRef2.current ?? natPctsRef.current;
           const scale = (simming && !ov) ? f : 1;   // live count grows with reporting
           // baked baseline → swung to the current vote (every coalition moves); an edited collegio shows its raw override
           const sorted = ov ? uniCoalShares(ov, is2026Ref.current) : uniSwungShares((props.shares as Record<string,number>) ?? {}, eff, is2026Ref.current);
           const parties = sorted.map(({ c, v }) => {
             const isWinReg = c==='OTH' && REG[coal];
-            return { id: c as unknown as ItPartyId, pct: v, rawVotes: Math.round(v/100*votes*scale),
-              label: isWinReg ? REG[coal][0] : (c==='CSX' && is2026Ref.current ? 'Centre-left + M5S' : IT_COAL_LABEL[c]),
-              color: isWinReg ? REG[coal][1] : IT_COAL_COLOR[c] };
+            let label = isWinReg ? REG[coal][0] : (c==='CSX' && is2026Ref.current ? 'Centre-left + M5S' : IT_COAL_LABEL[c]);
+            let color = isWinReg ? REG[coal][1] : IT_COAL_COLOR[c];
+            if (isAosta) { if (c==='OTH') { label='Aosta Valley'; color=IT_COAL_COLOR.AUT; } else if (c==='AZIV') { label='Other'; color='#9AA0A6'; } }
+            return { id: c as unknown as ItPartyId, pct: v, rawVotes: Math.round(v/100*votes*scale), label, color };
           });
           setTooltip({ x:tx, y:ty, name:nm, parties, leader:parties[0]?.id??null, reportingPct: (simming && !ov) ? Math.round(f*100) : undefined });
           return;
         }
-        // regions view: read-only. During a sim a region reports with its PR districts.
-        const fr = simming ? simReportFrac(nm, simFrac) : 1;
-        if (simming) { if (fr <= 0) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; } }
-        else if (blankModeRef.current) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; }
-        const pr = (props.pr as Record<string,number>) ?? {};
-        const parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0, rawVotes: Math.round((pr[id] ?? 0)/100*votes*fr) })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
-        setTooltip({ x:tx, y:ty, name:nm, parties, leader:parties[0]?.id??null, reportingPct: simming ? Math.round(fr*100) : undefined });
-        return;
       }
       if (!provId) { setTooltip(null); return; }
       const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
@@ -2207,8 +2186,11 @@ function ItFptpPanel({ coll, natPcts, override, onApply, onReset, onClose, dark,
       })()}
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-3">
         {SLIDERS.map(c => {
-          const v = draft[c] ?? 0; const col = IT_COAL_COLOR[c] || '#999';
-          const label = c==='CSX' && is2026 ? 'Centre-left + M5S' : IT_COAL_LABEL[c];
+          const isAostaColl = /aosta|vall[eé]e/i.test(coll.name);   // CDX (Lega) won; VdA + minor lists shown below
+          const aLabel = isAostaColl && c==='OTH' ? 'Aosta Valley' : isAostaColl && c==='AZIV' ? 'Other' : null;
+          const v = draft[c] ?? 0;
+          const col = isAostaColl && c==='OTH' ? IT_COAL_COLOR.AUT : isAostaColl && c==='AZIV' ? '#9AA0A6' : (IT_COAL_COLOR[c] || '#999');
+          const label = aLabel ?? (c==='CSX' && is2026 ? 'Centre-left + M5S' : IT_COAL_LABEL[c]);
           return (
             <div key={c}>
               <div className="flex items-center gap-1.5 mb-0.5">
@@ -2360,7 +2342,18 @@ export default function ItalyApp() {
   },[]);
 
   // ── Simulation ────────────────────────────────────────────────────────────
-  const [simDraftPcts,   setSimDraftPcts]   = useState<Record<ItPartyId,number>>(()=>({...IT_VOTE_PCT_2026}));
+  const [simDraftPcts,   setSimDraftPcts]   = useState<Record<ItPartyId,number>>(()=>{
+    // Seed = 2026 poll, normalised to 100 across the TUNABLE parties. ScN / VdA / MAIE
+    // aren't tunable inputs (their seats come from the FPTP collegi + overseas), so seed
+    // them at 0 — they don't enter the national vote the player edits.
+    const minor=new Set<ItPartyId>(['SCN','AUT','MAIE']);
+    const tun=IT_PARTIES.filter(p=>!minor.has(p.id)).map(p=>p.id);
+    const sum=tun.reduce((s,id)=>s+(IT_VOTE_PCT_2026[id]??0),0);
+    const out={...IT_VOTE_PCT_2026};
+    for(const id of tun) out[id]=sum>0?+(((IT_VOTE_PCT_2026[id]??0)/sum)*100).toFixed(2):0;
+    for(const id of minor) out[id]=0;
+    return out;
+  });
   const [simDraftLocks,  setSimDraftLocks]  = useState<Set<ItPartyId>>(new Set());
   const [simDraftStr,    setSimDraftStr]    = useState<Record<string,string>>({});   // raw text per box (free typing, no rounding)
   const [,setSimDraftTouched]               = useState(false);
@@ -2375,23 +2368,64 @@ export default function ItalyApp() {
   const simNatPctsRef = useRef<Record<ItPartyId,number>>(natPcts);
 
   useEffect(()=>{ if(rightPanel==='sim'){
-    // seed = the 2026 poll normalised to a clean set of 0.1 values summing to EXACTLY 100
-    const t=IT_PARTIES.reduce((s,p)=>s+(IT_VOTE_PCT_2026[p.id]??0),0);
-    const num={} as Record<ItPartyId,number>; let sum=0,maxId:ItPartyId=IT_PARTIES[0].id,maxV=-1;
-    for(const p of IT_PARTIES){ const v=t>0?Math.round((IT_VOTE_PCT_2026[p.id]??0)/t*1000)/10:0; num[p.id]=v; sum+=v; if(v>maxV){maxV=v;maxId=p.id;} }
-    num[maxId]=+(num[maxId]+(100-sum)).toFixed(1);   // largest party absorbs the rounding residual
+    // seed = the 2026 poll normalised across the TUNABLE parties to sum EXACTLY 100. ScN /
+    // VdA / MAIE aren't tunable (regional/overseas seats come from the collegi + overseas),
+    // so they stay at 0 and don't enter the player-edited national vote.
+    const minor=new Set<ItPartyId>(['SCN','AUT','MAIE']);
+    const tun=IT_PARTIES.filter(p=>!minor.has(p.id));
+    const t=tun.reduce((s,p)=>s+(IT_VOTE_PCT_2026[p.id]??0),0);
+    const num={} as Record<ItPartyId,number>; let sum=0,maxId:ItPartyId=tun[0].id,maxV=-1;
+    for(const p of IT_PARTIES){
+      if(minor.has(p.id)){ num[p.id]=0; continue; }
+      const v=t>0?Math.round((IT_VOTE_PCT_2026[p.id]??0)/t*1000)/10:0; num[p.id]=v; sum+=v; if(v>maxV){maxV=v;maxId=p.id;}
+    }
+    num[maxId]=+(num[maxId]+(100-sum)).toFixed(1);   // largest tunable party absorbs the rounding residual
     const str={} as Record<string,string>; for(const p of IT_PARTIES) str[p.id]=String(num[p.id]);
     setSimDraftPcts(num); setSimDraftStr(str); setSimDraftTouched(false);
   } },[rightPanel==='sim']); // eslint-disable-line
 
-  const simTotal=useMemo(()=>IT_PARTIES.reduce((s,p)=>s+(simDraftPcts[p.id]??0),0),[simDraftPcts]);
+  const simTotal=useMemo(()=>IT_PARTIES.filter(p=>p.id!=='SCN'&&p.id!=='AUT'&&p.id!=='MAIE').reduce((s,p)=>s+(simDraftPcts[p.id]??0),0),[simDraftPcts]);
   const [simSortOrder]=useState<ItPartyId[]>(()=>IT_LR_ORDER.slice());
 
   function stopSim(){ simTimersRef.current.forEach(clearTimeout); simTimersRef.current=[]; setSimRunning(false); }
 
+  // Per-collegio FPTP party counts for a given national vote, INCLUDING the regional OTH
+  // collegi routed to SVP / ScN / Vallée d'Aoste. Shared by the live page (displayPcts)
+  // and the simulation (simNatPcts) so the Aosta Valley seat and the other regional wins
+  // persist through a sim run even though those lists aren't tunable inputs.
+  const computeFptp=useCallback((pcts:Record<ItPartyId,number>):Record<string,number>|undefined=>{
+    const colls=Object.values(uniColl); if(colls.length<140) return undefined;
+    const byCoal:Record<string,{circo:string}[]>={};
+    for(const c of colls){ const coal=uniWinner(c.shares,pcts,is2026); (byCoal[coal]??=[]).push({circo:itCirco(c.name)}); }
+    const counts:Record<string,number>={};
+    for(const [coal,list0] of Object.entries(byCoal)){
+      if(coal==='OTH'){ for(const x of list0){ const r=othRegionalParty(x.circo); counts[r]=(counts[r]||0)+1; } continue; }
+      // pin known winners (Aosta → Lega) before the proportional split
+      const list:typeof list0=[];
+      for(const x of list0){ const pin=pinnedFptpRep(x.circo,coal); if(pin){ counts[pin]=(counts[pin]||0)+1; } else list.push(x); }
+      if(!list.length) continue;
+      const all=coalMembers(coal,is2026);
+      const members=all.filter(id=>(pcts[id]??0)>0.3);
+      if(!members.length){ counts[all[0]]=(counts[all[0]]||0)+list.length; continue; }
+      const w:Record<string,number>={}; members.forEach(id=>w[id]=pcts[id]??0);
+      const target=hareLR(w,list.length);
+      const pool=list.map(x=>({circo:x.circo,taken:false}));
+      const order=members.slice().sort((a,b)=>(pcts[a]??0)-(pcts[b]??0));
+      for(const id of order){
+        const need=target[id]??0; if(need<=0) continue;
+        const ranked=pool.filter(p=>!p.taken).sort((a,b)=>IT_CIRCO_RATIO(b.circo,id)-IT_CIRCO_RATIO(a.circo,id));
+        for(let k=0;k<need&&k<ranked.length;k++){ ranked[k].taken=true; counts[id]=(counts[id]||0)+1; }
+      }
+      const left=pool.filter(p=>!p.taken).length;
+      if(left>0){ const dom=members.reduce((b,id)=>(pcts[id]??0)>(pcts[b]??0)?id:b,members[0]); counts[dom]=(counts[dom]||0)+left; }
+    }
+    return counts;
+  },[uniColl,is2026]);
+
   function runSim() {
     stopSim(); setSimDraftTouched(false);
     simNatPctsRef.current={...simDraftPcts}; setSimNatPcts({...simDraftPcts});
+    const simFptp=computeFptp(simNatPctsRef.current);   // regional FPTP (incl. Aosta→AUT) for this scenario
     const PARTS=5; const totalProvs=IT_PROVINCES.length;
     const allTimes=itBellCurveTimes(PARTS*totalProvs,simDuration);
     const provIds=[...IT_PROVINCES.map(p=>p.id)].sort(()=>Math.random()-0.5);
@@ -2417,51 +2451,17 @@ export default function ItalyApp() {
         const fracSnap={...localFrac}; const declSnap=new Set(localDecl);
         setSimProvFractions(fracSnap); setDeclaredProvs(declSnap);
         setSimProgress(Object.keys(fracSnap).length);
-        setSimSeats(calcPartialSeats(simNatPctsRef.current,fracSnap,undefined,is2026));
+        setSimSeats(calcPartialSeats(simNatPctsRef.current,fracSnap,undefined,is2026,simFptp));
         if(Object.values(fracSnap).every(f=>(f??0)>=0.999)&&Object.keys(fracSnap).length>=totalProvs){
-          setSimSeats(calcAllProvinceSeats(simNatPctsRef.current,undefined,is2026)); setSimRunning(false);
+          setSimSeats(calcAllProvinceSeats(simNatPctsRef.current,simFptp,is2026)); setSimRunning(false);
         }
       },ev.t));
     }
     simTimersRef.current=timers;
   }
 
-  // FPTP coalition seat counts from the 147 collegi (baseline swung by the vote, edited per-collegio)
-  const fptpCounts=useMemo<Record<string,number>|undefined>(()=>{
-    const colls=Object.values(uniColl); if(colls.length<140) return undefined; // not loaded yet → national-model fallback
-    // 1. winning coalition per collegio (grouped, with each collegio's circoscrizione)
-    const byCoal:Record<string,{circo:string}[]>={};
-    for(const c of colls){
-      // PRISTINE winners only — single-member edits are applied as deltas in
-      // displaySeats, so one edit moves ~1 seat instead of re-rounding the whole split.
-      const coal=uniWinner(c.shares,displayPcts,is2026);
-      (byCoal[coal]??=[]).push({circo:itCirco(c.name)});
-    }
-    // 2. split each coalition's seats among its members — totals proportional to the
-    //    members' vote, each member's seats placed in its strongest regions (so Lega
-    //    takes the northern CDX wins, FI the southern, FdI the rest).
-    const counts:Record<string,number>={};
-    for(const [coal,list] of Object.entries(byCoal)){
-      if(coal==='OTH'){ for(const x of list){ const r=othRegionalParty(x.circo); counts[r]=(counts[r]||0)+1; } continue; }   // SVP / SCN / Vallée d'Aoste by territory
-      const all=coalMembers(coal,is2026);
-      const members=all.filter(id=>(displayPcts[id]??0)>0.3);
-      if(!members.length){ counts[all[0]]=(counts[all[0]]||0)+list.length; continue; }
-      const w:Record<string,number>={}; members.forEach(id=>w[id]=displayPcts[id]??0);
-      const target=hareLR(w,list.length);                       // collegi per member (∝ vote)
-      const pool=list.map(x=>({circo:x.circo,taken:false}));
-      // regional specialists (smaller parties) claim their strongholds first; the
-      // dominant member mops up the remainder
-      const order=members.slice().sort((a,b)=>(displayPcts[a]??0)-(displayPcts[b]??0));
-      for(const id of order){
-        const need=target[id]??0; if(need<=0) continue;
-        const ranked=pool.filter(p=>!p.taken).sort((a,b)=>IT_CIRCO_RATIO(b.circo,id)-IT_CIRCO_RATIO(a.circo,id));
-        for(let k=0;k<need&&k<ranked.length;k++){ ranked[k].taken=true; counts[id]=(counts[id]||0)+1; }
-      }
-      const left=pool.filter(p=>!p.taken).length;
-      if(left>0){ const dom=members.reduce((b,id)=>(displayPcts[id]??0)>(displayPcts[b]??0)?id:b,members[0]); counts[dom]=(counts[dom]||0)+left; }
-    }
-    return counts;
-  },[uniColl,displayPcts,is2026]);
+  // FPTP party seat counts for the live page (baseline collegi swung by the displayed vote).
+  const fptpCounts=useMemo<Record<string,number>|undefined>(()=>computeFptp(displayPcts),[computeFptp,displayPcts]);
   const displaySeats=useMemo(()=>{
     if(simSeats) return simSeats;
     if(blankSeats) return blankSeats;
