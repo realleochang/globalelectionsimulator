@@ -31,7 +31,7 @@ type ItParty = {
 // Ideological order left → right for the parliament hemicycle
 const IT_LR_ORDER: ItPartyId[] = ['AVS','M5S','PD','IC','PIU','IV','AZ','MAIE','AUT','SVP','SCN','FI','NM','LEGA','FDI','FN'];
 // Party keys present in the geojson `pr` objects (PR list shares)
-const IT_PR_KEYS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZ','IV','AVS','PIU','NM','IC'];
+const IT_PR_KEYS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZ','IV','AVS','PIU','NM','IC','SVP','SCN','AUT'];
 
 const IT_PARTIES: ItParty[] = [
   { id: 'FDI',  name: 'FdI',     fullName: "Fratelli d'Italia",        color: '#214A7B', seats2022: 119, leader: 'Giorgia Meloni',     wikiTitle: 'Giorgia_Meloni' },
