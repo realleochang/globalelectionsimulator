@@ -2428,7 +2428,7 @@ export default function TurkeyApp() {
 
   const panelAllIds = useMemo(() => {
     if (activeElection === '2023R1') return TR_CANDIDATES.map(c => c.id as string);
-    if (activeElection === '2023R2') return ['MAC', 'LEP'];
+    if (activeElection === '2023R2') return ['ERD', 'KIL'];   // Erdoğan vs Kılıçdaroğlu (R2 runoff)
     if (activeElection === '2028R1') return TR_2028_PARTIES.map(p => p.id as string).filter(id => !hiddenParty2028.has(id));
     // R2: only candidates officially projected to advance from R1 (empty until projections exist)
     return Array.from(r2028Reporting.projectedSet);
