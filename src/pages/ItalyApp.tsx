@@ -455,6 +455,15 @@ function uniWinner(shares: Record<string, number>, natPcts: Record<ItPartyId, nu
   for (const c of ['CDX','CSX','M5S','AZIV','OTH']) if ((val[c] ?? -1) > bestV) { bestV = val[c]; best = c; }
   return best;
 }
+// Single-member coalition vote buckets for a collegio (sorted, % shares). In 2026
+// the M5S bucket is folded into the centre-left (CSX) — they run as one alliance.
+function uniCoalShares(sh: Record<string, number>, is2026?: boolean): { c: string; v: number }[] {
+  const m: Record<string, number> = {};
+  for (const c of ['CDX','CSX','M5S','AZIV','OTH']) m[c] = sh[c] ?? 0;
+  if (is2026) { m.CSX += m.M5S; m.M5S = 0; }
+  const keys = is2026 ? ['CDX','CSX','AZIV','OTH'] : ['CDX','CSX','M5S','AZIV','OTH'];
+  return keys.map(c => ({ c, v: m[c] })).filter(x => x.v > 0).sort((a, b) => b.v - a.v);
+}
 
 // Partial seats: Rosatellum on the reported-so-far national vote, scaled to the
 // reported share of the electorate (seats grow 0 → 400 as districts report).
@@ -753,9 +762,9 @@ function zoomScale(zoom: number): number { return Math.max(0.15, Math.min(2.0, (
 function ItBubbleLayer({
   geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef,
   declaredProvs, provOverrides, provOverridesRef, blankMode, projectedProvs,
-  simProvFractions, simNatPctsRef, mapView, onSelectUni,
+  simProvFractions, simNatPctsRef, mapView, onSelectUni, is2026,
 }: {
-  mapView: ItMapViewId; onSelectUni?: (geoId:string)=>void;
+  mapView: ItMapViewId; onSelectUni?: (geoId:string)=>void; is2026?: boolean;
   geoData: any; natPcts: Record<ItPartyId,number>;
   containerRef: React.RefObject<HTMLDivElement|null>;
   setTooltip: (t:ProvTooltipState)=>void; onSelect: (id:ItProvId)=>void;
@@ -798,7 +807,7 @@ function ItBubbleLayer({
 
       if (mapView === 'uni') {
         const sh = (props.shares as Record<string,number>) ?? {}; const coal = props.coal as string;
-        const sorted = (['CDX','CSX','M5S','AZIV','OTH'] as const).map(c=>({c,v:sh[c]||0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+        const sorted = uniCoalShares(sh, is2026);
         if (!sorted.length) return;
         rawMargin = (sorted[0].v-(sorted[1]?.v||0))/100*votes;
         color = (coal==='SVP'||coal==='AUT'||coal==='SCN') ? (IT_COAL_COLOR[coal]||'#999') : (IT_COAL_COLOR[sorted[0].c]||'#999');
@@ -840,7 +849,7 @@ function ItBubbleLayer({
     });
     return () => { for (const {marker} of bubblesRef.current) marker.remove(); bubblesRef.current=[]; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, mapView]);
+  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, mapView, is2026]);
 
   return null;
 }
@@ -1006,6 +1015,8 @@ function ItMapView({
 
   const mapViewRef = useRef(mapView);
   useEffect(() => { mapViewRef.current = mapView; }, [mapView]);
+  const is2026Ref = useRef(is2026);
+  useEffect(() => { is2026Ref.current = is2026; }, [is2026]);
   const onSelectUniRef = useRef(onSelectUni); useEffect(()=>{ onSelectUniRef.current=onSelectUni; },[onSelectUni]);
   const fptpOvRef = useRef(fptpOverrides); useEffect(()=>{ fptpOvRef.current=fptpOverrides; },[fptpOverrides]);
   useEffect(() => {
@@ -1030,9 +1041,10 @@ function ItMapView({
       if (mapView === 'uni') {
         const coal = props.coal as string;
         if (ov) {
-          const order = (['CDX','CSX','M5S','AZIV','OTH'] as const).slice().sort((a,b)=>(ov[b]??0)-(ov[a]??0));
-          const margin = (ov[order[0]]??0) - (ov[order[1]]??0);
-          fill = shadeByMargin(IT_COAL_COLOR[order[0]] ?? '#7E57C2', margin, dark);
+          const sorted = uniCoalShares(ov as Record<string,number>, is2026);
+          const top = sorted[0]?.c ?? 'CDX';
+          const margin = (sorted[0]?.v ?? 0) - (sorted[1]?.v ?? 0);
+          fill = shadeByMargin(IT_COAL_COLOR[top] ?? '#7E57C2', margin, dark);
         }
         else if (coal==='SVP'||coal==='AUT'||coal==='SCN') fill = IT_COAL_COLOR[coal];  // regional winners — their own colour
         else fill = swungUniCoal((props.shares as Record<string,number>) ?? {}, eff, dark, is2026);
@@ -1087,11 +1099,12 @@ function ItMapView({
           const sh = (props.shares as Record<string,number>) ?? {};
           const coal = props.coal as string;
           const REG: Record<string, [string,string]> = { AUT:["Aosta Valley list",IT_COAL_COLOR.AUT], SVP:["SVP",IT_COAL_COLOR.SVP], SCN:["Sud chiama Nord",IT_COAL_COLOR.SCN] };
-          parties = (['CDX','CSX','M5S','AZIV','OTH'] as const).map(c => {
+          parties = uniCoalShares(sh, is2026Ref.current).map(({ c, v }) => {
             const isWinReg = c==='OTH' && REG[coal];
-            return { id: c as unknown as ItPartyId, pct: sh[c] ?? 0, rawVotes: Math.round((sh[c] ?? 0)/100*votes),
-              label: isWinReg ? REG[coal][0] : IT_COAL_LABEL[c], color: isWinReg ? REG[coal][1] : IT_COAL_COLOR[c] };
-          }).filter(p => p.pct > 0).sort((a,b)=>b.pct-a.pct);
+            return { id: c as unknown as ItPartyId, pct: v, rawVotes: Math.round(v/100*votes),
+              label: isWinReg ? REG[coal][0] : (c==='CSX' && is2026Ref.current ? 'Centre-left + M5S' : IT_COAL_LABEL[c]),
+              color: isWinReg ? REG[coal][1] : IT_COAL_COLOR[c] };
+          });
         } else {
           const pr = (props.pr as Record<string,number>) ?? {};
           parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0, rawVotes: Math.round((pr[id] ?? 0)/100*votes) })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
@@ -1142,7 +1155,7 @@ function ItMapView({
         )}
         {geoData && bubbleMap && (
           <ItBubbleLayer
-            mapView={mapView} onSelectUni={onSelectUni}
+            mapView={mapView} onSelectUni={onSelectUni} is2026={is2026}
             geoData={geoData} natPcts={simNatPcts??natPcts} containerRef={containerRef}
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
             declaredProvs={mapView==='pluri'?declaredProvs:undefined} provOverrides={provOverrides}
@@ -1863,28 +1876,34 @@ function ItReportingWidget({ projectedProvs,provReportingPct,simProvFractions,is
 // ── FPTP (single-member collegio) editor — coalition sliders ──────────────────
 type ItColl = { id: string; name: string; shares: Record<string, number>; votes: number; coal: string };
 const IT_REG_LABEL: Record<string, string> = { AUT:'Aosta Valley list', SVP:'SVP (South Tyrol)', SCN:'Sud chiama Nord' };
-function ItFptpPanel({ coll, natPcts, override, onApply, onReset, onClose, dark }: {
+function ItFptpPanel({ coll, natPcts, override, onApply, onReset, onClose, dark, is2026 }: {
   coll: ItColl; natPcts: Record<ItPartyId,number>; override?: Record<string,number>;
-  onApply: (shares: Record<string,number>) => void; onReset: () => void; onClose: () => void; dark: boolean;
+  onApply: (shares: Record<string,number>) => void; onReset: () => void; onClose: () => void; dark: boolean; is2026?: boolean;
 }) {
-  // baseline shares swung by the current national coalition vote
+  // In 2026 the centre-left absorbs M5S, so the single-member view drops the M5S bucket.
+  const SLIDERS: readonly string[] = is2026 ? ['CDX','CSX','AZIV','OTH'] : IT_COAL_SLIDERS;
+  // baseline shares swung by the current national coalition vote (M5S folded into CSX in 2026)
   const swung = useMemo(() => {
-    const out: Record<string,number> = {}; let tot = 0;
+    const keys = is2026 ? ['CDX','CSX','AZIV','OTH'] : ['CDX','CSX','M5S','AZIV','OTH'];
+    const out: Record<string,number> = {};
     for (const c of IT_COAL_SLIDERS) {
       const base = coll.shares[c] ?? 0;
       const m = IT_UNI_COAL_DEF[c];
       let f = 1; if (m) { const now=m.reduce((s,id)=>s+(natPcts[id]??0),0); const then=m.reduce((s,id)=>s+(IT_VOTE_PCT_2022[id]??0),0); f=then>0?now/then:1; }
-      out[c] = Math.max(0, base*f); tot += out[c];
+      out[c] = Math.max(0, base*f);
     }
-    if (tot>0) for (const c of IT_COAL_SLIDERS) out[c] = out[c]/tot*100;
-    return out;
-  }, [coll, natPcts]);
+    if (is2026) { out.CSX = (out.CSX??0) + (out.M5S??0); out.M5S = 0; }
+    const tot = keys.reduce((s,c)=>s+(out[c]??0),0);
+    const res: Record<string,number> = {};
+    for (const c of keys) res[c] = tot>0 ? out[c]/tot*100 : 0;
+    return res;
+  }, [coll, natPcts, is2026]);
   const [draft, setDraft] = useState<Record<string,number>>(() => override ? { ...override } : { ...swung });
   const [touched, setTouched] = useState(false);
   useEffect(() => { setDraft(override ? { ...override } : { ...swung }); setTouched(false); }, [coll.id, override, swung]);
-  const winner = IT_COAL_SLIDERS.reduce((b,c)=>(draft[c]??0)>(draft[b]??0)?c:b, 'CDX');
+  const winner = SLIDERS.reduce((b,c)=>(draft[c]??0)>(draft[b]??0)?c:b, 'CDX');
   const setSlider = (c: string, v: number) => {
-    const others = IT_COAL_SLIDERS.filter(x=>x!==c); const oldOther = others.reduce((s,x)=>s+(draft[x]??0),0);
+    const others = SLIDERS.filter(x=>x!==c); const oldOther = others.reduce((s,x)=>s+(draft[x]??0),0);
     const room = 100 - v; const next: Record<string,number> = { [c]: Math.max(0,Math.min(100,v)) };
     others.forEach(x => next[x] = oldOther>0 ? (draft[x]??0)/oldOther*room : room/others.length);
     setDraft(next); setTouched(true);
@@ -1910,13 +1929,14 @@ function ItFptpPanel({ coll, natPcts, override, onApply, onReset, onClose, dark 
         );
       })()}
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-3">
-        {IT_COAL_SLIDERS.map(c => {
+        {SLIDERS.map(c => {
           const v = draft[c] ?? 0; const col = IT_COAL_COLOR[c] || '#999';
+          const label = c==='CSX' && is2026 ? 'Centre-left + M5S' : IT_COAL_LABEL[c];
           return (
             <div key={c}>
               <div className="flex items-center gap-1.5 mb-0.5">
                 <span className="w-2 h-2 rounded-full shrink-0" style={{ background: col }} />
-                <span className="text-[10px] text-ink flex-1 truncate">{IT_COAL_LABEL[c]}</span>
+                <span className="text-[10px] text-ink flex-1 truncate">{label}</span>
                 <span className="text-[10px] font-mono font-bold tabular-nums" style={{ color: col }}>{v.toFixed(1)}%</span>
               </div>
               <input type="range" min={0} max={100} step={0.1} value={v}
@@ -2321,7 +2341,7 @@ export default function ItalyApp() {
             override={fptpOverrides[selectedUni]}
             onApply={shares=>setFptpOverrides(prev=>({...prev,[selectedUni]:shares}))}
             onReset={()=>{setFptpOverrides(prev=>{const n={...prev};delete n[selectedUni];return n;});}}
-            onClose={()=>setSelectedUni(null)} dark={dark}/>
+            onClose={()=>setSelectedUni(null)} dark={dark} is2026={is2026}/>
         )}
 
         {showDistrib  &&<ItDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} seats={displaySeats} is2026={preset!=='baseline'} onClose={()=>openRight('distributions')} exiting={exitRight==='distributions'} dark={dark}/>}
