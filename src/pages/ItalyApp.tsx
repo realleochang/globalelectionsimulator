@@ -1281,29 +1281,39 @@ function ItMapView({
         const nm = String(props.den ?? props.reg_name ?? '');
         const votes = (props.votes as number) ?? 0;
         const tx = e.originalEvent.clientX-rect.left, ty = e.originalEvent.clientY-rect.top;
+        const simFrac = simFracRef2.current;
+        const simming = Object.keys(simFrac).length > 0;
         if (mapViewRef.current === 'uni') {
-          // Blank Map: a collegio with no projection has no result yet.
           const ov = fptpOvRef.current?.[geoId];
-          if (blankModeRef.current && !ov) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; }
+          // During a sim a collegio reports with its circoscrizione; before that (or in a
+          // fresh Blank Map with no edit) it has no result yet.
+          const f = simming ? simReportFrac(itCirco(nm), simFrac) : 1;
+          if (!ov) {
+            if (simming) { if (f <= 0) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; } }
+            else if (blankModeRef.current) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; }
+          }
           const coal = ov ? '' : (props.coal as string);
           const REG: Record<string, [string,string]> = { AUT:["Aosta Valley list",IT_COAL_COLOR.AUT], SVP:["SVP",IT_COAL_COLOR.SVP], SCN:["Sud chiama Nord",IT_COAL_COLOR.SCN] };
           const eff = simNatPctsRef2.current ?? natPctsRef.current;
+          const scale = (simming && !ov) ? f : 1;   // live count grows with reporting
           // baked baseline → swung to the current vote (every coalition moves); an edited collegio shows its raw override
           const sorted = ov ? uniCoalShares(ov, is2026Ref.current) : uniSwungShares((props.shares as Record<string,number>) ?? {}, eff, is2026Ref.current);
           const parties = sorted.map(({ c, v }) => {
             const isWinReg = c==='OTH' && REG[coal];
-            return { id: c as unknown as ItPartyId, pct: v, rawVotes: Math.round(v/100*votes),
+            return { id: c as unknown as ItPartyId, pct: v, rawVotes: Math.round(v/100*votes*scale),
               label: isWinReg ? REG[coal][0] : (c==='CSX' && is2026Ref.current ? 'Centre-left + M5S' : IT_COAL_LABEL[c]),
               color: isWinReg ? REG[coal][1] : IT_COAL_COLOR[c] };
           });
-          setTooltip({ x:tx, y:ty, name:nm, parties, leader:parties[0]?.id??null, reportingPct:undefined });
+          setTooltip({ x:tx, y:ty, name:nm, parties, leader:parties[0]?.id??null, reportingPct: (simming && !ov) ? Math.round(f*100) : undefined });
           return;
         }
-        // regions view: read-only; nothing is projected in Blank Map
-        if (blankModeRef.current) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; }
+        // regions view: read-only. During a sim a region reports with its PR districts.
+        const fr = simming ? simReportFrac(nm, simFrac) : 1;
+        if (simming) { if (fr <= 0) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; } }
+        else if (blankModeRef.current) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; }
         const pr = (props.pr as Record<string,number>) ?? {};
-        const parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0, rawVotes: Math.round((pr[id] ?? 0)/100*votes) })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
-        setTooltip({ x:tx, y:ty, name:nm, parties, leader:parties[0]?.id??null, reportingPct:undefined });
+        const parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0, rawVotes: Math.round((pr[id] ?? 0)/100*votes*fr) })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
+        setTooltip({ x:tx, y:ty, name:nm, parties, leader:parties[0]?.id??null, reportingPct: simming ? Math.round(fr*100) : undefined });
         return;
       }
       if (!provId) { setTooltip(null); return; }
@@ -2378,7 +2388,7 @@ export default function ItalyApp() {
     }
     events.sort((a,b)=>a.t-b.t);
     setSimRunning(true); setSimProgress(0);
-    setSimSeats(undefined); setDeclaredProvs(new Set()); setSimProvFractions({});
+    setSimSeats(undefined); setDeclaredProvs(new Set()); setSimProvFractions({}); setSelectedProv(null); setSelectedUni(null);
     const localFrac:Partial<Record<ItProvId,number>>={};
     const localDecl=new Set<ItProvId>();
     const timers:ReturnType<typeof setTimeout>[]=[];
@@ -2556,8 +2566,8 @@ export default function ItalyApp() {
         <div className="relative flex-1 min-w-0 min-h-0">
           <ItMapView
             natPcts={natPcts} selectedProv={selectedProv} mapView={mapView}
-            onSelect={p=>setSelectedProv(prev=>prev===p?null:p)}
-            onSelectUni={geoId=>setSelectedUni(prev=>prev===geoId?null:geoId)}
+            onSelect={p=>{ if(simRunning) return; setSelectedProv(prev=>prev===p?null:p); }}
+            onSelectUni={geoId=>{ if(simRunning) return; setSelectedUni(prev=>prev===geoId?null:geoId); }}
             selectedUni={selectedUni} fptpOverrides={fptpOverrides}
             dark={dark} bubbleMap={bubbleMap} seatDots={seatDots}
             declaredProvs={declaredProvs} provOverrides={provOverrides}
