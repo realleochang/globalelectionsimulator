@@ -53,11 +53,18 @@ export const IT_PR_KEYS: ItPartyId[] = ['FDI','LEGA','FI','NM','PD','AVS','PIU',
 // ── Coalitions ────────────────────────────────────────────────────────────────
 export type ItCoalition = { id: ItCoalitionId; name: string; color: string; parties: ItPartyId[] };
 export const IT_COALITIONS: ItCoalition[] = [
-  { id: 'CSX',  name: 'Centro-sinistra', color: '#E63946', parties: ['PD','AVS','PIU','IC'] },
-  { id: 'M5S',  name: 'Movimento 5 Stelle', color: '#F2C200', parties: ['M5S'] },
-  { id: 'AZIV', name: 'Terzo Polo (Az–IV)', color: '#00A3C7', parties: ['AZIV'] },
-  { id: 'CDX',  name: 'Centro-destra',   color: '#214A7B', parties: ['FDI','LEGA','FI','NM'] },
+  { id: 'CSX',  name: 'Centre-left',     color: '#E63946', parties: ['PD','AVS','PIU','IC'] },
+  { id: 'M5S',  name: 'Five Star Movement', color: '#F2C200', parties: ['M5S'] },
+  { id: 'AZIV', name: 'Third Pole (Az–IV)', color: '#00A3C7', parties: ['AZIV'] },
+  { id: 'CDX',  name: 'Centre-right',    color: '#214A7B', parties: ['FDI','LEGA','FI','NM'] },
 ];
+
+// Editable coalition set for the FPTP (uninominali) layer → member parties (for
+// splitting an aggregated coalition vote back into party votes via baseline ratios)
+export const IT_COAL_PARTIES: Record<string, ItPartyId[]> = {
+  CDX: ['FDI','LEGA','FI','NM'], CSX: ['PD','AVS','PIU','IC'], M5S: ['M5S'], AZIV: ['AZIV'], OTH: ['SVP'],
+};
+export const IT_COAL_KEYS = ['CDX','CSX','M5S','AZIV','OTH'] as const;
 
 // Colors for the uninominali (FPTP) coalition-winner map
 export const IT_COAL_COLOR: Record<string, string> = {
@@ -71,13 +78,14 @@ export const IT_COAL_COLOR: Record<string, string> = {
   NONE: '#9AA0A6',
 };
 export const IT_COAL_NAME: Record<string, string> = {
-  CDX:  'Centro-destra',
-  CSX:  'Centro-sinistra',
-  M5S:  'Movimento 5 Stelle',
-  AZIV: 'Azione – Italia Viva',
-  SVP:  'SVP',
-  AUT:  "Valle d'Aosta (autonomisti)",
-  SCN:  'Sud chiama Nord',
+  CDX:  'Centre-right',
+  CSX:  'Centre-left',
+  M5S:  'Five Star Movement',
+  AZIV: 'Action – Italia Viva',
+  SVP:  'SVP (South Tyrol)',
+  AUT:  "Aosta Valley (autonomists)",
+  SCN:  'South calls North',
+  OTH:  'Others',
   NONE: '—',
 };
 
