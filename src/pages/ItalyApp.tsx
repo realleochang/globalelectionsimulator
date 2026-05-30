@@ -2365,8 +2365,9 @@ export default function ItalyApp() {
     // 1. winning coalition per collegio (grouped, with each collegio's circoscrizione)
     const byCoal:Record<string,{circo:string}[]>={};
     for(const c of colls){
-      const sh=fptpOverrides[c.id]??c.shares;
-      const coal=fptpOverrides[c.id] ? (uniCoalShares(sh,is2026)[0]?.c ?? 'CDX') : uniWinner(c.shares,displayPcts,is2026);
+      // PRISTINE winners only — single-member edits are applied as deltas in
+      // displaySeats, so one edit moves ~1 seat instead of re-rounding the whole split.
+      const coal=uniWinner(c.shares,displayPcts,is2026);
       (byCoal[coal]??=[]).push({circo:itCirco(c.name)});
     }
     // 2. split each coalition's seats among its members — totals proportional to the
@@ -2392,31 +2393,29 @@ export default function ItalyApp() {
       if(left>0){ const dom=members.reduce((b,id)=>(displayPcts[id]??0)>(displayPcts[b]??0)?id:b,members[0]); counts[dom]=(counts[dom]||0)+left; }
     }
     return counts;
-  },[uniColl,fptpOverrides,displayPcts,is2026]);
+  },[uniColl,displayPcts,is2026]);
   const displaySeats=useMemo(()=>{
     if(simSeats) return simSeats;
     if(blankSeats) return blankSeats;
-    if(preset==='baseline'){
-      // The 2022 baseline shows the EXACT official result and stays CONTINUOUS under
-      // editing: each flipped collegio just moves one seat from its baseline
-      // representative to its new one. So editing a district changes ~1 seat instead
-      // of discontinuously jumping to the model's own totals (which differ, e.g. the
-      // model can't reproduce Lega's 66 FPTP-heavy seats).
-      const out:Partial<Record<ItPartyId,number>>={...IT_SEATS_2022};
-      for(const c of Object.values(uniColl)){
-        const ov=fptpOverrides[c.id]; if(!ov) continue;
-        const baseCoal=uniWinner(c.shares,displayPcts,is2026);
-        const editCoal=uniCoalShares(ov,is2026)[0]?.c??baseCoal;
-        if(baseCoal===editCoal) continue;
-        const circo=itCirco(c.name);
-        const dec=collegioRep(circo,baseCoal,displayPcts,is2026);
-        const inc=collegioRep(circo,editCoal,displayPcts,is2026);
-        out[dec]=(out[dec]??0)-1;
-        out[inc]=(out[inc]??0)+1;
-      }
-      return out;
+    // Anchor = this page's PRISTINE seats (2022 = exact official; 2026/custom = the
+    // engine with un-edited collegi). Editing a single-member district then just moves
+    // ~1 seat from its old representative to its new one, so the dashboard stays
+    // CONTINUOUS instead of the totals jumping when the first district is changed.
+    const out:Partial<Record<ItPartyId,number>> = preset==='baseline'
+      ? {...IT_SEATS_2022}
+      : {...calcAllProvinceSeats(displayPcts,fptpCounts,is2026,provOverrides)};
+    for(const c of Object.values(uniColl)){
+      const ov=fptpOverrides[c.id]; if(!ov) continue;
+      const baseCoal=uniWinner(c.shares,displayPcts,is2026);
+      const editCoal=uniCoalShares(ov,is2026)[0]?.c??baseCoal;
+      if(baseCoal===editCoal) continue;
+      const circo=itCirco(c.name);
+      const dec=collegioRep(circo,baseCoal,displayPcts,is2026);
+      const inc=collegioRep(circo,editCoal,displayPcts,is2026);
+      out[dec]=(out[dec]??0)-1;
+      out[inc]=(out[inc]??0)+1;
     }
-    return calcAllProvinceSeats(displayPcts,fptpCounts,is2026,provOverrides);
+    return out;
   },[preset,simSeats,blankSeats,displayPcts,fptpCounts,is2026,fptpOverrides,provOverrides,uniColl]);
 
   const simPartialPcts=useMemo<Record<ItPartyId,number>|null>(()=>{
