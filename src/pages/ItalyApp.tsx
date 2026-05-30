@@ -673,6 +673,7 @@ type ProvTooltipState = {
   parties: { id: ItPartyId; pct: number; rawVotes?: number; label?: string; color?: string }[];
   leader: ItPartyId | null;
   reportingPct?: number;
+  noResults?: boolean;
 } | null;
 
 // ── Scoreboard tile ───────────────────────────────────────────────────────────
@@ -1226,44 +1227,49 @@ function ItMapView({
         const props = feature?.properties ?? {};
         const nm = String(props.den ?? props.reg_name ?? '');
         const votes = (props.votes as number) ?? 0;
-        let parties: { id: ItPartyId; pct: number; rawVotes?: number; label?: string; color?: string }[] = [];
+        const tx = e.originalEvent.clientX-rect.left, ty = e.originalEvent.clientY-rect.top;
         if (mapViewRef.current === 'uni') {
-          // coalition vote in this single-member collegio (raw votes alongside %)
-          const sh = (props.shares as Record<string,number>) ?? {};
-          const coal = props.coal as string;
+          // Blank Map: a collegio with no projection has no result yet.
+          const ov = fptpOvRef.current?.[geoId];
+          if (blankModeRef.current && !ov) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; }
+          const sh = (ov ?? (props.shares as Record<string,number>)) ?? {};
+          const coal = ov ? '' : (props.coal as string);
           const REG: Record<string, [string,string]> = { AUT:["Aosta Valley list",IT_COAL_COLOR.AUT], SVP:["SVP",IT_COAL_COLOR.SVP], SCN:["Sud chiama Nord",IT_COAL_COLOR.SCN] };
-          parties = uniCoalShares(sh, is2026Ref.current).map(({ c, v }) => {
+          const parties = uniCoalShares(sh, is2026Ref.current).map(({ c, v }) => {
             const isWinReg = c==='OTH' && REG[coal];
             return { id: c as unknown as ItPartyId, pct: v, rawVotes: Math.round(v/100*votes),
               label: isWinReg ? REG[coal][0] : (c==='CSX' && is2026Ref.current ? 'Centre-left + M5S' : IT_COAL_LABEL[c]),
               color: isWinReg ? REG[coal][1] : IT_COAL_COLOR[c] };
           });
-        } else {
-          const pr = (props.pr as Record<string,number>) ?? {};
-          parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0, rawVotes: Math.round((pr[id] ?? 0)/100*votes) })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
+          setTooltip({ x:tx, y:ty, name:nm, parties, leader:parties[0]?.id??null, reportingPct:undefined });
+          return;
         }
-        setTooltip({ x:e.originalEvent.clientX-rect.left, y:e.originalEvent.clientY-rect.top, name:nm, parties, leader:parties[0]?.id??null, reportingPct:undefined });
+        // regions view: read-only; nothing is projected in Blank Map
+        if (blankModeRef.current) { setTooltip({ x:tx, y:ty, name:nm, parties:[], leader:null, noResults:true }); return; }
+        const pr = (props.pr as Record<string,number>) ?? {};
+        const parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0, rawVotes: Math.round((pr[id] ?? 0)/100*votes) })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
+        setTooltip({ x:tx, y:ty, name:nm, parties, leader:parties[0]?.id??null, reportingPct:undefined });
         return;
       }
       if (!provId) { setTooltip(null); return; }
+      const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+      const prov     = IT_PROVINCE_MAP[provId];
+      const tx = e.originalEvent.clientX-rect.left, ty = e.originalEvent.clientY-rect.top;
       const draft    = provDraftRef2.current;
       const hasDraft = draft?.provId === provId;
       if (blankModeRef.current && !declaredRef.current) {
         const hasOverride = !!provOverridesRef.current[provId] && Object.keys(provOverridesRef.current[provId]!).length > 0;
-        if (!hasOverride && !hasDraft) { setTooltip(null); return; }
+        if (!hasOverride && !hasDraft) { setTooltip({ x:tx, y:ty, name:prov?.name??geoId, parties:[], leader:null, noResults:true }); return; }
       }
-      const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
       const overrideToUse = hasDraft ? draft!.pcts : provOverridesRef.current?.[provId];
       const fraction      = hasDraft ? draft!.rptPct/100 : simFracRef2.current[provId] ?? (declaredRef.current?.has(provId) ? 1 : undefined);
       const effectiveNatPcts = simNatPctsRef2.current ?? natPctsRef.current;
-      const prov     = IT_PROVINCE_MAP[provId];
       const provVots = IT_GRAND_TOTAL_VOTES * (prov?.weight??0) / IT_TOTAL_PROV_WEIGHT;
       const pv       = calcProvVotes(effectiveNatPcts, provId, overrideToUse);
       const parties  = (Object.entries(pv) as [ItPartyId,number][])
         .filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8)
         .map(([id,pct]) => ({ id:id as ItPartyId, pct, rawVotes:Math.round(pct/100*provVots*(fraction??1)) }));
-      setTooltip({ x:e.originalEvent.clientX-rect.left, y:e.originalEvent.clientY-rect.top,
-        name:prov?.name??geoId, parties, leader:parties[0]?.id??null,
+      setTooltip({ x:tx, y:ty, name:prov?.name??geoId, parties, leader:parties[0]?.id??null,
         reportingPct:fraction!=null ? Math.round(fraction*100) : undefined });
     });
     layer.on('mouseout', () => setTooltip(null));
@@ -1320,8 +1326,11 @@ function ItMapView({
             <div style={{ background:tt.bg, borderRadius:10, border:`1px solid ${tt.border}`, boxShadow:tt.shadow, backdropFilter:'blur(12px)', padding:'12px 14px' }}>
               <div style={{ fontSize:13, fontWeight:700, color:tt.title, lineHeight:1.2 }}>{tooltip.name}</div>
               <div style={{ fontSize:9, fontFamily:'"JetBrains Mono",monospace', color:tt.sub, marginTop:2 }}>
-                {tooltip.reportingPct!=null ? `${tooltip.reportingPct}% reporting` : 'Estimated district result'}
+                {tooltip.noResults ? 'Not yet reported' : tooltip.reportingPct!=null ? `${tooltip.reportingPct}% reporting` : 'Estimated district result'}
               </div>
+              {tooltip.noResults ? (
+                <div style={{ marginTop:9, fontSize:11, fontStyle:'italic', color:tt.sub }}>No results yet</div>
+              ) : (
               <div style={{ marginTop:9, display:'flex', flexDirection:'column', gap:5 }}>
                 {tooltip.parties.map(({ id, pct, rawVotes, label, color },i) => {
                   const pColor=color??partyColor(id);
@@ -1335,6 +1344,7 @@ function ItMapView({
                   );
                 })}
               </div>
+              )}
             </div>
           </div>
         );
@@ -2113,12 +2123,15 @@ export default function ItalyApp() {
   function loadBaseline()    { setNatPcts({...IT_VOTE_PCT_2022}); setPreset('baseline'); resetMapState(); }
   function loadPolling2026() { setNatPcts({...IT_VOTE_PCT_2026}); setPreset('polling2026'); resetMapState(); }
   function loadBlank()       { setNatPcts(Object.fromEntries(IT_PARTIES.map(p=>[p.id,100/IT_PARTIES.length])) as Record<ItPartyId,number>); setPreset('blank'); resetMapState(); }
+  // Reload whichever preset is active — resets every edit back to that page's originals.
+  function refreshPreset()   { if(preset==='polling2026') loadPolling2026(); else if(preset==='blank') loadBlank(); else loadBaseline(); }
 
   function resetMapState() {
     setSimSeats(undefined); setDeclaredProvs(undefined);
     setProvOverrides({}); setProjectedProvs(new Set());
     setProvReportingPct({}); setSimProvFractions({});
     setProvDraft(null); setSimNatPcts(null); stopSim();
+    setFptpOverrides({}); setSelectedUni(null); setSelectedProv(null);
   }
 
   // ── Province overrides (blank map) ────────────────────────────────────────
@@ -2234,7 +2247,7 @@ export default function ItalyApp() {
   const simTimersRef  = useRef<ReturnType<typeof setTimeout>[]>([]);
   const simNatPctsRef = useRef<Record<ItPartyId,number>>(natPcts);
 
-  useEffect(()=>{ if(rightPanel==='sim'){setSimDraftPcts({...natPcts});setSimDraftTouched(false);} },[rightPanel==='sim']); // eslint-disable-line
+  useEffect(()=>{ if(rightPanel==='sim'){setSimDraftPcts({...IT_VOTE_PCT_2026});setSimDraftTouched(false);} },[rightPanel==='sim']); // eslint-disable-line
 
   const simEffLocks=useMemo(()=>new Set<ItPartyId>([...simDraftLocks,...hiddenParties]),[simDraftLocks,hiddenParties]);
   const [simSortOrder]=useState<ItPartyId[]>(()=>IT_LR_ORDER.slice());
@@ -2388,8 +2401,9 @@ export default function ItalyApp() {
           <button onClick={loadBaseline}    className={preset==='baseline'   ?btnGold:btnMuted}>2022 Baseline</button>
           <button onClick={loadPolling2026} className={preset==='polling2026'?btnGold:btnMuted}>2026 Polling</button>
           <button onClick={loadBlank}       className={preset==='blank'      ?btnGold:btnMuted}>Blank Map</button>
+          <button onClick={refreshPreset} title="Reset this page to its original values" className={btnMuted}>↻ Refresh</button>
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
-          <button onClick={()=>openRight('sim')}       className={rightPanel==='sim'      ?btnActive:btnMuted}>▶ Simulation</button>
+          <button onClick={()=>{if(preset!=='blank')loadBlank();openRight('sim');}}       className={rightPanel==='sim'      ?btnActive:btnMuted}>▶ Simulation</button>
           <button onClick={()=>!simRunning&&openLeft('parties')} disabled={simRunning} className={`${leftPanel==='parties'?btnActive:btnMuted}${simRunning?' opacity-40 cursor-not-allowed':''}`}>Parties</button>
           <button onClick={()=>setScoreboardVisible(v=>!v)} className={scoreboardVisible?btnActive:btnMuted}>Scoreboard</button>
           <button onClick={()=>openLeft('breakdown')}  className={leftPanel==='breakdown' ?btnActive:btnMuted}>Breakdown</button>
