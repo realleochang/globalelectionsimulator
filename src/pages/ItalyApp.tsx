@@ -273,6 +273,17 @@ function itContests(partyId: ItPartyId, provId: ItProvId): boolean {
   const home = IT_REGIONAL_HOME[partyId];
   return !home || home.includes(provId);
 }
+// A regional party can never exceed its home region's share of the national vote
+// (even winning 100% there). This caps its simulation input; national parties are
+// uncapped (no entry → free typing).
+const IT_REGIONAL_CAP: Partial<Record<ItPartyId, number>> = (() => {
+  const out: Partial<Record<ItPartyId, number>> = {};
+  for (const id of Object.keys(IT_REGIONAL_HOME) as ItPartyId[]) {
+    const home = IT_REGIONAL_HOME[id]!;
+    out[id] = Math.round(home.reduce((s, p) => s + (IT_PROVINCE_MAP[p]?.weight ?? 0), 0) / IT_TOTAL_PROV_WEIGHT * 1000) / 10;
+  }
+  return out;
+})();
 
 // Proportional swing: prov_pct = base_2023 × (new_nat / old_nat), normalised
 function calcProvVotes(
@@ -2559,8 +2570,8 @@ export default function ItalyApp() {
                       className={`w-4 h-4 flex items-center justify-center shrink-0 ${isLocked?'text-gold':'text-ink-3 hover:text-ink'}`} title={isLocked?'Unlock':'Lock'}>
                       {isLocked?<svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>:<svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>}
                     </button>
-                    <input type="number" min={0} step="any" value={simDraftStr[id]??''} disabled={isLocked}
-                      onChange={e=>{const raw=e.target.value; setSimDraftStr(s=>({...s,[id]:raw})); const v=parseFloat(raw); setSimDraftPcts(prev=>({...prev,[id]:isNaN(v)?0:Math.max(0,v)})); setSimDraftTouched(true);}}
+                    <input type="number" min={0} max={IT_REGIONAL_CAP[id]} step="any" value={simDraftStr[id]??''} disabled={isLocked}
+                      onChange={e=>{const cap=IT_REGIONAL_CAP[id]; let raw=e.target.value; let v=parseFloat(raw); if(cap!=null&&!isNaN(v)&&v>cap){v=cap;raw=String(cap);} setSimDraftStr(s=>({...s,[id]:raw})); setSimDraftPcts(prev=>({...prev,[id]:isNaN(v)?0:Math.max(0,v)})); setSimDraftTouched(true);}}
                       className="w-14 h-6 shrink-0 text-right text-[11px] font-mono font-bold tabular-nums rounded-[4px] border border-default bg-transparent px-1 disabled:opacity-40 focus:outline-none focus:border-blue-500"
                       style={{color}}/>
                     <span className="text-[9px] font-mono text-ink-3 shrink-0">%</span>
