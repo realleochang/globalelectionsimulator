@@ -2175,9 +2175,9 @@ export default function ItalyApp() {
   useEffect(()=>{ document.documentElement.classList.toggle('dark',dark); localStorage.setItem('darkMode',String(dark)); },[dark]);
 
   // ── Preset / national pcts ────────────────────────────────────────────────
-  const [preset,setPreset]   = useState<'baseline'|'blank'|'polling2026'|'custom'>('baseline');
+  const [preset,setPreset]   = useState<'baseline'|'blank'|'polling2026'|'custom'>('polling2026');
   const is2026 = preset !== 'baseline';   // 2026 alignment: M5S sits in the centre-left, FN stands alone
-  const [natPcts,setNatPcts] = useState<Record<ItPartyId,number>>(()=>({...IT_VOTE_PCT_2022}));
+  const [natPcts,setNatPcts] = useState<Record<ItPartyId,number>>(()=>({...IT_VOTE_PCT_2026}));
 
   function loadBaseline()    { setNatPcts({...IT_VOTE_PCT_2022}); setPreset('baseline'); resetMapState(); }
   function loadPolling2026() { setNatPcts({...IT_VOTE_PCT_2026}); setPreset('polling2026'); resetMapState(); }
@@ -2257,7 +2257,7 @@ export default function ItalyApp() {
   const [selectedProv,setSelectedProv]         = useState<ItProvId|null>(null);
   const [bubbleMap,setBubbleMap]               = useState(false);
   const [seatDots,setSeatDots]                 = useState(false);
-  const [mapView,setMapView]                   = useState<ItMapViewId>('pluri');
+  const [mapView,setMapView]                   = useState<ItMapViewId>('uni');
   // ── FPTP single-member editing (uninominali view) ──
   const [uniColl,setUniColl]                   = useState<Record<string,ItColl>>({});
   const [fptpOverrides,setFptpOverrides]       = useState<Record<string,Record<string,number>>>({});
