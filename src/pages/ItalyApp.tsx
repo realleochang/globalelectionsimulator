@@ -34,21 +34,24 @@ const IT_PR_KEYS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZ','IV','AVS','P
 
 const IT_PARTIES: ItParty[] = [
   { id: 'FDI',  name: 'FdI',     fullName: "Fratelli d'Italia",        color: '#214A7B', seats2022: 119, leader: 'Giorgia Meloni',     wikiTitle: 'Giorgia_Meloni' },
-  { id: 'PD',   name: 'PD',      fullName: 'Partito Democratico',      color: '#E63946', seats2022:  69, leader: 'Elly Schlein',       wikiTitle: 'Elly_Schlein' },
+  { id: 'PD',   name: 'PD',      fullName: 'Partito Democratico',      color: '#E63946', seats2022:  69, leader: 'Enrico Letta',        wikiTitle: 'Enrico_Letta', leader2026: 'Elly Schlein', wikiTitle2026: 'Elly_Schlein' },
   { id: 'M5S',  name: 'M5S',     fullName: 'Movimento 5 Stelle',       color: '#F2C200', seats2022:  52, leader: 'Giuseppe Conte',     wikiTitle: 'Giuseppe_Conte' },
   { id: 'LEGA', name: 'Lega',    fullName: 'Lega',                     color: '#1B9E4B', seats2022:  66, leader: 'Matteo Salvini',     wikiTitle: 'Matteo_Salvini' },
-  { id: 'FI',   name: 'FI',      fullName: 'Forza Italia',             color: '#0F73B9', seats2022:  45, leader: 'Antonio Tajani',     wikiTitle: 'Antonio_Tajani' },
+  { id: 'FI',   name: 'FI',      fullName: 'Forza Italia',             color: '#0F73B9', seats2022:  45, leader: 'Silvio Berlusconi',   wikiTitle: 'Silvio_Berlusconi', leader2026: 'Antonio Tajani', wikiTitle2026: 'Antonio_Tajani' },
   { id: 'AZ',   name: 'Azione',  fullName: 'Azione',                  color: '#00A3C7', seats2022:  13, leader: 'Carlo Calenda',      wikiTitle: 'Carlo_Calenda' },
   { id: 'IV',   name: 'IV',      fullName: 'Italia Viva',             color: '#E5147D', seats2022:   8, leader: 'Matteo Renzi',        wikiTitle: 'Matteo_Renzi' },
   { id: 'FN',   name: 'FN',      fullName: 'Far Right (new)',         color: '#3E2723', seats2022:   0, leader: 'New far-right list',  wikiTitle: '' },
   { id: 'AVS',  name: 'AVS',     fullName: 'Alleanza Verdi e Sinistra',color: '#2E8B57', seats2022:  12, leader: 'Angelo Bonelli',     wikiTitle: 'Angelo_Bonelli' },
-  { id: 'PIU',  name: '+Europa', fullName: '+Europa',                  color: '#C4006B', seats2022:   2, leader: 'Riccardo Magi',      wikiTitle: 'Riccardo_Magi', regional: false },
+  { id: 'PIU',  name: '+Europa', fullName: '+Europa',                  color: '#C4006B', seats2022:   2, leader: 'Emma Bonino',         wikiTitle: 'Emma_Bonino', leader2026: 'Riccardo Magi', wikiTitle2026: 'Riccardo_Magi', regional: false },
   { id: 'NM',   name: 'NM',      fullName: 'Noi Moderati',             color: '#5B6E8C', seats2022:   7, leader: 'Maurizio Lupi',      wikiTitle: 'Maurizio_Lupi' },
   { id: 'IC',   name: 'IC',      fullName: 'Impegno Civico',           color: '#1A8FB5', seats2022:   1, leader: 'Luigi Di Maio',      wikiTitle: 'Luigi_Di_Maio' },
   { id: 'SVP',  name: 'SVP',     fullName: 'Südtiroler Volkspartei',   color: '#B30000', seats2022:   3, leader: 'Philipp Achammer',   wikiTitle: 'Philipp_Achammer', regional: true },
 ];
 
 const IT_PARTY_MAP = Object.fromEntries(IT_PARTIES.map(p => [p.id, p])) as Record<ItPartyId, ItParty>;
+// Exact official 2022 Chamber seats per party (sum = 397; the remaining 3 went to
+// micro-regional/overseas lists — Aosta Valley, South Calls North — not modelled here).
+const IT_SEATS_2022 = Object.fromEntries(IT_PARTIES.map(p => [p.id, p.seats2022])) as Partial<Record<ItPartyId, number>>;
 const IT_TOTAL_SEATS = 400;
 const IT_MAJORITY    = 201;
 
@@ -70,13 +73,15 @@ const IT_COAL_LABEL: Record<string, string> = { CDX:'Centre-right', CSX:'Centre-
 // Source: Wikipedia "Results of the 2022 Italian general election" (Camera,
 // quota proporzionale). Total valid Chamber votes: 28,098,196.
 const IT_VOTE_RAW_2022: Record<ItPartyId, number> = {
-  FDI: 7_301_303, PD: 5_348_676, M5S: 4_335_494, LEGA: 2_470_318, FI: 2_279_266, AZ: 1_235_375, IV: 951_130, FN: 0,
-  AVS: 1_021_808, PIU: 796_057, NM: 254_127, IC: 173_555, SVP: 117_032,
+  FDI: 7_302_517, PD: 5_356_180, M5S: 4_333_972, LEGA: 2_464_005, FI: 2_278_217, AZ: 1_235_468, IV: 951_201, FN: 0,
+  AVS: 1_018_669, PIU: 793_961, NM: 255_505, IC: 169_165, SVP: 117_010,
 };
-const IT_GRAND_TOTAL_VOTES = 28_098_196;
+// Az–IV ran as a single joint list (2,186,669 votes, 7.79%); the AZ/IV split is a
+// proportional estimate. All other figures are the exact official Chamber results.
+const IT_GRAND_TOTAL_VOTES = 28_087_782;
 const IT_VOTE_PCT_2022: Record<ItPartyId, number> = {
-  FDI: 25.98, PD: 19.04, M5S: 15.43, LEGA: 8.79, FI: 8.11, AZ: 4.40, IV: 3.38, FN: 0,
-  AVS: 3.64, PIU: 2.83, NM: 0.91, IC: 0.62, SVP: 0.42,
+  FDI: 26.00, PD: 19.07, M5S: 15.43, LEGA: 8.77, FI: 8.11, AZ: 4.40, IV: 3.39, FN: 0,
+  AVS: 3.63, PIU: 2.83, NM: 0.91, IC: 0.60, SVP: 0.42,
 };
 
 // 2026 polling — illustrative May 2026 estimate
@@ -359,24 +364,31 @@ function hareLR(weights: Record<string, number>, total: number): Record<string, 
 const IT_COAL_DEF: Record<string, ItPartyId[]> = {
   CDX: ['FDI','LEGA','FI','NM'], CSX: ['PD','AVS','PIU','IC'], M5S: ['M5S'], AZ: ['AZ'], IV: ['IV'], FN: ['FN'],
 };
+// 2026 alignment: M5S has joined the centre-left; FN stands alone (not in the CDX).
+const IT_COAL_DEF_2026: Record<string, ItPartyId[]> = {
+  CDX: ['FDI','LEGA','FI','NM'], CSX: ['PD','AVS','PIU','IC','M5S'], AZ: ['AZ'], IV: ['IV'], FN: ['FN'],
+};
+const coalDefFor = (is2026?: boolean) => (is2026 ? IT_COAL_DEF_2026 : IT_COAL_DEF);
 // fptpCounts: seats won per coalition in the 147 single-member collegi (editable
 // FPTP view). When omitted, FPTP is modelled from national coalition strength.
 function calcRosatellum(
   natPcts: Partial<Record<ItPartyId, number>>,
   fptpCounts?: Record<string, number>,
+  is2026?: boolean,
 ): Partial<Record<ItPartyId, number>> {
+  const COAL = coalDefFor(is2026);
   const useCounts = !!fptpCounts;
   const svpV = natPcts.SVP ?? 0;
   const svpSeats = (!useCounts && svpV >= 0.3) ? 3 : 0;  // SVP South Tyrol (only in the national-model fallback)
   const PR = 245 - svpSeats, FPTP = 147, OV = 8;
   const coalPct: Record<string, number> = {};
-  for (const [c, ps] of Object.entries(IT_COAL_DEF)) coalPct[c] = ps.reduce((a, id) => a + (natPcts[id] ?? 0), 0);
+  for (const [c, ps] of Object.entries(COAL)) coalPct[c] = ps.reduce((a, id) => a + (natPcts[id] ?? 0), 0);
   // PR — parties over 3% nationally whose coalition cleared 10% (lone parties: own 3%)
   const qual: Record<string, number> = {};
   for (const pty of IT_PARTIES) {
     if (pty.id === 'SVP') continue;
     const v = natPcts[pty.id] ?? 0; if (v < 3) continue;
-    const coal = Object.entries(IT_COAL_DEF).find(([, ps]) => ps.includes(pty.id));
+    const coal = Object.entries(COAL).find(([, ps]) => ps.includes(pty.id));
     if (coal && coal[1].length > 1 && coalPct[coal[0]] < 10) continue;  // 10% rule: multi-party coalitions only
     qual[pty.id] = v;
   }
@@ -391,13 +403,17 @@ function calcRosatellum(
     }
   };
   if (useCounts) {
-    // counts are keyed by the single-member coalitions (incl. AZIV = Third Pole, OTH = regional)
-    distribute(fptpCounts!, { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZ','IV'] });
+    // counts are keyed by the single-member coalitions (AZIV = Az–IV, OTH = regional).
+    // In 2026 the centre-left absorbs M5S, so CSX collegi split across its members.
+    const cdef: Record<string, ItPartyId[]> = is2026
+      ? { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC','M5S'], AZIV:['AZ','IV'] }
+      : { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZ','IV'] };
+    distribute(fptpCounts!, cdef);
     if ((fptpCounts!.OTH || 0) > 0) fptp.SVP = (fptp.SVP || 0) + (fptpCounts!.OTH || 0); // South Tyrol / regional collegi
   } else {
     const coalW: Record<string, number> = {};
     for (const c in coalPct) coalW[c] = Math.pow(Math.max(coalPct[c], 0.01), 3.2);
-    distribute(hareLR(coalW, FPTP), IT_COAL_DEF);
+    distribute(hareLR(coalW, FPTP), COAL);
   }
   const ov = hareLR(qual, OV);
   const out: Partial<Record<ItPartyId, number>> = {};
@@ -412,22 +428,31 @@ function calcRosatellum(
 function calcAllProvinceSeats(
   natPcts: Partial<Record<ItPartyId, number>>,
   fptpCounts?: Record<string, number>,
+  is2026?: boolean,
 ): Partial<Record<ItPartyId, number>> {
-  return calcRosatellum(natPcts, fptpCounts);
+  return calcRosatellum(natPcts, fptpCounts, is2026);
 }
 
 // Coalition of a uninominale's shares (max), with optional national swing applied
 const IT_UNI_COAL_DEF: Record<string, ItPartyId[]> = { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZ','IV'] };
-function uniWinner(shares: Record<string, number>, natPcts: Record<ItPartyId, number>): string {
-  let best = 'NONE', bestV = -1;
+// Per-collegio swung coalition strengths. In 2026 M5S runs inside the centre-left,
+// so its bucket is merged into CSX before a winner is picked.
+function uniSwungVals(shares: Record<string, number>, natPcts: Record<ItPartyId, number>, is2026?: boolean): Record<string, number> {
+  const val: Record<string, number> = {};
   for (const c of ['CDX','CSX','M5S','AZIV','OTH']) {
-    const base = shares[c] ?? 0; if (base <= 0) continue;
+    const base = shares[c] ?? 0; if (base <= 0) { val[c] = -1; continue; }
     const members = IT_UNI_COAL_DEF[c];
     let factor = 1;
     if (members) { const now = members.reduce((s,id)=>s+(natPcts[id]??0),0); const then = members.reduce((s,id)=>s+(IT_VOTE_PCT_2022[id]??0),0); factor = then>0?now/then:1; }
-    const v = base * factor;
-    if (v > bestV) { bestV = v; best = c; }
+    val[c] = base * factor;
   }
+  if (is2026 && (val.M5S ?? -1) >= 0) { val.CSX = Math.max(0, val.CSX ?? 0) + val.M5S; val.M5S = -1; }
+  return val;
+}
+function uniWinner(shares: Record<string, number>, natPcts: Record<ItPartyId, number>, is2026?: boolean): string {
+  const val = uniSwungVals(shares, natPcts, is2026);
+  let best = 'NONE', bestV = -1;
+  for (const c of ['CDX','CSX','M5S','AZIV','OTH']) if ((val[c] ?? -1) > bestV) { bestV = val[c]; best = c; }
   return best;
 }
 
@@ -437,6 +462,7 @@ function calcPartialSeats(
   natPcts:        Record<ItPartyId, number>,
   provFractions:  Partial<Record<ItProvId, number>>,
   provOverrides?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
+  is2026?:        boolean,
 ): Partial<Record<ItPartyId, number>> {
   const entries = Object.entries(provFractions) as [ItProvId, number][];
   if (entries.length === 0) return {};
@@ -451,7 +477,7 @@ function calcPartialSeats(
   if (reportedW <= 0) return {};
   const nat = {} as Record<ItPartyId, number>;
   for (const pty of IT_PARTIES) nat[pty.id] = (weighted[pty.id] ?? 0) / reportedW;
-  const full = calcRosatellum(nat) as Record<string, number>;
+  const full = calcRosatellum(nat, undefined, is2026) as Record<string, number>;
   const frac = Math.min(1, reportedW / IT_TOTAL_PROV_WEIGHT);
   return hareLR(full, Math.round(400 * frac));
 }
@@ -617,8 +643,7 @@ function ItScoreboardTile({
 // nationalist/regionalist parties — ERC, Junts, EH Bildu, PNV, BNG, CC, UPN — are
 // grouped together in the Regional bloc (ordered by 2022 seat size as a fallback).
 const IT_LEFT_IDS:     ItPartyId[] = ['AVS','PD','IC','PIU'];
-const IT_RIGHT_IDS:    ItPartyId[] = ['FI','NM','LEGA','FDI','FN'];
-const IT_REGIONAL_IDS: ItPartyId[] = ['M5S','AZ','IV','SVP'];
+const IT_RIGHT_IDS:    ItPartyId[] = ['FI','NM','LEGA','FDI'];
 
 function ItScoreboard({
   natPcts, simSeats, isBaseline, is2026, dark, reportedVoteScale,
@@ -634,16 +659,18 @@ function ItScoreboard({
   }, []);
 
   const seats = useMemo(() => simSeats ?? calcAllProvinceSeats(natPcts), [simSeats, natPcts]);
-  const pctTotal = Object.values(natPcts).reduce((s,v) => s+(v??0), 0);
   const scale    = reportedVoteScale ?? 1;
 
-  const leftSeats     = IT_LEFT_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
-  const rightSeats    = IT_RIGHT_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
-  const regionalSeats = IT_REGIONAL_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
+  // 2026 alignment: M5S sits inside the centre-left; FN and Az/IV stand alone.
+  const leftIds  = is2026 ? ([...IT_LEFT_IDS, 'M5S'] as ItPartyId[]) : IT_LEFT_IDS;
+  const indepIds = is2026 ? (['AZ','IV','FN','SVP'] as ItPartyId[]) : (['M5S','AZ','IV','FN','SVP'] as ItPartyId[]);
+  const leftSeats  = leftIds.reduce((s,id)=>s+(seats[id]??0), 0);
+  const rightSeats = IT_RIGHT_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
+  const indepSeats = indepIds.reduce((s,id)=>s+(seats[id]??0), 0);
 
   const leftMajority  = leftSeats  >= IT_MAJORITY;
   const rightMajority = rightSeats >= IT_MAJORITY;
-  const maxGroup = Math.max(leftSeats, rightSeats, regionalSeats);
+  const maxGroup = Math.max(leftSeats, rightSeats, indepSeats);
   const leftLeading   = maxGroup > 0 && leftSeats  === maxGroup;
   const rightLeading  = maxGroup > 0 && rightSeats === maxGroup;
 
@@ -654,11 +681,11 @@ function ItScoreboard({
 
   const makeTile = (id: ItPartyId) => {
     const s   = seats[id] ?? 0;
-    const pct = pctTotal > 0 ? (natPcts[id]??0)/pctTotal*100 : 0;
+    const pct = natPcts[id] ?? 0;   // true vote share (minor lists omitted, so parties don't sum to 100)
     const rawVotes = isBaseline
       ? Math.round((IT_VOTE_RAW_2022[id]??0)*scale)
       : Math.round((natPcts[id]??0)/100*IT_GRAND_TOTAL_VOTES*scale);
-    const inLeft   = IT_LEFT_IDS.includes(id);
+    const inLeft   = leftIds.includes(id);
     const inRight  = IT_RIGHT_IDS.includes(id);
     const isWinner = inLeft ? leftMajority : inRight ? rightMajority : false;
     const isLeader = inLeft  ? (leftLeading  && !leftMajority)
@@ -687,9 +714,9 @@ function ItScoreboard({
 
   // Blocs listed by combined seat size (largest first).
   const blocDefs = [
-    { ids: IT_LEFT_IDS,     label: 'Centre-left', total: leftSeats,     isLeading: leftLeading  && !leftMajority,  isMajority: leftMajority },
-    { ids: IT_REGIONAL_IDS, label: 'M5S · Third Pole',           total: regionalSeats, isLeading: false,                          isMajority: false },
-    { ids: IT_RIGHT_IDS,    label: 'Centre-right', total: rightSeats,    isLeading: rightLeading && !rightMajority, isMajority: rightMajority },
+    { ids: leftIds,      label: 'Centre-left',  total: leftSeats,  isLeading: leftLeading  && !leftMajority,  isMajority: leftMajority },
+    { ids: indepIds,     label: 'Independents', total: indepSeats, isLeading: false,                          isMajority: false },
+    { ids: IT_RIGHT_IDS, label: 'Centre-right', total: rightSeats, isLeading: rightLeading && !rightMajority, isMajority: rightMajority },
   ].sort((a,b)=>b.total-a.total);
 
   return (
@@ -904,33 +931,38 @@ type ItProvDraft = { provId: ItProvId; pcts: Record<ItPartyId,number>; rptPct: n
 // ── Map view ──────────────────────────────────────────────────────────────────
 // Leading party (regions view) / winning coalition (single-member view) after a
 // uniform national swing applied to the geojson's baked 2022 shares.
-function swungRegLeadColor(pr: Record<string, number>, natPcts: Record<ItPartyId, number>): string {
-  let best = '', bestV = -1;
+// Lighten a base colour toward neutral for narrow margins, deepen it for blow-outs
+// (mirrors getProvFill's margin→lightness ramp so all three map views share a gradient).
+function shadeByMargin(hex: string, margin: number, dark: boolean): string {
+  const c = hsl(hex);
+  const t = Math.min(Math.max(margin, 0) / 20, 1);
+  c.l = dark ? 0.60 - t * 0.32 : 0.84 - t * 0.48;
+  return c.formatHex();
+}
+function swungRegLeadColor(pr: Record<string, number>, natPcts: Record<ItPartyId, number>, dark: boolean): string {
+  const sw: { id: ItPartyId; v: number }[] = [];
   for (const id of IT_PR_KEYS) {
     const base = pr[id] ?? 0; if (base <= 0) continue;
-    const sw = (IT_VOTE_PCT_2022[id] ?? 0) > 0 ? base * ((natPcts[id] ?? 0) / (IT_VOTE_PCT_2022[id] ?? 1)) : base;
-    if (sw > bestV) { bestV = sw; best = id; }
+    const v = (IT_VOTE_PCT_2022[id] ?? 0) > 0 ? base * ((natPcts[id] ?? 0) / (IT_VOTE_PCT_2022[id] ?? 1)) : base;
+    sw.push({ id: id as ItPartyId, v });
   }
-  return partyColor((best || 'FDI') as ItPartyId);
+  sw.sort((a, b) => b.v - a.v);
+  if (sw.length === 0) return partyColor('FDI');
+  const margin = sw[0].v - (sw[1]?.v ?? 0);
+  return shadeByMargin(partyColor(sw[0].id), margin, dark);
 }
-const IT_UNI_COAL: Record<string, ItPartyId[]> = { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZ','IV'] };
-function swungUniCoal(shares: Record<string, number>, natPcts: Record<ItPartyId, number>): string {
-  let best = 'NONE', bestV = -1;
-  for (const c of ['CDX','CSX','M5S','AZIV','OTH']) {
-    const base = shares[c] ?? 0; if (base <= 0) continue;
-    const members = IT_UNI_COAL[c];
-    let factor = 1;
-    if (members) { const now = members.reduce((s,id)=>s+(natPcts[id]??0),0); const then = members.reduce((s,id)=>s+(IT_VOTE_PCT_2022[id]??0),0); factor = then>0?now/then:1; }
-    const sw = base * factor;
-    if (sw > bestV) { bestV = sw; best = c; }
-  }
-  return IT_COAL_COLOR[best] ?? '#9AA0A6';
+function swungUniCoal(shares: Record<string, number>, natPcts: Record<ItPartyId, number>, dark: boolean, is2026?: boolean): string {
+  const val = uniSwungVals(shares, natPcts, is2026);
+  const order = ['CDX','CSX','M5S','AZIV','OTH'].filter(c => (val[c] ?? -1) >= 0).sort((a, b) => val[b] - val[a]);
+  if (order.length === 0) return '#9AA0A6';
+  const margin = val[order[0]] - (order[1] ? val[order[1]] : 0);
+  return shadeByMargin(IT_COAL_COLOR[order[0]] ?? '#9AA0A6', margin, dark);
 }
 
 function ItMapView({
   natPcts, selectedProv, onSelect, dark, bubbleMap, seatDots, mapView,
   declaredProvs, provOverrides, blankMode, projectedProvs, simProvFractions,
-  provDraft, simNatPcts, onSelectUni, selectedUni, fptpOverrides,
+  provDraft, simNatPcts, onSelectUni, selectedUni, fptpOverrides, is2026,
 }: {
   natPcts: Record<ItPartyId,number>; selectedProv: ItProvId|null; mapView: ItMapViewId;
   onSelect: (id:ItProvId)=>void; dark: boolean; bubbleMap: boolean; seatDots: boolean;
@@ -939,7 +971,7 @@ function ItMapView({
   provOverrides?: Partial<Record<ItProvId,Partial<Record<ItPartyId,number>>>>;
   blankMode?: boolean; projectedProvs?: Set<ItProvId>;
   simProvFractions?: Partial<Record<ItProvId,number>>;
-  provDraft?: ItProvDraft|null; simNatPcts?: Record<ItPartyId,number>|null;
+  provDraft?: ItProvDraft|null; simNatPcts?: Record<ItPartyId,number>|null; is2026?: boolean;
 }) {
   const containerRef    = useRef<HTMLDivElement>(null);
   const layerRef        = useRef<L.GeoJSON|null>(null);
@@ -995,10 +1027,14 @@ function ItMapView({
       let fill: string;
       if (mapView === 'uni') {
         const coal = props.coal as string;
-        if (ov) { const w = (['CDX','CSX','M5S','AZIV','OTH'] as const).reduce((b,c)=>(ov[c]??0)>(ov[b]??0)?c:b,'CDX'); fill = IT_COAL_COLOR[w]??'#7E57C2'; }
+        if (ov) {
+          const order = (['CDX','CSX','M5S','AZIV','OTH'] as const).slice().sort((a,b)=>(ov[b]??0)-(ov[a]??0));
+          const margin = (ov[order[0]]??0) - (ov[order[1]]??0);
+          fill = shadeByMargin(IT_COAL_COLOR[order[0]] ?? '#7E57C2', margin, dark);
+        }
         else if (coal==='SVP'||coal==='AUT'||coal==='SCN') fill = IT_COAL_COLOR[coal];  // regional winners — their own colour
-        else fill = swungUniCoal((props.shares as Record<string,number>) ?? {}, eff);
-      } else fill = swungRegLeadColor((props.pr as Record<string,number>) ?? {}, eff);
+        else fill = swungUniCoal((props.shares as Record<string,number>) ?? {}, eff, dark, is2026);
+      } else fill = swungRegLeadColor((props.pr as Record<string,number>) ?? {}, eff, dark);
       return { fillColor: fill, fillOpacity: 0.85, weight: ovSel?2.2:0.5, color: ovSel?'#c8a020':border, opacity: 1 };
     }
 
@@ -1023,7 +1059,7 @@ function ItMapView({
     const fill    = getProvFill(effectiveNatPcts, provId, dark, provOverrides?.[provId]);
     const opacity = isDeclared ? 0.78 : Math.max(0.35, 0.78*(simFrac??1));
     return { fillColor:fill, fillOpacity:opacity, weight:isSel?2:0.4, color:isSel?'#c8a020':border, opacity:1 };
-  }, [natPcts, selectedProv, dark, bubbleMap, seatDots, mapView, declaredProvs, provOverrides, blankMode, simProvFractions, simNatPcts, selectedUni, fptpOverrides]);
+  }, [natPcts, selectedProv, dark, bubbleMap, seatDots, mapView, declaredProvs, provOverrides, blankMode, simProvFractions, simNatPcts, selectedUni, fptpOverrides, is2026]);
 
   useEffect(() => { layerRef.current?.setStyle((f:any)=>getStyle(f)); }, [getStyle]);
 
@@ -1160,8 +1196,8 @@ function ItMapView({
 }
 
 // ── Parliament hemicycle — 7 rows ─────────────────────────────────────────────
-function ItParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
-  seats: Partial<Record<ItPartyId,number>>; onClose:()=>void; exiting?:boolean; dark?:boolean;
+function ItParliamentPanel({ seats: seatsMap, onClose, exiting, dark, is2026 }: {
+  seats: Partial<Record<ItPartyId,number>>; onClose:()=>void; exiting?:boolean; dark?:boolean; is2026?:boolean;
 }) {
   const seatColors: string[] = [];
   const legend: { id:ItPartyId; count:number; color:string }[] = [];
@@ -1216,10 +1252,12 @@ function ItParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
             <div className="px-3.5 pb-4">
               {(() => {
                 const dot=dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.25)';
+                const lIds=is2026?([...IT_LEFT_IDS,'M5S'] as ItPartyId[]):IT_LEFT_IDS;
+                const iIds=is2026?(['AZ','IV','FN','SVP'] as ItPartyId[]):(['M5S','AZ','IV','FN','SVP'] as ItPartyId[]);
                 const blocs=[
-                  {label:'C-left',    seats:IT_LEFT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0),     color:'#E4003B'},
-                  {label:'M5S/3P',seats:IT_REGIONAL_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0), color:'#007442'},
-                  {label:'C-right',    seats:IT_RIGHT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0),    color:'#0066CC'},
+                  {label:'C-left',  seats:lIds.reduce((s,id)=>s+(seatsMap[id]??0),0),         color:'#E4003B'},
+                  {label:'Indep',   seats:iIds.reduce((s,id)=>s+(seatsMap[id]??0),0),         color:'#007442'},
+                  {label:'C-right', seats:IT_RIGHT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0), color:'#0066CC'},
                 ].sort((a,b)=>b.seats-a.seats);
                 return (
                   <div className="flex items-center gap-1.5 mb-3 text-[9px] font-mono">
@@ -1511,9 +1549,11 @@ function ItBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
 }) {
   const totalS=IT_LR_ORDER.reduce((s,id)=>s+(seats[id]??0),0);
   const totalV=IT_PARTIES.reduce((s,p)=>s+(natPcts[p.id]??0),0);
-  const leftS   =IT_LEFT_IDS.reduce((s,id)=>s+(seats[id]??0),0);
+  const bLeftIds  = isBaseline ? IT_LEFT_IDS : ([...IT_LEFT_IDS,'M5S'] as ItPartyId[]);
+  const bIndepIds = isBaseline ? (['M5S','AZ','IV','FN','SVP'] as ItPartyId[]) : (['AZ','IV','FN','SVP'] as ItPartyId[]);
+  const leftS   =bLeftIds.reduce((s,id)=>s+(seats[id]??0),0);
   const rightS  =IT_RIGHT_IDS.reduce((s,id)=>s+(seats[id]??0),0);
-  const regS    =IT_REGIONAL_IDS.reduce((s,id)=>s+(seats[id]??0),0);
+  const regS    =bIndepIds.reduce((s,id)=>s+(seats[id]??0),0);
 
   const enp = totalS>0 ? 1/IT_LR_ORDER.reduce((s,id)=>{const sh=(seats[id]??0)/totalS;return s+sh*sh;},0) : 0;
   const gallagher = Math.sqrt(IT_PARTIES.reduce((s,p)=>{
@@ -1550,9 +1590,9 @@ function ItBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
         <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3.5 space-y-5">
           <Section title="Three Blocs">
             {[
-              {label:'Centre-left', desc:'PD+AVS+€+IC',                   seats:leftS, color:'#E4003B'},
-              {label:'M5S · Third Pole',desc:'M5S+Az–IV+SVP', seats:regS,  color:'#007442'},
-              {label:'Centre-right', desc:'FdI+Lega+FI+NM',                       seats:rightS,color:'#0066CC'},
+              {label:'Centre-left', desc:isBaseline?'PD+AVS+€+IC':'PD+M5S+AVS+€+IC', seats:leftS, color:'#E4003B'},
+              {label:'Independents',desc:isBaseline?'M5S+Az+IV+SVP':'Az+IV+FN+SVP',  seats:regS,  color:'#007442'},
+              {label:'Centre-right',desc:'FdI+Lega+FI+NM',                           seats:rightS,color:'#0066CC'},
             ].sort((a,b)=>b.seats-a.seats).map(b=>(
               <div key={b.label} style={{background:cardBg,borderRadius:5,padding:'6px 8px',borderLeft:`3px solid ${b.color}`}}>
                 <div className="flex items-center justify-between">
@@ -1698,8 +1738,8 @@ function ItDistributionsPanel({ natPcts, provOverrides, seats, is2026, onClose, 
       {(() => {
         const GROUPS = ([
           {label:'Centre-right', color:IT_COAL_COLOR.CDX, ids:['FDI','LEGA','FI','NM']},
-          {label:'Centre-left',  color:IT_COAL_COLOR.CSX, ids:['PD','AVS','PIU','IC']},
-          {label:'M5S',          color:IT_COAL_COLOR.M5S, ids:['M5S']},
+          {label:'Centre-left',  color:IT_COAL_COLOR.CSX, ids:is2026?['PD','AVS','PIU','IC','M5S']:['PD','AVS','PIU','IC']},
+          ...(is2026?[]:[{label:'M5S', color:IT_COAL_COLOR.M5S, ids:['M5S']}]),
           {label:'Azione',       color:'#00A3C7',         ids:['AZ']},
           {label:'Italia Viva',  color:'#E5147D',         ids:['IV']},
           {label:'Far Right',    color:'#3E2723',         ids:['FN']},
@@ -1904,6 +1944,7 @@ export default function ItalyApp() {
 
   // ── Preset / national pcts ────────────────────────────────────────────────
   const [preset,setPreset]   = useState<'baseline'|'blank'|'polling2026'|'custom'>('baseline');
+  const is2026 = preset !== 'baseline';   // 2026 alignment: M5S sits in the centre-left, FN stands alone
   const [natPcts,setNatPcts] = useState<Record<ItPartyId,number>>(()=>({...IT_VOTE_PCT_2022}));
 
   function loadBaseline()    { setNatPcts({...IT_VOTE_PCT_2022}); setPreset('baseline'); resetMapState(); }
@@ -1957,8 +1998,8 @@ export default function ItalyApp() {
   // provinces contribute (real Spanish per-constituency D'Hondt), never a national
   // extrapolation across all 52 provinces.
   const blankSeats=useMemo<Partial<Record<ItPartyId,number>>|undefined>(()=>
-    preset==='blank'?calcPartialSeats(natPcts,blankProvFractions,provOverrides):undefined,
-  [preset,natPcts,blankProvFractions,provOverrides]);
+    preset==='blank'?calcPartialSeats(natPcts,blankProvFractions,provOverrides,is2026):undefined,
+  [preset,natPcts,blankProvFractions,provOverrides,is2026]);
 
   const overrideDisplayPcts=useMemo<Record<ItPartyId,number>>(()=>{
     const hasAny=Object.values(provOverrides).some(o=>o&&Object.keys(o).length>0);
@@ -2065,9 +2106,9 @@ export default function ItalyApp() {
         const fracSnap={...localFrac}; const declSnap=new Set(localDecl);
         setSimProvFractions(fracSnap); setDeclaredProvs(declSnap);
         setSimProgress(Object.keys(fracSnap).length);
-        setSimSeats(calcPartialSeats(simNatPctsRef.current,fracSnap));
+        setSimSeats(calcPartialSeats(simNatPctsRef.current,fracSnap,undefined,is2026));
         if(Object.values(fracSnap).every(f=>(f??0)>=0.999)&&Object.keys(fracSnap).length>=totalProvs){
-          setSimSeats(calcAllProvinceSeats(simNatPctsRef.current)); setSimRunning(false);
+          setSimSeats(calcAllProvinceSeats(simNatPctsRef.current,undefined,is2026)); setSimRunning(false);
         }
       },ev.t));
     }
@@ -2078,10 +2119,14 @@ export default function ItalyApp() {
   const fptpCounts=useMemo<Record<string,number>|undefined>(()=>{
     const colls=Object.values(uniColl); if(colls.length<140) return undefined; // not loaded yet → national-model fallback
     const counts:Record<string,number>={CDX:0,CSX:0,M5S:0,AZ:0,IV:0,OTH:0};
-    for(const c of colls){ const sh=fptpOverrides[c.id]??c.shares; const w=fptpOverrides[c.id]?IT_COAL_SLIDERS.reduce((b,k)=>(sh[k]??0)>(sh[b]??0)?k:b,'CDX'):uniWinner(c.shares,displayPcts); counts[w]=(counts[w]||0)+1; }
+    for(const c of colls){ const sh=fptpOverrides[c.id]??c.shares; let w=fptpOverrides[c.id]?IT_COAL_SLIDERS.reduce((b,k)=>(sh[k]??0)>(sh[b]??0)?k:b,'CDX'):uniWinner(c.shares,displayPcts,is2026); if(is2026&&w==='M5S')w='CSX'; counts[w]=(counts[w]||0)+1; }
     return counts;
-  },[uniColl,fptpOverrides,displayPcts]);
-  const displaySeats=useMemo(()=>simSeats??blankSeats??calcAllProvinceSeats(displayPcts,fptpCounts),[simSeats,blankSeats,displayPcts,fptpCounts]);
+  },[uniColl,fptpOverrides,displayPcts,is2026]);
+  const displaySeats=useMemo(()=>{
+    // pristine 2022 baseline → exact official per-party seats; once a district is edited, switch to the live engine
+    if(preset==='baseline'&&!simSeats&&Object.keys(fptpOverrides).length===0&&Object.keys(provOverrides).length===0) return IT_SEATS_2022;
+    return simSeats??blankSeats??calcAllProvinceSeats(displayPcts,fptpCounts,is2026);
+  },[preset,simSeats,blankSeats,displayPcts,fptpCounts,is2026,fptpOverrides,provOverrides]);
 
   const simPartialPcts=useMemo<Record<ItPartyId,number>|null>(()=>{
     if(!simNatPcts) return null;
@@ -2163,7 +2208,7 @@ export default function ItalyApp() {
       {scoreboardVisible&&(
         <ItScoreboard
           natPcts={simPartialPcts??(simNatPcts??displayPcts)}
-          simSeats={simSeats??blankSeats}
+          simSeats={displaySeats}
           isBaseline={preset==='baseline'&&!simNatPcts}
           is2026={preset!=='baseline'||!!simNatPcts}
           dark={dark}
@@ -2174,7 +2219,7 @@ export default function ItalyApp() {
       {/* ── Body ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
         {leftPanel==='parties'&&<ItPartiesPanel hiddenParties={hiddenParties} onToggle={id=>setHiddenParties(prev=>{const n=new Set(prev);n.has(id)?n.delete(id):n.add(id);return n;})} onClose={()=>openLeft('parties')} dark={dark}/>}
-        {showParli    &&<ItParliamentPanel seats={displaySeats} onClose={()=>openLeft('parli')}    exiting={exitLeft==='parli'}    dark={dark}/>}
+        {showParli    &&<ItParliamentPanel seats={displaySeats} onClose={()=>openLeft('parli')}    exiting={exitLeft==='parli'}    dark={dark} is2026={is2026}/>}
         {showBreakdown&&<ItBreakdownPanel  seats={displaySeats} natPcts={displayPcts} isBaseline={preset==='baseline'} onClose={()=>openLeft('breakdown')} exiting={exitLeft==='breakdown'} dark={dark}/>}
 
         {/* MAP */}
@@ -2189,7 +2234,7 @@ export default function ItalyApp() {
             blankMode={preset==='blank'} projectedProvs={projectedProvs}
             simProvFractions={simProvFractions}
             provDraft={preset==='blank'?provDraft:null}
-            simNatPcts={simNatPcts}
+            simNatPcts={simNatPcts} is2026={is2026}
           />
           {(preset==='blank'||simRunning||simSeats!=null)&&(
             <ItReportingWidget
