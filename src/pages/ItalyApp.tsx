@@ -318,42 +318,94 @@ function calcProvVotes(
   return raw;
 }
 
-// Sum of per-province D'Hondt allocations — the actual Spanish method
-function calcAllProvinceSeats(
-  natPcts: Partial<Record<ItPartyId, number>>,
-  provOverrides?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
-): Partial<Record<ItPartyId, number>> {
-  const totals: Partial<Record<ItPartyId, number>> = {};
-  for (const prov of IT_PROVINCES) {
-    const provVotes = calcProvVotes(natPcts as Record<ItPartyId, number>, prov.id, provOverrides?.[prov.id]);
-    const provSeats = calcDHondtProv(provVotes, prov.seats);
-    for (const [id, s] of Object.entries(provSeats) as [ItPartyId, number][]) {
-      totals[id] = (totals[id] ?? 0) + s;
-    }
-  }
-  return totals;
+// ── Hare-quota largest-remainder helper ──────────────────────────────────────
+function hareLR(weights: Record<string, number>, total: number): Record<string, number> {
+  const ks = Object.keys(weights); const out: Record<string, number> = {};
+  ks.forEach(k => out[k] = 0);
+  const sum = ks.reduce((a, k) => a + Math.max(0, weights[k] || 0), 0);
+  if (sum <= 0 || total <= 0) return out;
+  const ex = ks.map(k => ({ k, e: Math.max(0, weights[k] || 0) / sum * total }));
+  let used = 0; ex.forEach(x => { out[x.k] = Math.floor(x.e); used += out[x.k]; });
+  ex.sort((a, b) => (b.e - Math.floor(b.e)) - (a.e - Math.floor(a.e)));
+  let i = 0; while (used < total && ex.length) { out[ex[i % ex.length].k]++; used++; i++; }
+  return out;
 }
 
-// Partial-result seats: only from provinces that have reported (fraction > 0)
+// ── Rosatellum seat allocation — Camera dei Deputati (400) ────────────────────
+// 147 FPTP single-member seats + 245 proportional (Hare quota, 3% party / 10%
+// coalition threshold, SVP minority-exempt) + 8 overseas. FPTP is modelled from
+// coalition strength (vote^k majoritarian bonus), split within a coalition by
+// √share; PR + overseas via national Hare-quota largest remainder.
+const IT_COAL_DEF: Record<string, ItPartyId[]> = {
+  CDX: ['FDI','LEGA','FI','NM'], CSX: ['PD','AVS','PIU','IC'], M5S: ['M5S'], AZIV: ['AZIV'],
+};
+function calcRosatellum(natPcts: Partial<Record<ItPartyId, number>>): Partial<Record<ItPartyId, number>> {
+  const svpV = natPcts.SVP ?? 0;
+  const svpSeats = svpV >= 0.3 ? 3 : 0;                  // SVP's South Tyrol seats (minority exemption)
+  const PR = 245 - svpSeats, FPTP = 147, OV = 8;
+  // coalition national strength + qualifying check (coalition needs 10%, party 3%)
+  const coalPct: Record<string, number> = {};
+  for (const [c, ps] of Object.entries(IT_COAL_DEF)) coalPct[c] = ps.reduce((a, id) => a + (natPcts[id] ?? 0), 0);
+  // PR — parties over 3% nationally whose coalition cleared 10% (lone parties: own 3%)
+  const qual: Record<string, number> = {};
+  for (const pty of IT_PARTIES) {
+    if (pty.id === 'SVP') continue;
+    const v = natPcts[pty.id] ?? 0; if (v < 3) continue;
+    const coal = Object.entries(IT_COAL_DEF).find(([, ps]) => ps.includes(pty.id));
+    if (coal && coal[1].length > 1 && coalPct[coal[0]] < 10) continue;  // 10% rule: multi-party coalitions only
+    qual[pty.id] = v;
+  }
+  const pr = hareLR(qual, PR);
+  // FPTP — majoritarian coalition bonus, then √share within the coalition
+  const coalW: Record<string, number> = {};
+  for (const c in coalPct) coalW[c] = Math.pow(Math.max(coalPct[c], 0.01), 3.2);
+  const coalFptp = hareLR(coalW, FPTP);
+  const fptp: Record<string, number> = {};
+  for (const [c, ps] of Object.entries(IT_COAL_DEF)) {
+    const within: Record<string, number> = {}; ps.forEach(id => within[id] = Math.sqrt(Math.max(0.04, natPcts[id] ?? 0)));
+    const a = hareLR(within, coalFptp[c] || 0);
+    for (const [id, n] of Object.entries(a)) fptp[id] = (fptp[id] || 0) + n;
+  }
+  const ov = hareLR(qual, OV);
+  const out: Partial<Record<ItPartyId, number>> = {};
+  for (const pty of IT_PARTIES) {
+    const t = (pr[pty.id] || 0) + (fptp[pty.id] || 0) + (ov[pty.id] || 0) + (pty.id === 'SVP' ? svpSeats : 0);
+    if (t > 0) out[pty.id] = t;
+  }
+  return out;
+}
+
+// National Rosatellum seats from the (province-aggregated) national vote
+function calcAllProvinceSeats(
+  natPcts: Partial<Record<ItPartyId, number>>,
+  _ov?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
+): Partial<Record<ItPartyId, number>> {
+  return calcRosatellum(natPcts);
+}
+
+// Partial seats: Rosatellum on the reported-so-far national vote, scaled to the
+// reported share of the electorate (seats grow 0 → 400 as districts report).
 function calcPartialSeats(
-  natPcts:         Record<ItPartyId, number>,
-  provFractions:   Partial<Record<ItProvId, number>>,
-  provOverrides?:  Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
+  natPcts:        Record<ItPartyId, number>,
+  provFractions:  Partial<Record<ItProvId, number>>,
+  provOverrides?: Partial<Record<ItProvId, Partial<Record<ItPartyId, number>>>>,
 ): Partial<Record<ItPartyId, number>> {
   const entries = Object.entries(provFractions) as [ItProvId, number][];
   if (entries.length === 0) return {};
-  const totals: Partial<Record<ItPartyId, number>> = {};
+  const weighted: Partial<Record<ItPartyId, number>> = {}; let reportedW = 0;
   for (const [pId, frac] of entries) {
-    if (!frac) continue;
-    const prov = IT_PROVINCE_MAP[pId];
-    if (!prov) continue;
-    const provVotes = calcProvVotes(natPcts, pId, provOverrides?.[pId]);
-    const provSeats = calcDHondtProv(provVotes, prov.seats);
-    for (const [id, s] of Object.entries(provSeats) as [ItPartyId, number][]) {
-      totals[id] = (totals[id] ?? 0) + s;
-    }
+    if (!frac) continue; const prov = IT_PROVINCE_MAP[pId]; if (!prov) continue;
+    const cv = calcProvVotes(natPcts, pId, provOverrides?.[pId]);
+    const w = prov.weight * frac;
+    for (const pty of IT_PARTIES) weighted[pty.id] = (weighted[pty.id] ?? 0) + (cv[pty.id] ?? 0) * w;
+    reportedW += w;
   }
-  return totals;
+  if (reportedW <= 0) return {};
+  const nat = {} as Record<ItPartyId, number>;
+  for (const pty of IT_PARTIES) nat[pty.id] = (weighted[pty.id] ?? 0) / reportedW;
+  const full = calcRosatellum(nat) as Record<string, number>;
+  const frac = Math.min(1, reportedW / IT_TOTAL_PROV_WEIGHT);
+  return hareLR(full, Math.round(400 * frac));
 }
 
 // ── Simulation helpers ────────────────────────────────────────────────────────
