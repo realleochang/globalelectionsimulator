@@ -274,21 +274,6 @@ function itContests(partyId: ItPartyId, provId: ItProvId): boolean {
   return !home || home.includes(provId);
 }
 
-// Max national vote % each party can reach in the simulator. National parties:
-// 55 (the slider ceiling). Regional parties: their home region's share of the
-// national electorate — i.e. the most they could win even taking 100% of every
-// province they contest — so e.g. ERC cannot be dialled past ~Catalonia's size.
-const IT_PARTY_VOTE_CAP: Record<ItPartyId, number> = (() => {
-  const caps = {} as Record<ItPartyId, number>;
-  for (const p of IT_PARTIES) {
-    const home = IT_REGIONAL_HOME[p.id];
-    caps[p.id] = home
-      ? Math.round(home.reduce((s, id) => s + (IT_PROVINCE_MAP[id]?.weight ?? 0), 0) / IT_TOTAL_PROV_WEIGHT * 1000) / 10
-      : 55;
-  }
-  return caps;
-})();
-
 // Proportional swing: prov_pct = base_2023 × (new_nat / old_nat), normalised
 function calcProvVotes(
   natPcts:  Record<ItPartyId, number>,
@@ -2299,6 +2284,7 @@ export default function ItalyApp() {
   // ── Simulation ────────────────────────────────────────────────────────────
   const [simDraftPcts,   setSimDraftPcts]   = useState<Record<ItPartyId,number>>(()=>({...IT_VOTE_PCT_2026}));
   const [simDraftLocks,  setSimDraftLocks]  = useState<Set<ItPartyId>>(new Set());
+  const [simDraftStr,    setSimDraftStr]    = useState<Record<string,string>>({});   // raw text per box (free typing, no rounding)
   const [,setSimDraftTouched]               = useState(false);
   const [simDuration,    setSimDuration]    = useState<60000|120000|300000|600000>(120000);
   const [simNatPcts,     setSimNatPcts]     = useState<Record<ItPartyId,number>|null>(null);
@@ -2310,7 +2296,15 @@ export default function ItalyApp() {
   const simTimersRef  = useRef<ReturnType<typeof setTimeout>[]>([]);
   const simNatPctsRef = useRef<Record<ItPartyId,number>>(natPcts);
 
-  useEffect(()=>{ if(rightPanel==='sim'){ const t=IT_PARTIES.reduce((s,p)=>s+(IT_VOTE_PCT_2026[p.id]??0),0); const seed={} as Record<ItPartyId,number>; for(const p of IT_PARTIES) seed[p.id]=t>0?(IT_VOTE_PCT_2026[p.id]??0)/t*100:0; setSimDraftPcts(seed); setSimDraftTouched(false);} },[rightPanel==='sim']); // eslint-disable-line
+  useEffect(()=>{ if(rightPanel==='sim'){
+    // seed = the 2026 poll normalised to a clean set of 0.1 values summing to EXACTLY 100
+    const t=IT_PARTIES.reduce((s,p)=>s+(IT_VOTE_PCT_2026[p.id]??0),0);
+    const num={} as Record<ItPartyId,number>; let sum=0,maxId:ItPartyId=IT_PARTIES[0].id,maxV=-1;
+    for(const p of IT_PARTIES){ const v=t>0?Math.round((IT_VOTE_PCT_2026[p.id]??0)/t*1000)/10:0; num[p.id]=v; sum+=v; if(v>maxV){maxV=v;maxId=p.id;} }
+    num[maxId]=+(num[maxId]+(100-sum)).toFixed(1);   // largest party absorbs the rounding residual
+    const str={} as Record<string,string>; for(const p of IT_PARTIES) str[p.id]=String(num[p.id]);
+    setSimDraftPcts(num); setSimDraftStr(str); setSimDraftTouched(false);
+  } },[rightPanel==='sim']); // eslint-disable-line
 
   const simTotal=useMemo(()=>IT_PARTIES.reduce((s,p)=>s+(simDraftPcts[p.id]??0),0),[simDraftPcts]);
   const [simSortOrder]=useState<ItPartyId[]>(()=>IT_LR_ORDER.slice());
@@ -2554,7 +2548,7 @@ export default function ItalyApp() {
             <div className="flex-1 overflow-y-auto px-3.5 py-3 thin-scroll space-y-3">
               {simSortOrder.filter(id=>!hiddenParties.has(id)).map(id=>{
                 const party=IT_PARTY_MAP[id]; const pct=simDraftPcts[id]??0; const isLocked=simDraftLocks.has(id); const color=partyColor(id);
-                const rawVotes=Math.round(pct/100*IT_GRAND_TOTAL_VOTES); const cap=IT_PARTY_VOTE_CAP[id];
+                const rawVotes=Math.round(pct/100*IT_GRAND_TOTAL_VOTES);
                 return (
                   <div key={id} className="flex items-center gap-1.5">
                     <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{background:color}}/>
@@ -2565,8 +2559,8 @@ export default function ItalyApp() {
                       className={`w-4 h-4 flex items-center justify-center shrink-0 ${isLocked?'text-gold':'text-ink-3 hover:text-ink'}`} title={isLocked?'Unlock':'Lock'}>
                       {isLocked?<svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>:<svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>}
                     </button>
-                    <input type="number" min={0} max={IT_REGIONAL_HOME[id]?cap:undefined} step={0.1} value={pct.toFixed(1)} disabled={isLocked}
-                      onChange={e=>{const v=parseFloat(e.target.value); if(!isNaN(v)){const nv=Math.max(0,IT_REGIONAL_HOME[id]?Math.min(v,cap):v); setSimDraftPcts(prev=>({...prev,[id]:nv}));setSimDraftTouched(true);}}}
+                    <input type="number" min={0} step="any" value={simDraftStr[id]??''} disabled={isLocked}
+                      onChange={e=>{const raw=e.target.value; setSimDraftStr(s=>({...s,[id]:raw})); const v=parseFloat(raw); setSimDraftPcts(prev=>({...prev,[id]:isNaN(v)?0:Math.max(0,v)})); setSimDraftTouched(true);}}
                       className="w-14 h-6 shrink-0 text-right text-[11px] font-mono font-bold tabular-nums rounded-[4px] border border-default bg-transparent px-1 disabled:opacity-40 focus:outline-none focus:border-blue-500"
                       style={{color}}/>
                     <span className="text-[9px] font-mono text-ink-3 shrink-0">%</span>
@@ -2578,10 +2572,10 @@ export default function ItalyApp() {
               {!simRunning&&(
                 <div className="flex items-center justify-between text-[10px] font-mono">
                   <span className="text-ink-3">Total</span>
-                  <span style={{color:Math.abs(simTotal-100)<0.5?'#16a34a':'#ef4444',fontWeight:700}}>{simTotal.toFixed(1)}%{Math.abs(simTotal-100)<0.5?' ✓':' · must equal 100%'}</span>
+                  <span style={{color:Math.round(simTotal*10)===1000?'#16a34a':'#ef4444',fontWeight:700}}>{simTotal.toFixed(1)}%{Math.round(simTotal*10)===1000?' ✓':' · must equal exactly 100%'}</span>
                 </div>
               )}
-              <button disabled={simRunning||Math.abs(simTotal-100)>=0.5} onClick={runSim} title={Math.abs(simTotal-100)>=0.5?'Values must add up to 100%':''}
+              <button disabled={simRunning||Math.round(simTotal*10)!==1000} onClick={runSim} title={Math.round(simTotal*10)!==1000?'Values must add up to exactly 100%':''}
                 className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 {simRunning?`${simProgress}/${IT_PROVINCES.length} reporting…`:'▶ Run Simulation'}
               </button>
