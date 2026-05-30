@@ -666,11 +666,11 @@ function ItScoreboard({
   const indepIds = is2026 ? (['AZ','IV','FN','SVP'] as ItPartyId[]) : (['M5S','AZ','IV','FN','SVP'] as ItPartyId[]);
   const leftSeats  = leftIds.reduce((s,id)=>s+(seats[id]??0), 0);
   const rightSeats = IT_RIGHT_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
-  const indepSeats = indepIds.reduce((s,id)=>s+(seats[id]??0), 0);
 
   const leftMajority  = leftSeats  >= IT_MAJORITY;
   const rightMajority = rightSeats >= IT_MAJORITY;
-  const maxGroup = Math.max(leftSeats, rightSeats, indepSeats);
+  const maxIndep = indepIds.reduce((m,id)=>Math.max(m, seats[id]??0), 0);
+  const maxGroup = Math.max(leftSeats, rightSeats, maxIndep);
   const leftLeading   = maxGroup > 0 && leftSeats  === maxGroup;
   const rightLeading  = maxGroup > 0 && rightSeats === maxGroup;
 
@@ -712,18 +712,20 @@ function ItScoreboard({
     );
   };
 
-  // Blocs listed by combined seat size (largest first).
-  const blocDefs = [
-    { ids: leftIds,      label: 'Centre-left',  total: leftSeats,  isLeading: leftLeading  && !leftMajority,  isMajority: leftMajority },
-    { ids: indepIds,     label: 'Independents', total: indepSeats, isLeading: false,                          isMajority: false },
-    { ids: IT_RIGHT_IDS, label: 'Centre-right', total: rightSeats, isLeading: rightLeading && !rightMajority, isMajority: rightMajority },
-  ].sort((a,b)=>b.total-a.total);
+  // The two coalitions stay grouped; every other party is its own independent
+  // card (no combined "Independents" bloc). All sorted together by seat size.
+  type ScoreItem = { key: string; total: number; el: React.ReactNode };
+  const items: ScoreItem[] = [];
+  if (sortedBloc(leftIds).length)      items.push({ key:'left',  total:leftSeats,  el: renderBloc(leftIds, 'Centre-left', leftLeading && !leftMajority, leftMajority) });
+  if (sortedBloc(IT_RIGHT_IDS).length) items.push({ key:'right', total:rightSeats, el: renderBloc(IT_RIGHT_IDS, 'Centre-right', rightLeading && !rightMajority, rightMajority) });
+  for (const id of sortedBloc(indepIds)) items.push({ key:id, total: seats[id]??0, el: makeTile(id) });
+  items.sort((a,b)=>b.total-a.total);
 
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
-          {blocDefs.map(b=>renderBloc(b.ids, b.label, b.isLeading, b.isMajority))}
+          {items.map(it => <React.Fragment key={it.key}>{it.el}</React.Fragment>)}
         </div>
       </div>
     </div>
