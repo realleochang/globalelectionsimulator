@@ -223,6 +223,17 @@ export const COUNTRIES = [
       { color: '#1B9E4B', abbr: 'Lega' }, { color: '#214A7B', abbr: 'FdI' },
     ],
   },
+  {
+    id: 'argentina', path: '/argentina', name: 'Argentina', flag: '🇦🇷', demonym: 'Argentine', mapColor: '#6CA0DC',
+    flagSrc: 'argentina-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'Presidential Election', subtitle: 'Casa Rosada',
+    lat: -38, lng: -64,
+    accent: 'linear-gradient(90deg,#74ACDF,#FFFFFF,#74ACDF)',
+    parties: [
+      { color: '#3FA9F5', abbr: 'UxP' }, { color: '#6A2C8E', abbr: 'LLA' },
+      { color: '#F2C200', abbr: 'JxC' },
+    ],
+  },
 ];
 
 export type Country = typeof COUNTRIES[0];
@@ -232,14 +243,14 @@ const ISO_TO_COLOR: Record<string, string> = {
   'AU': '#003893', 'DE': '#FFCE00', 'BR': '#009C3B', 'NL': '#E17000',
   'ZA': '#FFB612', 'RO': '#FCD116', 'SE': '#006AA7',
   'PL': '#DC143C', 'IN': '#FF6B1A', 'NG': '#008751',
-  'ES': '#AA151B', 'KR': '#CD2E3A', 'PT': '#006600', 'TR': '#E30A17', 'IT': '#008C45',
+  'ES': '#AA151B', 'KR': '#CD2E3A', 'PT': '#006600', 'TR': '#E30A17', 'IT': '#008C45', 'AR': '#6CA0DC',
 };
 
 const ISO_TO_COUNTRY: Record<string, string> = {
   'GB': 'uk', 'FR': 'france', 'CA': 'canada', 'US': 'usa',
   'AU': 'australia', 'DE': 'germany', 'BR': 'brazil', 'NL': 'netherlands',
   'ZA': 'south-africa', 'RO': 'romania', 'SE': 'sweden',
-  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india', 'KR': 'south-korea', 'PT': 'portugal', 'TR': 'turkey', 'IT': 'italy',
+  'PL': 'poland', 'NG': 'nigeria', 'ES': 'spain', 'IN': 'india', 'KR': 'south-korea', 'PT': 'portugal', 'TR': 'turkey', 'IT': 'italy', 'AR': 'argentina',
 };
 
 // ISO 3166-1 numeric → ISO A2 (for 110m topojson feature IDs)
@@ -247,7 +258,7 @@ const NUMERIC_TO_ISO: Record<string, string> = {
   '826': 'GB', '250': 'FR', '124': 'CA', '840': 'US',
   '036': 'AU', '276': 'DE', '076': 'BR', '528': 'NL',
   '710': 'ZA', '642': 'RO', '752': 'SE',
-  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN', '410': 'KR', '620': 'PT', '792': 'TR', '380': 'IT',
+  '566': 'NG', '724': 'ES', '616': 'PL', '356': 'IN', '410': 'KR', '620': 'PT', '792': 'TR', '380': 'IT', '032': 'AR',
 };
 
 function hexToRgba(hex: string, alpha: number): string {
