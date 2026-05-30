@@ -963,27 +963,45 @@ function ItBubbleLayer({
       bubblesRef.current.push({ marker, baseRadius });
     });
 
-    // Overseas constituency (Circoscrizione Estero) — one bubble per zone, placed
-    // on its continent; sized by its seat count, coloured by the winning party.
-    for (const z of IT_OVERSEAS) {
-      const { seats, sorted } = overseasZoneSeats(z);
-      if (!sorted.length) continue;
-      const winner = sorted[0].id;
-      const baseRadius = 7 + z.seats * 4.5;
-      const m = L.circleMarker([z.lat, z.lng], { radius: baseRadius * scale, color: partyColor(winner), fillColor: partyColor(winner), fillOpacity: 0.62, weight: 1.6, opacity: 0.92, dashArray: '4,2' }).addTo(map);
-      const tipParties = (Object.entries(seats) as [ItPartyId, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])
-        .map(([id, n]) => ({ id, pct: z.v[id] ?? 0, rawVotes: undefined as number | undefined, label: `${IT_PARTY_MAP[id]?.name ?? id} · ${n} seat${n > 1 ? 's' : ''}`, color: partyColor(id) }));
-      m.on('mousemove', (e: L.LeafletMouseEvent) => {
-        const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
-        setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: `Overseas — ${z.name} (${z.seats} seats)`, parties: tipParties, leader: tipParties[0]?.id ?? null, reportingPct: undefined });
-      });
-      m.on('mouseout', () => setTooltip(null));
-      bubblesRef.current.push({ marker: m, baseRadius });
-    }
     return () => { for (const {marker} of bubblesRef.current) marker.remove(); bubblesRef.current=[]; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, mapView, is2026]);
 
+  return null;
+}
+
+// ── Overseas constituency layer — ALWAYS shown (choropleth, bubble & dot views) ──
+// The 8 international seats (4 zones) plotted on their continents, sized by seat
+// count and coloured by the zone winner. The per-zone allocation is constant.
+function ItOverseasLayer({ containerRef, setTooltip }: {
+  containerRef: React.RefObject<HTMLDivElement|null>;
+  setTooltip: (t:ProvTooltipState)=>void;
+}) {
+  const map = useMap();
+  const ref = useRef<L.CircleMarker[]>([]);
+  useEffect(() => {
+    const build = () => {
+      for (const m of ref.current) m.remove(); ref.current = [];
+      const scale = zoomScale(map.getZoom());
+      for (const z of IT_OVERSEAS) {
+        const { seats, sorted } = overseasZoneSeats(z);
+        if (!sorted.length) continue;
+        const winner = sorted[0].id;
+        const m = L.circleMarker([z.lat, z.lng], { radius:(7 + z.seats*4.5)*scale, color:partyColor(winner), fillColor:partyColor(winner), fillOpacity:0.62, weight:1.6, opacity:0.92, dashArray:'4,2' }).addTo(map);
+        const tipParties = (Object.entries(seats) as [ItPartyId, number][]).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1])
+          .map(([id, n]) => ({ id, pct: z.v[id] ?? 0, rawVotes: undefined as number | undefined, label: `${IT_PARTY_MAP[id]?.name ?? id} · ${n} seat${n > 1 ? 's' : ''}`, color: partyColor(id) }));
+        m.on('mousemove', (e: L.LeafletMouseEvent) => {
+          const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+          setTooltip({ x: e.originalEvent.clientX - rect.left, y: e.originalEvent.clientY - rect.top, name: `Overseas — ${z.name} (${z.seats} seats)`, parties: tipParties, leader: tipParties[0]?.id ?? null, reportingPct: undefined });
+        });
+        m.on('mouseout', () => setTooltip(null));
+        ref.current.push(m);
+      }
+    };
+    build();
+    map.on('zoomend', build);
+    return () => { map.off('zoomend', build); for (const m of ref.current) m.remove(); ref.current = []; };
+  }, [map]);
   return null;
 }
 
@@ -1165,6 +1183,8 @@ function ItMapView({
 
     // Single-member (FPTP, editable) and Regions views
     if (mapView !== 'pluri') {
+      // Bubble Map: show ONLY the bubbles — hide the choropleth underneath.
+      if (bubbleMap) return { fillOpacity:0, weight:0.4, color:dark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.18)', opacity:0.6 };
       const eff = simNatPcts ?? natPcts;
       const props = feature?.properties ?? {};
       const ov = mapView==='uni' ? fptpOverrides?.[geoId] : undefined;
@@ -1292,6 +1312,7 @@ function ItMapView({
             style={(f:any)=>getStyle(f)} onEachFeature={onEachFeature}
             {...({ smoothFactor:0 } as any)} />
         )}
+        {geoData && <ItOverseasLayer containerRef={containerRef} setTooltip={setTooltip} />}
         {geoData && bubbleMap && (
           <ItBubbleLayer
             mapView={mapView} onSelectUni={onSelectUni} is2026={is2026}
@@ -1358,12 +1379,16 @@ function ItMapView({
 function ItParliamentPanel({ seats: seatsMap, onClose, exiting, dark, is2026 }: {
   seats: Partial<Record<ItPartyId,number>>; onClose:()=>void; exiting?:boolean; dark?:boolean; is2026?:boolean;
 }) {
+  const [parliMode,setParliMode]=useState<'parties'|'coalitions'>('parties');
+  const pLeftIds=is2026?([...IT_LEFT_IDS,'M5S'] as ItPartyId[]):IT_LEFT_IDS;
+  const coalColorOf=(id:ItPartyId)=>pLeftIds.includes(id)?'#E4003B':IT_RIGHT_IDS.includes(id)?'#0066CC':partyColor(id);
   const seatColors: string[] = [];
   const legend: { id:ItPartyId; count:number; color:string }[] = [];
   for (const id of IT_LR_ORDER) {
     const n = seatsMap[id] ?? 0; if (n===0) continue;
-    const color = partyColor(id); legend.push({ id, count:n, color });
-    for (let i=0; i<n; i++) seatColors.push(color);
+    legend.push({ id, count:n, color:partyColor(id) });
+    const arcColor = parliMode==='coalitions' ? coalColorOf(id) : partyColor(id);
+    for (let i=0; i<n; i++) seatColors.push(arcColor);
   }
   const totalSeats = seatColors.length;
   const W=380, H=215, cx=W/2, cy=H-6, innerR=68, rowSpacing=18, numRows=7;
@@ -1389,9 +1414,17 @@ function ItParliamentPanel({ seats: seatsMap, onClose, exiting, dark, is2026 }: 
       <div className="flex items-center justify-between px-3.5 py-3 border-b border-default shrink-0">
         <div>
           <h2 className="text-[13px] font-bold text-ink leading-none">Camera dei Deputati — Parliamentary Composition</h2>
-          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeats} seats · majority {IT_MAJORITY} · sorted by ideology</div>
+          <div className="text-[9px] font-mono text-ink-3 mt-0.5">{totalSeats} seats · majority {IT_MAJORITY} · {parliMode==='coalitions'?'by coalition':'by party'}</div>
         </div>
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
+      </div>
+      <div className="flex gap-1 px-3.5 py-2 border-b border-default shrink-0">
+        {(['parties','coalitions'] as const).map(m=>(
+          <button key={m} onClick={()=>setParliMode(m)}
+            className={`flex-1 py-1 rounded-[4px] text-[9px] font-mono font-bold uppercase tracking-wide transition-colors ${parliMode===m?'bg-gold text-black':'border border-default text-ink-3 hover:bg-hover'}`}>
+            {m==='parties'?'By party':'By coalition'}
+          </button>
+        ))}
       </div>
       <div className="flex-1 overflow-y-auto thin-scroll">
         {totalSeats===0 ? (
@@ -1647,7 +1680,7 @@ function ItProvPanel({
           </div>
         )}
         <div className="px-3.5 space-y-3 py-3">
-          {sortedIds.filter(id=>!hiddenParties?.has(id)&&(isBlankMode||(displayPv[id]??0)>=0.1||locks.has(id))).map(id=>{
+          {sortedIds.filter(id=>!hiddenParties?.has(id)&&itContests(id,provId)&&(isBlankMode||(displayPv[id]??0)>=0.1||locks.has(id))).map(id=>{
             const p=IT_PARTY_MAP[id]; const pct=displayPv[id]??0; const isLocked=locks.has(id); const color=p.color;
             const rawVotes=Math.round((pct/100)*provTotalVotes*(isBlankMode?localRptPct/100:1));
             return (
@@ -1968,20 +2001,50 @@ function ItTutorialPanel({ onClose, exiting, dark }: { onClose:()=>void; exiting
         <button onClick={onClose} className="w-6 h-6 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
       </div>
       <div className="flex-1 overflow-y-auto px-3.5 py-3.5 thin-scroll">
-        <H2 c="The Italian Electoral System"/>
-        <P c="Italy's Chamber of Deputies has 400 seats. This simulator models the proportional vote: each of the 49 plurinominal districts (collegi plurinominali) fills its seats by D'Hondt, summing to 400. (The real Rosatellum also has 147 single-member seats — folded into the proportional picture here for a clean model.)"/>
-        <Note c="D'Hondt divides each party's votes by 1, 2, 3, … Seats go to the highest quotients, slightly favouring larger lists."/>
-        <H2 c="The 3% Threshold"/>
-        <P c="A party needs at least 3% of valid votes in a district to take seats there. Vote totals are 2022 estimates — toggle 2022 Baseline, 2026 Polling or Blank Map up top."/>
-        <Note c="Regional parties like the SVP are landlocked to their home territory (South Tyrol) — they can never gain votes elsewhere."/>
-        <H2 c="Three views & seat allocations"/>
-        <P c="View the same result three ways: the choropleth (winner per district), the Bubble Map (margin-sized circles — hover for a tooltip, click to open its sliders), and Seat Dots (one dot per seat)."/>
-        <H2 c="Blank Map Mode"/>
-        <P c="Click a district, set party shares + % reporting, then hit Project Result. The national scoreboard only updates after you click — seats accumulate district by district."/>
-        <H2 c="Simulation"/>
-        <P c="Type each party's national %, pick a speed, then Run. Each district reports in 5 random-sized batches on a bell-curve schedule; D'Hondt runs live as results come in."/>
-        <H2 c="Parliament View"/>
-        <P c="400 seats in a semicircle, sorted left→right by ideology: AVS · M5S · PD · IC · +Europa · Az–IV · SVP · FI · NM · Lega · FdI."/>
+        <P c="A crash course in the Italian election simulator — what the seats mean and how every control works. Read top to bottom and you will understand the whole thing."/>
+
+        <H2 c="1 · The Rosatellum system"/>
+        <P c="Italy's Chamber of Deputies has 400 seats, elected three ways at once: 147 single-member seats won by plurality (first-past-the-post), 245 proportional seats shared out among party lists, and 8 seats for Italians living abroad. This simulator models all three and they always add up to 400."/>
+
+        <H2 c="2 · Single-member seats (147)"/>
+        <P c="Each of 147 collegi is won outright by whichever COALITION gets the most votes there — winner takes the seat, no proportionality. The seat then goes to one PARTY: the coalition's strongest member in that region. So a centre-right win in the north goes to Lega, one in the south to Forza Italia, most others to Fratelli d'Italia. Open a collegio to see 'seat → party'."/>
+
+        <H2 c="3 · Proportional seats (245) & the 3% threshold"/>
+        <P c="The 245 list seats are shared nationally by largest-remainder (Hare quota), then spread across the 49 PR districts where each party is strongest. A party must clear 3% of the national vote to win any list seats; a junior partner only counts if its coalition clears 10%. Below 3% you get nothing."/>
+        <Note c="The South Tyrolean SVP is a protected minority list: it is exempt from the 3% rule and takes its 2-3 seats in South Tyrol regardless."/>
+
+        <H2 c="4 · Overseas seats (8)"/>
+        <P c="The Circoscrizione Estero elects 8 deputies in four world zones — Europe (4), South America (2), North & Central America (1), Africa-Asia-Oceania (1). They are drawn as bubbles ON their continents and are always visible; zoom the map out to see them. Hover one for its zone result."/>
+
+        <H2 c="5 · Coalitions"/>
+        <P c="Centre-right (FdI · Lega · FI · Noi Moderati) and Centre-left (PD · AVS · +Europa · Impegno Civico). In the 2026 scenarios the Five Star Movement has joined the centre-left, so on those pages M5S votes count toward the CSX alliance. Azione, Italia Viva and the far-right Forza Nuova run alone. In 2022 only, Azione+Italia Viva ran as one joint Az–IV list."/>
+
+        <H2 c="6 · The three data pages (top-left)"/>
+        <P c="2022 Baseline = the exact official 2022 result. 2026 Polling = current polling, with M5S in the centre-left. Blank Map = an empty canvas you fill in yourself. The ↻ Refresh button reloads whichever page you are on, throwing away every edit."/>
+
+        <H2 c="7 · Three map geographies (View toggle)"/>
+        <P c="See the same election as Single-member collegi (147), PR districts (49), or Regions (20). Switch with the View buttons in the header."/>
+
+        <H2 c="8 · Three ways to draw the map"/>
+        <P c="Choropleth shades each area by its winner, darker = bigger margin. Bubble Map draws a circle sized by the raw vote margin (in single-member view the choropleth hides so you see only bubbles). Seat Dots plots one dot per seat. Hover anything for a tooltip with % and raw votes; click to open it."/>
+
+        <H2 c="9 · Editing a result"/>
+        <P c="Click any district to open its sliders. On the 2022/2026 pages, change a single-member winner and the dashboard moves just that one seat — it never jumps. Open the 'last result' reference inside a district panel to compare to the baseline."/>
+
+        <H2 c="10 · Blank Map mode"/>
+        <P c="Start from nothing: click a district, set party shares and a % reporting, then Project Result. Until a district is projected it reads 'No results yet' on hover, and the national scoreboard only counts districts you have projected — results accumulate district by district."/>
+
+        <H2 c="11 · Simulation"/>
+        <P c="Clicking Simulation drops you onto the Blank Map. Type each party's national % freely — nothing auto-adjusts — but the inputs must add up to 100% before Run unlocks (the total is shown live). Regional parties are capped at their home area's share. Pick a length (1-10 min) and Run: the 49 districts report in 5 random batches each on a bell-curve, filling the map live — hover to watch the count climb."/>
+
+        <H2 c="12 · Parliament view"/>
+        <P c="A 400-seat hemicycle sorted left→right by ideology. Toggle By party (one colour per party) or By coalition (centre-left red, centre-right blue, everyone else their own colour) with the buttons at the top of the panel. The dashed line marks the 201-seat majority."/>
+
+        <H2 c="13 · The other panels"/>
+        <P c="Breakdown = nerdy stats (effective number of parties, Gallagher disproportionality, swing vs 2022). Distributions = national totals plus the per-district proportional allocation and a by-coalition bar. Coalition = build your own alliance and test its majority. Parties = hide/show any party."/>
+
+        <H2 c="14 · Regional parties"/>
+        <P c="A regional list (SVP) is landlocked: it only appears on the sliders of its home district, can never score elsewhere, and its national input is capped at its region's share of the country."/>
       </div>
     </aside>
   );
@@ -2247,9 +2310,9 @@ export default function ItalyApp() {
   const simTimersRef  = useRef<ReturnType<typeof setTimeout>[]>([]);
   const simNatPctsRef = useRef<Record<ItPartyId,number>>(natPcts);
 
-  useEffect(()=>{ if(rightPanel==='sim'){setSimDraftPcts({...IT_VOTE_PCT_2026});setSimDraftTouched(false);} },[rightPanel==='sim']); // eslint-disable-line
+  useEffect(()=>{ if(rightPanel==='sim'){ const t=IT_PARTIES.reduce((s,p)=>s+(IT_VOTE_PCT_2026[p.id]??0),0); const seed={} as Record<ItPartyId,number>; for(const p of IT_PARTIES) seed[p.id]=t>0?(IT_VOTE_PCT_2026[p.id]??0)/t*100:0; setSimDraftPcts(seed); setSimDraftTouched(false);} },[rightPanel==='sim']); // eslint-disable-line
 
-  const simEffLocks=useMemo(()=>new Set<ItPartyId>([...simDraftLocks,...hiddenParties]),[simDraftLocks,hiddenParties]);
+  const simTotal=useMemo(()=>IT_PARTIES.reduce((s,p)=>s+(simDraftPcts[p.id]??0),0),[simDraftPcts]);
   const [simSortOrder]=useState<ItPartyId[]>(()=>IT_LR_ORDER.slice());
 
   function stopSim(){ simTimersRef.current.forEach(clearTimeout); simTimersRef.current=[]; setSimRunning(false); }
@@ -2502,8 +2565,8 @@ export default function ItalyApp() {
                       className={`w-4 h-4 flex items-center justify-center shrink-0 ${isLocked?'text-gold':'text-ink-3 hover:text-ink'}`} title={isLocked?'Unlock':'Lock'}>
                       {isLocked?<svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="currentColor"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>:<svg width="9" height="11" viewBox="0 0 9 11" fill="none"><rect x="1" y="4.5" width="7" height="6" rx="1" fill="none" stroke="currentColor" strokeWidth="1.1"/><path d="M2.5 4.5V3a2 2 0 0 1 4 0" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" fill="none"/></svg>}
                     </button>
-                    <input type="number" min={0} max={cap} step={0.1} value={pct.toFixed(1)} disabled={isLocked}
-                      onChange={e=>{const v=parseFloat(e.target.value); if(!isNaN(v)){setSimDraftPcts(redistributePcts(simDraftPcts,id,v,simEffLocks,IT_PARTY_VOTE_CAP));setSimDraftTouched(true);}}}
+                    <input type="number" min={0} max={IT_REGIONAL_HOME[id]?cap:undefined} step={0.1} value={pct.toFixed(1)} disabled={isLocked}
+                      onChange={e=>{const v=parseFloat(e.target.value); if(!isNaN(v)){const nv=Math.max(0,IT_REGIONAL_HOME[id]?Math.min(v,cap):v); setSimDraftPcts(prev=>({...prev,[id]:nv}));setSimDraftTouched(true);}}}
                       className="w-14 h-6 shrink-0 text-right text-[11px] font-mono font-bold tabular-nums rounded-[4px] border border-default bg-transparent px-1 disabled:opacity-40 focus:outline-none focus:border-blue-500"
                       style={{color}}/>
                     <span className="text-[9px] font-mono text-ink-3 shrink-0">%</span>
@@ -2512,8 +2575,14 @@ export default function ItalyApp() {
               })}
             </div>
             <div className="px-3.5 pb-3.5 pt-2 border-t border-default shrink-0 space-y-2">
-              <button disabled={simRunning} onClick={runSim}
-                className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {!simRunning&&(
+                <div className="flex items-center justify-between text-[10px] font-mono">
+                  <span className="text-ink-3">Total</span>
+                  <span style={{color:Math.abs(simTotal-100)<0.5?'#16a34a':'#ef4444',fontWeight:700}}>{simTotal.toFixed(1)}%{Math.abs(simTotal-100)<0.5?' ✓':' · must equal 100%'}</span>
+                </div>
+              )}
+              <button disabled={simRunning||Math.abs(simTotal-100)>=0.5} onClick={runSim} title={Math.abs(simTotal-100)>=0.5?'Values must add up to 100%':''}
+                className="w-full h-8 rounded-[4px] bg-blue-600 text-white text-[11px] font-mono font-semibold uppercase tracking-wide hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
                 {simRunning?`${simProgress}/${IT_PROVINCES.length} reporting…`:'▶ Run Simulation'}
               </button>
               {(simSeats||declaredProvs)&&(
