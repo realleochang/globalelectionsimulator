@@ -29,6 +29,8 @@ type ItParty = {
 
 // Ideological order left → right for the parliament hemicycle
 const IT_LR_ORDER: ItPartyId[] = ['AVS','M5S','PD','IC','PIU','AZIV','SVP','FI','NM','LEGA','FDI'];
+// Party keys present in the geojson `pr` objects (PR list shares)
+const IT_PR_KEYS: ItPartyId[] = ['FDI','PD','M5S','LEGA','FI','AZIV','AVS','PIU','NM','IC'];
 
 const IT_PARTIES: ItParty[] = [
   { id: 'FDI',  name: 'FdI',     fullName: "Fratelli d'Italia",        color: '#214A7B', seats2022: 119, leader: 'Giorgia Meloni',     wikiTitle: 'Giorgia_Meloni' },
@@ -47,6 +49,18 @@ const IT_PARTIES: ItParty[] = [
 const IT_PARTY_MAP = Object.fromEntries(IT_PARTIES.map(p => [p.id, p])) as Record<ItPartyId, ItParty>;
 const IT_TOTAL_SEATS = 400;
 const IT_MAJORITY    = 201;
+
+// ── Map views: the same election on three geographies ─────────────────────────
+type ItMapViewId = 'uni' | 'pluri' | 'reg';
+const IT_MAP_VIEWS: { id: ItMapViewId; label: string; file: string }[] = [
+  { id: 'uni',   label: 'Single-member', file: 'italy-uninominali.geojson' },
+  { id: 'pluri', label: 'PR districts',  file: 'italy-plurinominali.geojson' },
+  { id: 'reg',   label: 'Regions',       file: 'italy-regioni.geojson' },
+];
+// Coalition colours for the FPTP (single-member) view
+const IT_COAL_COLOR: Record<string, string> = {
+  CDX:'#214A7B', CSX:'#E63946', M5S:'#F2C200', AZIV:'#00A3C7', SVP:'#B30000', AUT:'#8E44AD', SCN:'#FF6F00', NONE:'#9AA0A6',
+};
 
 // 2022 national list results — source: Ministero dell'Interno (Camera)
 const IT_VOTE_PCT_2022: Record<ItPartyId, number> = {
@@ -842,12 +856,37 @@ function ItSeatDotsLayer({
 type ItProvDraft = { provId: ItProvId; pcts: Record<ItPartyId,number>; rptPct: number };
 
 // ── Map view ──────────────────────────────────────────────────────────────────
+// Leading party (regions view) / winning coalition (single-member view) after a
+// uniform national swing applied to the geojson's baked 2022 shares.
+function swungRegLeadColor(pr: Record<string, number>, natPcts: Record<ItPartyId, number>): string {
+  let best = '', bestV = -1;
+  for (const id of IT_PR_KEYS) {
+    const base = pr[id] ?? 0; if (base <= 0) continue;
+    const sw = (IT_VOTE_PCT_2022[id] ?? 0) > 0 ? base * ((natPcts[id] ?? 0) / (IT_VOTE_PCT_2022[id] ?? 1)) : base;
+    if (sw > bestV) { bestV = sw; best = id; }
+  }
+  return partyColor((best || 'FDI') as ItPartyId);
+}
+const IT_UNI_COAL: Record<string, ItPartyId[]> = { CDX:['FDI','LEGA','FI','NM'], CSX:['PD','AVS','PIU','IC'], M5S:['M5S'], AZIV:['AZIV'] };
+function swungUniCoal(shares: Record<string, number>, natPcts: Record<ItPartyId, number>): string {
+  let best = 'NONE', bestV = -1;
+  for (const c of ['CDX','CSX','M5S','AZIV','OTH']) {
+    const base = shares[c] ?? 0; if (base <= 0) continue;
+    const members = IT_UNI_COAL[c];
+    let factor = 1;
+    if (members) { const now = members.reduce((s,id)=>s+(natPcts[id]??0),0); const then = members.reduce((s,id)=>s+(IT_VOTE_PCT_2022[id]??0),0); factor = then>0?now/then:1; }
+    const sw = base * factor;
+    if (sw > bestV) { bestV = sw; best = c; }
+  }
+  return IT_COAL_COLOR[best] ?? '#9AA0A6';
+}
+
 function ItMapView({
-  natPcts, selectedProv, onSelect, dark, bubbleMap, seatDots,
+  natPcts, selectedProv, onSelect, dark, bubbleMap, seatDots, mapView,
   declaredProvs, provOverrides, blankMode, projectedProvs, simProvFractions,
   provDraft, simNatPcts,
 }: {
-  natPcts: Record<ItPartyId,number>; selectedProv: ItProvId|null;
+  natPcts: Record<ItPartyId,number>; selectedProv: ItProvId|null; mapView: ItMapViewId;
   onSelect: (id:ItProvId)=>void; dark: boolean; bubbleMap: boolean; seatDots: boolean;
   declaredProvs?: Set<ItProvId>;
   provOverrides?: Partial<Record<ItProvId,Partial<Record<ItPartyId,number>>>>;
@@ -884,16 +923,30 @@ function ItMapView({
   useEffect(() => { provDraftRef2.current     = provDraft ?? null;      }, [provDraft]);
   useEffect(() => { simNatPctsRef2.current    = simNatPcts ?? null;     }, [simNatPcts]);
 
+  const mapViewRef = useRef(mapView);
+  useEffect(() => { mapViewRef.current = mapView; }, [mapView]);
   useEffect(() => {
-    fetch(`${import.meta.env.BASE_URL}italy-plurinominali.geojson`)
-      .then(r => r.json()).then(setGeoData).catch(console.error);
-  }, []);
+    const file = IT_MAP_VIEWS.find(v => v.id === mapView)?.file ?? 'italy-plurinominali.geojson';
+    setGeoData(null);
+    fetch(`${import.meta.env.BASE_URL}${file}`).then(r => r.json()).then(setGeoData).catch(console.error);
+  }, [mapView]);
 
   const getStyle = useCallback((feature: any): L.PathOptions => {
     const geoId  = feature?.properties?.id ?? '';
+    const border = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
+
+    // Single-member (FPTP) and Regions views: colour by the swung result, read-only
+    if (mapView !== 'pluri') {
+      const eff = simNatPcts ?? natPcts;
+      const props = feature?.properties ?? {};
+      const fill = mapView === 'uni'
+        ? swungUniCoal((props.shares as Record<string,number>) ?? {}, eff)
+        : swungRegLeadColor((props.pr as Record<string,number>) ?? {}, eff);
+      return { fillColor: fill, fillOpacity: 0.82, weight: 0.5, color: border, opacity: 1 };
+    }
+
     const provId = IT_GEOID_TO_ID[geoId];
     const isSel  = provId === selectedProv;
-    const border = dark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.35)';
 
     if (bubbleMap) return { fillOpacity:0, weight:0.4, color:dark?'rgba(255,255,255,0.18)':'rgba(0,0,0,0.18)', opacity:0.6 };
     if (seatDots) return { fillColor:dark?'#1f2937':'#EEF1F5', fillOpacity:isSel?0.5:0.32, weight:isSel?1.4:0.5, color:isSel?'#c8a020':border, opacity:0.7 };
@@ -913,7 +966,7 @@ function ItMapView({
     const fill    = getProvFill(effectiveNatPcts, provId, dark, provOverrides?.[provId]);
     const opacity = isDeclared ? 0.78 : Math.max(0.35, 0.78*(simFrac??1));
     return { fillColor:fill, fillOpacity:opacity, weight:isSel?2:0.4, color:isSel?'#c8a020':border, opacity:1 };
-  }, [natPcts, selectedProv, dark, bubbleMap, seatDots, declaredProvs, provOverrides, blankMode, simProvFractions, simNatPcts]);
+  }, [natPcts, selectedProv, dark, bubbleMap, seatDots, mapView, declaredProvs, provOverrides, blankMode, simProvFractions, simNatPcts]);
 
   useEffect(() => { layerRef.current?.setStyle((f:any)=>getStyle(f)); }, [getStyle]);
 
@@ -923,6 +976,24 @@ function ItMapView({
 
     layer.on('click', () => { if (provId) onSelectRef.current(provId); });
     layer.on('mousemove', (e: L.LeafletMouseEvent) => {
+      // uni / regions views: tooltip from the baked result (read-only)
+      if (mapViewRef.current !== 'pluri') {
+        const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+        const props = feature?.properties ?? {};
+        const nm = String(props.den ?? props.reg_name ?? '');
+        let parties: { id: ItPartyId; pct: number; rawVotes?: number }[] = [];
+        if (mapViewRef.current === 'uni') {
+          const sh = (props.shares as Record<string,number>) ?? {};
+          const REP: Record<string, ItPartyId> = { CDX:'FDI', CSX:'PD', M5S:'M5S', AZIV:'AZIV', OTH:'NM' };
+          parties = (['CDX','CSX','M5S','AZIV','OTH'] as const).map(c => ({ id: REP[c], pct: sh[c] ?? 0 }))
+            .filter(p => p.pct > 0).sort((a,b)=>b.pct-a.pct);
+        } else {
+          const pr = (props.pr as Record<string,number>) ?? {};
+          parties = IT_PR_KEYS.map(id => ({ id, pct: pr[id] ?? 0 })).filter(p => p.pct >= 1).sort((a,b)=>b.pct-a.pct).slice(0,6);
+        }
+        setTooltip({ x:e.originalEvent.clientX-rect.left, y:e.originalEvent.clientY-rect.top, name:nm, parties, leader:parties[0]?.id??null, reportingPct:undefined });
+        return;
+      }
       if (!provId) { setTooltip(null); return; }
       const draft    = provDraftRef2.current;
       const hasDraft = draft?.provId === provId;
@@ -964,7 +1035,7 @@ function ItMapView({
             style={(f:any)=>getStyle(f)} onEachFeature={onEachFeature}
             {...({ smoothFactor:0 } as any)} />
         )}
-        {geoData && bubbleMap && (
+        {geoData && bubbleMap && mapView==='pluri' && (
           <ItBubbleLayer
             geoData={geoData} natPcts={simNatPcts??natPcts} containerRef={containerRef}
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
@@ -974,7 +1045,7 @@ function ItMapView({
             simNatPctsRef={simNatPctsRef2}
           />
         )}
-        {geoData && seatDots && (
+        {geoData && seatDots && mapView==='pluri' && (
           <ItSeatDotsLayer
             geoData={geoData} natPcts={simNatPcts??natPcts} containerRef={containerRef}
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
@@ -1738,6 +1809,7 @@ export default function ItalyApp() {
   const [selectedProv,setSelectedProv]         = useState<ItProvId|null>(null);
   const [bubbleMap,setBubbleMap]               = useState(false);
   const [seatDots,setSeatDots]                 = useState(false);
+  const [mapView,setMapView]                   = useState<ItMapViewId>('pluri');
   const [scoreboardVisible,setScoreboardVisible] = useState(true);
   const [hiddenParties,setHiddenParties]       = useState<Set<ItPartyId>>(new Set());
 
@@ -1882,8 +1954,15 @@ export default function ItalyApp() {
           <button onClick={()=>openRight('distributions')} className={rightPanel==='distributions'?btnActive:btnMuted}>Distributions</button>
           <button onClick={()=>openRight('coalition')} className={rightPanel==='coalition'?btnActive:btnMuted}>Coalition</button>
           <button onClick={()=>openLeft('parli')}      className={leftPanel==='parli'     ?btnActive:btnMuted}>Parliament</button>
-          <button onClick={()=>{setBubbleMap(v=>!v);setSeatDots(false);}}    className={bubbleMap?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Bubble Map</button>
-          <button onClick={()=>{setSeatDots(v=>!v);setBubbleMap(false);}}    className={seatDots?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Seat Dots</button>
+          <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
+          <span className="text-[8px] font-mono uppercase tracking-wider text-ink-3 shrink-0 hidden md:block">View</span>
+          {IT_MAP_VIEWS.map(v=>(
+            <button key={v.id} onClick={()=>{ setMapView(v.id); if(v.id!=='pluri'){setSelectedProv(null);setBubbleMap(false);setSeatDots(false);} }}
+              className={mapView===v.id?`${btnBase} bg-[#7C3AED] text-white`:btnMuted}>{v.label}</button>
+          ))}
+          <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
+          <button onClick={()=>{if(mapView!=='pluri')setMapView('pluri');setBubbleMap(v=>!v);setSeatDots(false);}}    className={bubbleMap?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Bubble Map</button>
+          <button onClick={()=>{if(mapView!=='pluri')setMapView('pluri');setSeatDots(v=>!v);setBubbleMap(false);}}    className={seatDots?`${btnBase} bg-emerald-600 text-white hover:bg-emerald-700`:btnMuted}>Seat Dots</button>
           <button onClick={()=>openRight('tutorial')}  className={rightPanel==='tutorial' ?btnActive:btnMuted}>Tutorial</button>
         </div>
         <div className="shrink-0 flex items-center gap-2 pr-4">
@@ -1914,7 +1993,7 @@ export default function ItalyApp() {
         {/* MAP */}
         <div className="relative flex-1 min-w-0 min-h-0">
           <ItMapView
-            natPcts={natPcts} selectedProv={selectedProv}
+            natPcts={natPcts} selectedProv={selectedProv} mapView={mapView}
             onSelect={p=>setSelectedProv(prev=>prev===p?null:p)}
             dark={dark} bubbleMap={bubbleMap} seatDots={seatDots}
             declaredProvs={declaredProvs} provOverrides={provOverrides}
