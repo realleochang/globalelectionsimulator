@@ -2293,10 +2293,30 @@ export default function ItalyApp() {
     return counts;
   },[uniColl,fptpOverrides,displayPcts,is2026]);
   const displaySeats=useMemo(()=>{
-    // pristine 2022 baseline → exact official per-party seats; once a district is edited, switch to the live engine
-    if(preset==='baseline'&&!simSeats&&Object.keys(fptpOverrides).length===0&&Object.keys(provOverrides).length===0) return IT_SEATS_2022;
-    return simSeats??blankSeats??calcAllProvinceSeats(displayPcts,fptpCounts,is2026,provOverrides);
-  },[preset,simSeats,blankSeats,displayPcts,fptpCounts,is2026,fptpOverrides,provOverrides]);
+    if(simSeats) return simSeats;
+    if(blankSeats) return blankSeats;
+    if(preset==='baseline'){
+      // The 2022 baseline shows the EXACT official result and stays CONTINUOUS under
+      // editing: each flipped collegio just moves one seat from its baseline
+      // representative to its new one. So editing a district changes ~1 seat instead
+      // of discontinuously jumping to the model's own totals (which differ, e.g. the
+      // model can't reproduce Lega's 66 FPTP-heavy seats).
+      const out:Partial<Record<ItPartyId,number>>={...IT_SEATS_2022};
+      for(const c of Object.values(uniColl)){
+        const ov=fptpOverrides[c.id]; if(!ov) continue;
+        const baseCoal=uniWinner(c.shares,displayPcts,is2026);
+        const editCoal=uniCoalShares(ov,is2026)[0]?.c??baseCoal;
+        if(baseCoal===editCoal) continue;
+        const circo=itCirco(c.name);
+        const dec=collegioRep(circo,baseCoal,displayPcts,is2026);
+        const inc=collegioRep(circo,editCoal,displayPcts,is2026);
+        out[dec]=(out[dec]??0)-1;
+        out[inc]=(out[inc]??0)+1;
+      }
+      return out;
+    }
+    return calcAllProvinceSeats(displayPcts,fptpCounts,is2026,provOverrides);
+  },[preset,simSeats,blankSeats,displayPcts,fptpCounts,is2026,fptpOverrides,provOverrides,uniColl]);
 
   const simPartialPcts=useMemo<Record<ItPartyId,number>|null>(()=>{
     if(!simNatPcts) return null;
