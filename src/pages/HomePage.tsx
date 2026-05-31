@@ -14,12 +14,12 @@ export const COUNTRIES = [
     electionType: 'EU Parliament Election', subtitle: 'European Parliament',
     lat: 50, lng: 10,
     accent: 'linear-gradient(90deg,#003399,#FFCC00,#003399)',
-    locked: true as true,
     parties: [
-      { color: '#8B0000', abbr: 'LEFT'  }, { color: '#57B45F', abbr: 'G/EFA' },
-      { color: '#F0001C', abbr: 'S&D'   }, { color: '#FFD700', abbr: 'RE'    },
+      { color: '#8B0000', abbr: 'LEFT'  }, { color: '#3FA34D', abbr: 'G/EFA' },
+      { color: '#F0001C', abbr: 'S&D'   }, { color: '#FFCC00', abbr: 'RE'    },
       { color: '#3399FF', abbr: 'EPP'   }, { color: '#0054A5', abbr: 'ECR'   },
-      { color: '#1D2D5C', abbr: 'PfE'   },
+      { color: '#1D2D5C', abbr: 'PfE'   }, { color: '#5D5FA3', abbr: 'ESN'   },
+      { color: '#8A8D91', abbr: 'NI'    },
     ],
   },
   {
