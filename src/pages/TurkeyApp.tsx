@@ -1153,27 +1153,40 @@ function trProvBatchTimes(totalMs: number): number[] {
 }
 
 // Noisy partial votes — drifts toward final answer as fraction approaches 1.
-function trPartialVotes(finalVotes: Record<string, number>, f: number, seed: number): Record<string, number> {
+// Precompute 10 batch vote snapshots for one province. Each batch adds an
+// increment — so cumulative votes per candidate are strictly non-decreasing.
+// The final snapshot always equals finalVotes exactly.
+function trComputeBatches(
+  finalVotes: Record<string, number>,
+  cuts: number[],   // length BATCHES+1, cuts[0]=0, cuts[BATCHES]=1
+  seed: number,
+): Record<string, number>[] {
   const ids = Object.keys(finalVotes);
   const finalTotal = ids.reduce((s, id) => s + finalVotes[id], 0);
-  if (finalTotal === 0 || f <= 0) return Object.fromEntries(ids.map(id => [id, 0]));
-  if (f >= 1) return { ...finalVotes };
-  const counted = Math.round(finalTotal * f);
-  const noiseAmp = 0.18 * (1 - f);
-  let shareSum = 0;
-  const noisyShares: Record<string, number> = {};
-  ids.forEach((id, i) => {
-    const trueShare = finalVotes[id] / finalTotal;
-    const phase = (seed * 7919 + i * 1301) % 1;
-    const noise = noiseAmp * Math.sin(phase * Math.PI * 2 + f * Math.PI);
-    noisyShares[id] = Math.max(0.001, trueShare + noise);
-    shareSum += noisyShares[id];
-  });
-  const raw = ids.map(id => Math.round((noisyShares[id] / shareSum) * counted));
-  const diff = counted - raw.reduce((s, v) => s + v, 0);
-  const maxIdx = raw.reduce((bi, v, i) => v > raw[bi] ? i : bi, 0);
-  raw[maxIdx] = Math.max(0, raw[maxIdx] + diff);
-  return Object.fromEntries(ids.map((id, i) => [id, raw[i]]));
+  const BATCHES = cuts.length - 1;
+  if (finalTotal === 0) return Array(BATCHES).fill(Object.fromEntries(ids.map(id => [id, 0])));
+  const snapshots: Record<string, number>[] = [];
+  const cum: Record<string, number> = Object.fromEntries(ids.map(id => [id, 0]));
+  for (let b = 0; b < BATCHES; b++) {
+    if (b === BATCHES - 1) { snapshots.push({ ...finalVotes }); break; }
+    const incFrac = cuts[b + 1] - cuts[b];
+    const batchTotal = Math.round(finalTotal * incFrac);
+    const noiseAmp = 0.28 * (1 - cuts[b + 1]);  // noise collapses as counting progresses
+    let shareSum = 0;
+    const ns: Record<string, number> = {};
+    ids.forEach((id, i) => {
+      const phase = (seed * 7919 + i * 1301 + b * 4567) % 1;
+      const noise = noiseAmp * Math.sin(phase * Math.PI * 2);
+      ns[id] = Math.max(0, finalVotes[id] / finalTotal + noise);
+      shareSum += ns[id];
+    });
+    const raw = ids.map(id => Math.round((ns[id] / (shareSum || 1)) * batchTotal));
+    const diff = batchTotal - raw.reduce((s, v) => s + v, 0);
+    raw[raw.reduce((bi, v, i) => v > raw[bi] ? i : bi, 0)] += diff;
+    ids.forEach((id, i) => { cum[id] = (cum[id] ?? 0) + Math.max(0, raw[i]); });
+    snapshots.push({ ...cum });
+  }
+  return snapshots;
 }
 
 function simulateTurkeyR1(
@@ -2325,20 +2338,18 @@ export default function TurkeyApp() {
   const deptResults = useMemo<Record<string, Partial<Record<string, number>>>>(() => {
     if (activeElection === '2028R1') {
       const out: Record<string, Partial<Record<string, number>>> = {};
-      for (const [code, r] of Object.entries(workingDeptResults)) {
-        if (projected2028.has(code)) out[code] = r;
-      }
+      for (const [code, r] of Object.entries(workingDeptResults))
+        if (projected2028.has(code) || (simBatchFractions[code] ?? 0) > 0) out[code] = r;
       return out;
     }
     if (activeElection === '2028R2') {
       const out: Record<string, Partial<Record<string, number>>> = {};
-      for (const [code, r] of Object.entries(workingDeptResults)) {
-        if (projected2028R2.has(code)) out[code] = r;
-      }
+      for (const [code, r] of Object.entries(workingDeptResults))
+        if (projected2028R2.has(code) || (simBatchFractionsR2[code] ?? 0) > 0) out[code] = r;
       return out;
     }
     return workingDeptResults;
-  }, [activeElection, workingDeptResults, projected2028, projected2028R2]);
+  }, [activeElection, workingDeptResults, projected2028, projected2028R2, simBatchFractions, simBatchFractionsR2]);
 
   // ── 2028 R1 projection engine — always live, drives both R1 ADVANCE badges and R2 panel ──
   const r2028Reporting = useMemo(() => {
@@ -2523,22 +2534,21 @@ export default function TurkeyApp() {
 
     const timers: ReturnType<typeof setTimeout>[] = [];
     for (const code of deptCodesR1) {
-      const fullResults = r1Results[code] ?? {};
+      const fullResults = r1Results[code] as Record<string,number> ?? {};
       const seed = deptCodesR1.indexOf(code);
       const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      const snapshots = trComputeBatches(fullResults, cuts, seed);
       const batchTimes = trProvBatchTimes(totalMs);
       for (let b = 0; b < BATCHES; b++) {
-        const cumFrac = cuts[b + 1];
-        const isLast  = b === BATCHES - 1;
+        const snap = snapshots[b];
+        const frac = cuts[b + 1];
+        const isLast = b === BATCHES - 1;
         timers.push(setTimeout(() => {
+          setOverrides(prev => ({ ...prev, '2028R1': { ...prev['2028R1'], [code]: snap } }));
+          setSimBatchFractions(prev => ({ ...prev, [code]: frac }));
           if (isLast) {
-            setSimBatchFractions(prev => ({ ...prev, [code]: 1 }));
             setProjected2028(prev => new Set([...prev, code]));
             setSimProgress(prev => prev + 1);
-          } else {
-            const partial = trPartialVotes(fullResults as Record<string,number>, cumFrac, seed);
-            setOverrides(prev => ({ ...prev, '2028R1': { ...prev['2028R1'], [code]: partial } }));
-            setSimBatchFractions(prev => ({ ...prev, [code]: cumFrac }));
           }
         }, batchTimes[b]));
       }
@@ -2580,22 +2590,21 @@ export default function TurkeyApp() {
 
     const timers: ReturnType<typeof setTimeout>[] = [];
     for (const code of deptCodesR2) {
-      const fullResults = r2Results[code] ?? {};
+      const fullResults = r2Results[code] as Record<string,number> ?? {};
       const seed = deptCodesR2.indexOf(code);
       const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      const snapshots = trComputeBatches(fullResults, cuts, seed);
       const batchTimes = trProvBatchTimes(totalMs);
       for (let b = 0; b < BATCHES; b++) {
-        const cumFrac = cuts[b + 1];
-        const isLast  = b === BATCHES - 1;
+        const snap = snapshots[b];
+        const frac = cuts[b + 1];
+        const isLast = b === BATCHES - 1;
         timers.push(setTimeout(() => {
+          setOverrides(prev => ({ ...prev, '2028R2': { ...prev['2028R2'], [code]: snap } }));
+          setSimBatchFractionsR2(prev => ({ ...prev, [code]: frac }));
           if (isLast) {
-            setSimBatchFractionsR2(prev => ({ ...prev, [code]: 1 }));
             setProjected2028R2(prev => new Set([...prev, code]));
             setSimProgress(prev => prev + 1);
-          } else {
-            const partial = trPartialVotes(fullResults as Record<string,number>, cumFrac, seed);
-            setOverrides(prev => ({ ...prev, '2028R2': { ...prev['2028R2'], [code]: partial } }));
-            setSimBatchFractionsR2(prev => ({ ...prev, [code]: cumFrac }));
           }
         }, batchTimes[b]));
       }

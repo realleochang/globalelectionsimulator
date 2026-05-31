@@ -1211,37 +1211,40 @@ function arProvBatchTimes(totalMs: number): number[] {
 // Build noisy partial votes for a province at batch fraction f (0-1).
 // Each candidate's running share drifts from a starting noise toward the true final value.
 // At f=1 the result snaps exactly to finalVotes.
-function arPartialVotes(
+// Precompute 10 batch vote snapshots for one province. Each batch adds an
+// increment — so cumulative votes per candidate are strictly non-decreasing.
+// The final snapshot always equals finalVotes exactly.
+function arComputeBatches(
   finalVotes: Record<string, number>,
-  f: number,   // fraction of votes counted (0–1)
-  seed: number, // stable per-province seed for noise direction
-): Record<string, number> {
+  cuts: number[],   // length BATCHES+1, cuts[0]=0, cuts[BATCHES]=1
+  seed: number,
+): Record<string, number>[] {
   const ids = Object.keys(finalVotes);
   const finalTotal = ids.reduce((s, id) => s + finalVotes[id], 0);
-  if (finalTotal === 0 || f <= 0) return Object.fromEntries(ids.map(id => [id, 0]));
-  if (f >= 1) return { ...finalVotes };
-
-  const counted = Math.round(finalTotal * f);
-  // Each candidate gets a noisy share; noise amplitude shrinks as f→1
-  const noiseAmp = 0.18 * (1 - f);   // ±18% noise at start, collapses to 0 at end
-  const noisyShares: Record<string, number> = {};
-  let shareSum = 0;
-  ids.forEach((id, i) => {
-    const trueShare = finalVotes[id] / finalTotal;
-    // deterministic-ish noise per candidate per province using seed
-    const phase = (seed * 7919 + i * 1301) % 1;
-    const noise = noiseAmp * Math.sin(phase * Math.PI * 2 + f * Math.PI);
-    noisyShares[id] = Math.max(0.001, trueShare + noise);
-    shareSum += noisyShares[id];
-  });
-  // Normalise and round to integer votes
-  const raw = ids.map(id => Math.round((noisyShares[id] / shareSum) * counted));
-  // Fix rounding residual on the largest candidate
-  const rawSum = raw.reduce((s, v) => s + v, 0);
-  const diff = counted - rawSum;
-  const maxIdx = raw.reduce((bi, v, i) => v > raw[bi] ? i : bi, 0);
-  raw[maxIdx] = Math.max(0, raw[maxIdx] + diff);
-  return Object.fromEntries(ids.map((id, i) => [id, raw[i]]));
+  const BATCHES = cuts.length - 1;
+  if (finalTotal === 0) return Array(BATCHES).fill(Object.fromEntries(ids.map(id => [id, 0])));
+  const snapshots: Record<string, number>[] = [];
+  const cum: Record<string, number> = Object.fromEntries(ids.map(id => [id, 0]));
+  for (let b = 0; b < BATCHES; b++) {
+    if (b === BATCHES - 1) { snapshots.push({ ...finalVotes }); break; }
+    const incFrac = cuts[b + 1] - cuts[b];
+    const batchTotal = Math.round(finalTotal * incFrac);
+    const noiseAmp = 0.28 * (1 - cuts[b + 1]);  // noise collapses as counting progresses
+    let shareSum = 0;
+    const ns: Record<string, number> = {};
+    ids.forEach((id, i) => {
+      const phase = (seed * 7919 + i * 1301 + b * 4567) % 1;
+      const noise = noiseAmp * Math.sin(phase * Math.PI * 2);
+      ns[id] = Math.max(0, finalVotes[id] / finalTotal + noise);
+      shareSum += ns[id];
+    });
+    const raw = ids.map(id => Math.round((ns[id] / (shareSum || 1)) * batchTotal));
+    const diff = batchTotal - raw.reduce((s, v) => s + v, 0);
+    raw[raw.reduce((bi, v, i) => v > raw[bi] ? i : bi, 0)] += diff;
+    ids.forEach((id, i) => { cum[id] = (cum[id] ?? 0) + Math.max(0, raw[i]); });
+    snapshots.push({ ...cum });
+  }
+  return snapshots;
 }
 
 function simulateArgentinaR1(
@@ -2374,42 +2377,20 @@ export default function ArgentinaApp() {
   // Published results — what the map and scoreboard see.
   // 2027R1: fully projected depts show exact votes; partial batch depts show noisy partial votes.
   // 2027R2: only fully projected depts shown.
+  // Snapshots are now written directly into overrides on every batch, so
+  // workingDeptResults already contains the current (monotonically increasing)
+  // partial vote state. Just gate on projected OR any batch having fired.
   const deptResults = useMemo<Record<string, Partial<Record<string, number>>>>(() => {
     if (activeElection === '2027R1') {
       const out: Record<string, Partial<Record<string, number>>> = {};
-      for (const [code, r] of Object.entries(workingDeptResults)) {
-        if (projected2027.has(code)) {
-          out[code] = r;  // fully reported — exact final votes
-        } else {
-          const f = simBatchFractions[code];
-          if (f && f > 0) {
-            // In-progress batch: noisy partial votes for suspense
-            const final = Object.fromEntries(
-              Object.entries(r).map(([id, v]) => [id, (v as number) ?? 0])
-            ) as Record<string, number>;
-            const seed = Object.keys(PROV_2023R1_TOTALS).indexOf(code);
-            out[code] = arPartialVotes(final, f, seed);
-          }
-        }
-      }
+      for (const [code, r] of Object.entries(workingDeptResults))
+        if (projected2027.has(code) || (simBatchFractions[code] ?? 0) > 0) out[code] = r;
       return out;
     }
     if (activeElection === '2027R2') {
       const out: Record<string, Partial<Record<string, number>>> = {};
-      for (const [code, r] of Object.entries(workingDeptResults)) {
-        if (projected2027R2.has(code)) {
-          out[code] = r;
-        } else {
-          const f = simBatchFractionsR2[code];
-          if (f && f > 0) {
-            const final = Object.fromEntries(
-              Object.entries(r).map(([id, v]) => [id, (v as number) ?? 0])
-            ) as Record<string, number>;
-            const seed = Object.keys(PROV_2023R2_TOTALS).indexOf(code);
-            out[code] = arPartialVotes(final, f, seed);
-          }
-        }
-      }
+      for (const [code, r] of Object.entries(workingDeptResults))
+        if (projected2027R2.has(code) || (simBatchFractionsR2[code] ?? 0) > 0) out[code] = r;
       return out;
     }
     return workingDeptResults;
@@ -2605,22 +2586,24 @@ export default function ArgentinaApp() {
     let r1Declared = 0;
 
     for (const code of deptCodesR1) {
-      // Random cumulative fractions for 10 batches
+      const finalVotes = r1Results[code] as Record<string,number> ?? {};
+      const seed = deptCodesR1.indexOf(code);
       const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
-      // Every province starts early, batches land randomly over the full duration
+      // Precompute monotonic snapshots — votes never decrease between batches
+      const snapshots = arComputeBatches(finalVotes, cuts, seed);
       const batchTimes = arProvBatchTimes(totalMs);
 
       for (let b = 0; b < BATCHES; b++) {
-        const cumFrac = cuts[b + 1];
-        const isLast  = b === BATCHES - 1;
+        const snap = snapshots[b];
+        const frac = cuts[b + 1];
+        const isLast = b === BATCHES - 1;
         timers.push(setTimeout(() => {
+          setOverrides(prev => ({ ...prev, '2027R1': { ...prev['2027R1'], [code]: snap } }));
+          setSimBatchFractions(prev => ({ ...prev, [code]: frac }));
           if (isLast) {
-            setSimBatchFractions(prev => ({ ...prev, [code]: 1 }));
             setProjected2027(prev => new Set([...prev, code]));
             r1Declared++;
             setSimProgress(r1Declared);
-          } else {
-            setSimBatchFractions(prev => ({ ...prev, [code]: cumFrac }));
           }
         }, batchTimes[b]));
       }
@@ -2667,20 +2650,23 @@ export default function ArgentinaApp() {
     let r2Declared = 0;
 
     for (const code of deptCodesR2) {
+      const finalVotes = r2Results[code] as Record<string,number> ?? {};
+      const seed = deptCodesR2.indexOf(code);
       const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      const snapshots = arComputeBatches(finalVotes, cuts, seed);
       const batchTimes = arProvBatchTimes(totalMs);
 
       for (let b = 0; b < BATCHES; b++) {
-        const cumFrac = cuts[b + 1];
-        const isLast  = b === BATCHES - 1;
+        const snap = snapshots[b];
+        const frac = cuts[b + 1];
+        const isLast = b === BATCHES - 1;
         timers.push(setTimeout(() => {
+          setOverrides(prev => ({ ...prev, '2027R2': { ...prev['2027R2'], [code]: snap } }));
+          setSimBatchFractionsR2(prev => ({ ...prev, [code]: frac }));
           if (isLast) {
-            setSimBatchFractionsR2(prev => ({ ...prev, [code]: 1 }));
             setProjected2027R2(prev => new Set([...prev, code]));
             r2Declared++;
             setSimProgress(r2Declared);
-          } else {
-            setSimBatchFractionsR2(prev => ({ ...prev, [code]: cumFrac }));
           }
         }, batchTimes[b]));
       }
