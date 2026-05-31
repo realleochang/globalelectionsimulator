@@ -1984,17 +1984,24 @@ export default function BrazilApp() {
     const remainingVotes  = Math.max(0, totalVotes - reportedVotes);
     const sorted          = Object.entries(tally).sort(([, a], [, b]) => b - a);
     const projectedSet    = new Set<string>();
+    const outrightWinner  = new Set<string>(); // statistically certain R1 win (no runoff)
     const LOCK_SHARE      = 0.65;
     const thirdVotes      = sorted[2]?.[1] ?? 0;
-    if (sorted.length >= 1 && reportingPct >= 0.20) {
+    if (sorted.length >= 1 && reportingPct >= 0.15) {
       const [p1id, p1votes] = sorted[0];
-      if (p1votes > thirdVotes + LOCK_SHARE * remainingVotes) projectedSet.add(p1id);
+      // Outright win: p1 already holds > half of ALL possible votes —
+      // even routing every remaining vote to opponents can't drop them below 50%.
+      if (p1votes > totalVotes / 2) outrightWinner.add(p1id);
+      // R2 advance: statistically locked (can't be caught by 3rd-place even
+      // if all remaining votes went to them).
+      if (reportingPct >= 0.20 && p1votes > thirdVotes + LOCK_SHARE * remainingVotes)
+        projectedSet.add(p1id);
     }
     if (sorted.length >= 2 && reportingPct >= 0.35) {
       const [p2id, p2votes] = sorted[1];
       if (p2votes > thirdVotes + LOCK_SHARE * remainingVotes) projectedSet.add(p2id);
     }
-    return { reportingPct, projectedSet };
+    return { reportingPct, projectedSet, outrightWinner };
   }, [overrides, projected2026R1, stateReportingPct2026R1]);
 
   // Live reporting tracker for 2026R2 — drives winner badge + reporting widget
@@ -2017,6 +2024,7 @@ export default function BrazilApp() {
     const remainingVotes = Math.max(0, totalVotes - reportedVotes);
     const sorted         = Object.entries(tally).sort(([, a], [, b]) => b - a);
     const projectedWinner = new Set<string>();
+    // Only project R2 winner when enough is in and the lead is mathematically locked
     if (sorted.length >= 2 && reportingPct >= 0.20) {
       const [p1id, p1votes] = sorted[0];
       const [, p2votes]     = sorted[1];
@@ -2343,7 +2351,9 @@ export default function BrazilApp() {
                 picks={picks2026}
                 onPick={handlePick2026}
                 projectedAdvancers={
-                  activeElection === '2026R1' ? r2026Reporting.projectedSet
+                  activeElection === '2026R1'
+                    // Outright win takes priority; otherwise show statistically-locked advancers
+                    ? (r2026Reporting.outrightWinner.size > 0 ? r2026Reporting.outrightWinner : r2026Reporting.projectedSet)
                   : activeElection === '2026R2' ? r2026R2Reporting.projectedWinner
                   : undefined
                 }
@@ -2644,14 +2654,9 @@ function Br2026Scoreboard({ stateResults, election, allPartyIds, picks, onPick, 
   [allPartyIds, popularVote]);
 
   const top2Ids = useMemo(() => grandTotal > 0 ? new Set(parties.slice(0, 2).map(p => p.id)) : new Set<string>(), [parties, grandTotal]);
-  const winnerIds = useMemo<Set<string>>(() => {
-    // R1: if one candidate already exceeds 50%, show only their checkmark (outright win).
-    if (election === '2026R1' && grandTotal > 0) {
-      const majority = parties.find(p => (popularVote[p.id] ?? 0) / grandTotal > 0.5);
-      if (majority) return new Set([majority.id]);
-    }
-    return projectedAdvancers ?? new Set();
-  }, [election, parties, popularVote, grandTotal, projectedAdvancers]);
+  // winnerIds comes purely from the statistical projection engine (projectedAdvancers),
+  // which gates on reportingPct thresholds and LOCK_SHARE — no raw-count shortcuts.
+  const winnerIds = useMemo<Set<string>>(() => projectedAdvancers ?? new Set(), [projectedAdvancers]);
 
   return (
     <div className="relative bg-white border-b border-default shrink-0 select-none z-[45]">
