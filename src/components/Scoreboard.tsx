@@ -76,14 +76,9 @@ function LeaderDropdown({ options, value, color, onChange }: {
       </button>
       {open && pos && (
         <>
-          {/* Full-screen scrim below the dropdown but above the map */}
           <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
-          {/* Dropdown renders above map (Leaflet z-index peaks ~600) and above scrim */}
-          <div className="fixed z-[9999] border border-default rounded-lg shadow-xl py-1"
-            style={{
-              top: pos.top, left: pos.left, transform: 'translateX(-50%)', minWidth: 190,
-              background: 'var(--color-canvas, #fff)',
-            }}>
+          <div className="fixed z-[9999] bg-white border border-default rounded-lg shadow-xl py-1"
+            style={{ top: pos.top, left: pos.left, transform: 'translateX(-50%)', minWidth: 190 }}>
             {options.map(opt => (
               <button key={opt} onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
                 className={`flex items-center gap-2 w-full px-3 py-2 text-left transition-colors ${opt === value ? 'bg-[#f8f7f4]' : 'hover:bg-hover'}`}>
