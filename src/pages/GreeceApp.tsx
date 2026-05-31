@@ -213,6 +213,27 @@ function grNatPctsFromVotes(
   for (const p of ES_PARTIES) out[p.id] = tot8 > 0 ? agg[p.id] / tot8 * modelledSharePct : 0;
   return out;
 }
+// Live seats during a sim: only the seats that have actually been DECIDED so far — the full
+// allocation scaled down to the share of the national vote counted, so the tally climbs 0 → 300
+// as constituencies report (rather than projecting all 300 from a partial count).
+function grLiveSeats(
+  simVotes: Partial<Record<EsProvId, Partial<Record<EsPartyId, number>>>>,
+  fracs: Partial<Record<EsProvId, number>>,
+  modelledSharePct: number,
+): Partial<Record<EsPartyId, number>> {
+  const full = grAllocate(grNatPctsFromVotes(simVotes, modelledSharePct));   // ~300, bonus included
+  let wRep = 0, wTot = 0;
+  for (const prov of ES_PROVINCES) { wTot += prov.weight; const f = fracs[prov.id]; if (f) wRep += prov.weight * f; }
+  const frac = wTot > 0 ? wRep / wTot : 0;
+  const target = Math.round(ES_TOTAL_SEATS * frac);
+  const rows = ES_PARTIES.map(p => p.id).filter(id => (full[id] ?? 0) > 0)
+    .map(id => { const x = (full[id] ?? 0) * frac; return { id, f: Math.floor(x), r: x - Math.floor(x) }; });
+  const out: Partial<Record<EsPartyId, number>> = {}; let sum = 0;
+  for (const r of rows) { out[r.id] = r.f; sum += r.f; }
+  rows.sort((a, b) => b.r - a.r);
+  let i = 0; while (sum < target && rows.length) { out[rows[i % rows.length].id] = (out[rows[i % rows.length].id] ?? 0) + 1; sum++; i++; }
+  return out;
+}
 
 
 // Redistribute % when one slider moves; unlocked others absorb the change
@@ -429,7 +450,7 @@ function zoomScale(zoom: number): number { return Math.max(0.15, Math.min(2.0, (
 function EsBubbleLayer({
   geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef,
   declaredProvs, provOverrides, provOverridesRef, blankMode, projectedProvs,
-  simProvFractions, simNatPctsRef,
+  simProvFractions, simProvVotes, simNatPctsRef,
 }: {
   geoData: any; natPcts: Record<EsPartyId,number>;
   containerRef: React.RefObject<HTMLDivElement|null>;
@@ -440,6 +461,7 @@ function EsBubbleLayer({
   provOverridesRef: React.MutableRefObject<Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>>;
   blankMode?: boolean; projectedProvs?: Set<EsProvId>;
   simProvFractions?: Partial<Record<EsProvId,number>>;
+  simProvVotes?: Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>;
   simNatPctsRef?: React.MutableRefObject<Record<EsPartyId,number>|null>;
 }) {
   const map        = useMap();
@@ -465,17 +487,29 @@ function EsBubbleLayer({
       const geoId: string = path.feature?.properties?.id ?? '';
       const provId = ES_GEOID_TO_ID[geoId];
       if (!provId) return;
-      if (declaredProvs && !declaredProvs.has(provId)) return;
-      if (!declaredProvs && blankMode && !(projectedProvs?.has(provId))) return;
+      const liveOn = !!simProvVotes && Object.keys(simProvVotes).length > 0;
+      if (liveOn) { if (!simProvVotes![provId]) return; }                  // sim: only constituencies that have started
+      else {
+        if (declaredProvs && !declaredProvs.has(provId)) return;
+        if (!declaredProvs && blankMode && !(projectedProvs?.has(provId))) return;
+      }
       const bounds = (layer as any).getBounds?.();
       if (!bounds?.isValid()) return;
       const center = bounds.getCenter();
 
-      const pv     = calcProvVotes(natPcts, provId, provOverrides?.[provId]);
-      const sorted = (Object.entries(pv) as [EsPartyId,number][]).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
-      if (sorted.length === 0) return;
-      const [winId, winPct] = sorted[0];
-      const margin     = winPct - (sorted[1]?.[1] ?? 0);
+      const liveV = simProvVotes?.[provId];
+      let winId: EsPartyId, margin: number;
+      if (liveV) {
+        const s = ES_PARTIES.map(p=>({id:p.id, v:liveV[p.id]??0})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+        if (!s.length) return;
+        const tot = s.reduce((a,x)=>a+x.v,0)||1;
+        winId = s[0].id; margin = (s[0].v-(s[1]?.v??0))/tot*100;
+      } else {
+        const pv = calcProvVotes(natPcts, provId, provOverrides?.[provId]);
+        const sorted = (Object.entries(pv) as [EsPartyId,number][]).filter(([,v])=>v>0).sort(([,a],[,b])=>b-a);
+        if (sorted.length === 0) return;
+        winId = sorted[0][0]; margin = sorted[0][1] - (sorted[1]?.[1] ?? 0);
+      }
       const prov       = ES_PROVINCE_MAP[provId];
       // Bubble radius: margin-based + seat count bonus for large provinces
       const seatBonus  = Math.min((prov?.seats ?? 1) / 37 * 10, 10);
@@ -504,7 +538,7 @@ function EsBubbleLayer({
     });
     return () => { for (const {marker} of bubblesRef.current) marker.remove(); bubblesRef.current=[]; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs]);
+  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, Object.keys(simProvVotes??{}).length]);
 
   return null;
 }
@@ -514,7 +548,7 @@ function EsBubbleLayer({
 function EsSeatDotsLayer({
   geoData, natPcts, containerRef, setTooltip, onSelect, natPctsRef,
   declaredProvs, provOverrides, provOverridesRef, blankMode, projectedProvs,
-  simProvFractions, simNatPctsRef,
+  simProvFractions, simProvVotes, simNatPctsRef,
 }: {
   geoData: any; natPcts: Record<EsPartyId,number>;
   containerRef: React.RefObject<HTMLDivElement|null>;
@@ -525,6 +559,7 @@ function EsSeatDotsLayer({
   provOverridesRef: React.MutableRefObject<Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>>;
   blankMode?: boolean; projectedProvs?: Set<EsProvId>;
   simProvFractions?: Partial<Record<EsProvId,number>>;
+  simProvVotes?: Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>;
   simNatPctsRef?: React.MutableRefObject<Record<EsPartyId,number>|null>;
 }) {
   const map = useMap();
@@ -544,12 +579,20 @@ function EsSeatDotsLayer({
         const geoId: string = path.feature?.properties?.id ?? '';
         const provId = ES_GEOID_TO_ID[geoId];
         if (!provId) return;
-        if (declaredProvs && !declaredProvs.has(provId)) return;
-        if (!declaredProvs && blankMode && !(projectedProvs?.has(provId))) return;
+        const liveOn = !!simProvVotes && Object.keys(simProvVotes).length > 0;
+        if (liveOn) { if (!simProvVotes![provId]) return; }                  // sim: only constituencies that have started
+        else {
+          if (declaredProvs && !declaredProvs.has(provId)) return;
+          if (!declaredProvs && blankMode && !(projectedProvs?.has(provId))) return;
+        }
         const bounds = (layer as any).getBounds?.(); if (!bounds?.isValid()) return;
         const center = bounds.getCenter();
         const prov = ES_PROVINCE_MAP[provId];
-        const pv = calcProvVotes(natPcts, provId, provOverrides?.[provId]);
+        const liveV = simProvVotes?.[provId];
+        const lvTot = liveV ? Math.max(1, ES_PARTIES.reduce((s,q)=>s+(liveV[q.id]??0),0)) : 1;
+        const pv = liveV
+          ? Object.fromEntries(ES_PARTIES.map(p=>[p.id,(liveV[p.id]??0)/lvTot*100])) as Record<EsPartyId,number>
+          : calcProvVotes(natPcts, provId, provOverrides?.[provId]);
         const alloc = calcDHondtProv(pv, prov?.seats ?? 0);
         const colors: string[] = [];
         for (const id of ES_LR_ORDER) { const n = alloc[id] ?? 0; for (let i=0;i<n;i++) colors.push(partyColor(id)); }
@@ -586,7 +629,7 @@ function EsSeatDotsLayer({
     map.on('zoomend', layout);
     return () => { map.off('zoomend', layout); for (const m of dotsRef.current) m.remove(); dotsRef.current=[]; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, provOverrides]);
+  }, [map, geoData, natPcts, blankMode, projectedProvs, declaredProvs, provOverrides, Object.keys(simProvVotes??{}).length]);
 
   return null;
 }
@@ -736,7 +779,7 @@ function EsMapView({
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
             declaredProvs={declaredProvs} provOverrides={provOverrides}
             provOverridesRef={provOverridesRef} blankMode={blankMode}
-            projectedProvs={projectedProvs} simProvFractions={simProvFractions}
+            projectedProvs={projectedProvs} simProvFractions={simProvFractions} simProvVotes={simProvVotes}
             simNatPctsRef={simNatPctsRef2}
           />
         )}
@@ -746,7 +789,7 @@ function EsMapView({
             setTooltip={setTooltip} onSelect={onSelect} natPctsRef={natPctsRef}
             declaredProvs={declaredProvs} provOverrides={provOverrides}
             provOverridesRef={provOverridesRef} blankMode={blankMode}
-            projectedProvs={projectedProvs} simProvFractions={simProvFractions}
+            projectedProvs={projectedProvs} simProvFractions={simProvFractions} simProvVotes={simProvVotes}
             simNatPctsRef={simNatPctsRef2}
           />
         )}
@@ -1407,6 +1450,68 @@ function EsReportingWidget({ projectedProvs,provReportingPct,simProvFractions,is
   );
 }
 
+// ── Results summary popup (shown when the simulation finishes) ────────────────
+function GrResultsSummary({ result, dark, onClose }: {
+  result: { seats: Partial<Record<EsPartyId,number>>; pcts: Record<EsPartyId,number> };
+  dark: boolean; onClose: () => void;
+}) {
+  const { seats, pcts } = result;
+  const ranked = ES_PARTIES.map(p=>p.id).filter(id=>(seats[id]??0)>0).sort((a,b)=>(seats[b]??0)-(seats[a]??0));
+  const winId = ranked[0]; const win = winId?ES_PARTY_MAP[winId]:null;
+  const winSeats = winId?(seats[winId]??0):0;
+  const majority = winSeats>=ES_MAJORITY;
+  const runnerUp = ranked[1]?ES_PARTY_MAP[ranked[1]]:null;
+  const totalSeats = ES_LR_ORDER.reduce((s,id)=>s+(seats[id]??0),0);
+  const wc = win?.color ?? '#888';
+  const bg = dark?'#0d1b2e':'#ffffff';
+  const ink = dark?'#e8eef8':'#111';
+  const ink3 = dark?'rgba(255,255,255,0.5)':'rgba(0,0,0,0.45)';
+  return (
+    <div className="absolute inset-0 z-[1200] flex items-center justify-center p-4 gr-summary-in"
+      style={{background:'rgba(0,0,0,0.55)',backdropFilter:'blur(3px)'}} onClick={onClose}>
+      <div onClick={e=>e.stopPropagation()} className="w-[420px] max-w-full rounded-[16px] overflow-hidden gr-summary-card"
+        style={{background:bg, boxShadow:'0 24px 70px rgba(0,0,0,0.55)'}}>
+        <div className="px-5 pt-4 pb-4 relative" style={{background:`linear-gradient(135deg, ${wc} 0%, ${hexToRgba(wc,0.65)} 100%)`}}>
+          <button onClick={onClose} className="absolute top-2.5 right-3 text-white/85 hover:text-white text-xl leading-none">×</button>
+          <div className="text-[8px] font-mono font-bold uppercase tracking-[0.22em] text-white/85">Hellenic Parliament · Final Result</div>
+          <div className="flex items-end gap-3 mt-2.5">
+            <div className="text-[46px] font-black leading-none text-white tabular-nums" style={{letterSpacing:'-0.02em'}}>{winSeats}</div>
+            <div className="pb-1 min-w-0">
+              <div className="text-[18px] font-black text-white leading-tight truncate">{win?.name}</div>
+              <div className="text-[10px] font-mono text-white/85 mt-0.5 truncate">{win?.leader}</div>
+            </div>
+          </div>
+          <div className="mt-3 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/22 text-white text-[10px] font-mono font-bold">
+            {majority ? `✓ Single-party majority` : runnerUp ? `Largest party · ${ES_MAJORITY-winSeats} short of ${ES_MAJORITY}` : '—'}
+          </div>
+        </div>
+        <div className="px-5 py-4 space-y-2 max-h-[42vh] overflow-y-auto thin-scroll">
+          {ranked.map(id=>{
+            const p=ES_PARTY_MAP[id]; const sc=seats[id]??0; const pc=pcts[id]??0;
+            return (
+              <div key={id}>
+                <div className="flex items-center justify-between mb-0.5">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold truncate" style={{color:ink}}>
+                    <span className="w-2 h-2 rounded-full shrink-0" style={{background:p.color}}/>{p.name}
+                  </span>
+                  <span className="text-[11px] font-mono shrink-0 pl-2" style={{color:ink3}}>{pc.toFixed(1)}% · <b style={{color:ink}}>{sc}</b></span>
+                </div>
+                <div className="h-1.5 rounded-full overflow-hidden" style={{background:dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)'}}>
+                  <div className="h-full rounded-full" style={{width:`${Math.min(sc/ES_TOTAL_SEATS*100,100)}%`,background:p.color}}/>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="px-5 pb-4 flex items-center justify-between">
+          <span className="text-[9px] font-mono" style={{color:ink3}}>{totalSeats} seats · majority {ES_MAJORITY}</span>
+          <button onClick={onClose} className="px-4 py-1.5 rounded-[7px] text-[11px] font-mono font-bold text-white" style={{background:wc}}>View full results →</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ── Main app ──────────────────────────────────────────────────────────────────
 export default function GreeceApp() {
   const navigate = useNavigate();
@@ -1530,6 +1635,7 @@ export default function GreeceApp() {
   const [declaredProvs,  setDeclaredProvs]  = useState<Set<EsProvId>|undefined>();
   const [simProvFractions,setSimProvFractions] = useState<Partial<Record<EsProvId,number>>>({});
   const [simProvVotes,setSimProvVotes] = useState<Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>>({});
+  const [simResult,setSimResult] = useState<{seats:Partial<Record<EsPartyId,number>>; pcts:Record<EsPartyId,number>}|null>(null);
   const simTimersRef  = useRef<ReturnType<typeof setTimeout>[]>([]);
   const simNatPctsRef = useRef<Record<EsPartyId,number>>(natPcts);
 
@@ -1580,7 +1686,7 @@ export default function GreeceApp() {
     }
     events.sort((a,b)=>a.t-b.t);
     setSimRunning(true); setSimProgress(0);
-    setSimSeats(undefined); setDeclaredProvs(new Set()); setSimProvFractions({}); setSimProvVotes({});
+    setSimSeats(undefined); setDeclaredProvs(new Set()); setSimProvFractions({}); setSimProvVotes({}); setSimResult(null);
     const localFrac:Partial<Record<EsProvId,number>>={};
     const localVotes:Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>={};
     const localDecl=new Set<EsProvId>();
@@ -1592,9 +1698,11 @@ export default function GreeceApp() {
         const fracSnap={...localFrac}; const votesSnap={...localVotes}; const declSnap=new Set(localDecl);
         setSimProvFractions(fracSnap); setSimProvVotes(votesSnap); setDeclaredProvs(declSnap);
         setSimProgress(Object.keys(fracSnap).length);
-        setSimSeats(grAllocate(grNatPctsFromVotes(votesSnap,modelledSharePct)));
+        setSimSeats(grLiveSeats(votesSnap,fracSnap,modelledSharePct));
         if(declSnap.size>=totalProvs){
-          setSimSeats(calcAllProvinceSeats(simNatPctsRef.current)); setSimRunning(false);
+          const finalSeats=calcAllProvinceSeats(simNatPctsRef.current);
+          setSimSeats(finalSeats); setSimRunning(false);
+          setSimResult({seats:finalSeats, pcts:{...simNatPctsRef.current}});
         }
       },ev.t));
     }
@@ -1703,6 +1811,20 @@ export default function GreeceApp() {
               dark={dark}
             />
           )}
+          {/* LIVE banner — red, flashing, top-centre while the simulation counts */}
+          {simRunning&&(
+            <div className="absolute top-3 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none flex items-center gap-2 px-4 py-1.5 rounded-full"
+              style={{background:'rgba(220,38,38,0.96)',boxShadow:'0 6px 22px rgba(220,38,38,0.45)'}}>
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"/>
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-white"/>
+              </span>
+              <span className="text-white text-[11px] font-mono font-black uppercase tracking-[0.2em]">Live</span>
+              <span className="text-white/90 text-[10px] font-mono font-bold tabular-nums">{simProgress}/{ES_PROVINCES.length} reporting</span>
+            </div>
+          )}
+          {/* Results summary popup when the count finishes */}
+          {simResult&&<GrResultsSummary result={simResult} dark={dark} onClose={()=>setSimResult(null)}/>}
         </div>
 
         {/* RIGHT panels */}
@@ -1756,7 +1878,7 @@ export default function GreeceApp() {
                 {simRunning?`${simProgress}/${ES_PROVINCES.length} reporting…`:'▶ Run Simulation'}
               </button>
               {(simSeats||declaredProvs)&&(
-                <button onClick={()=>{stopSim();setSimSeats(undefined);setDeclaredProvs(undefined);setSimProgress(0);setSimProvFractions({});setSimProvVotes({});setSimNatPcts(null);}}
+                <button onClick={()=>{stopSim();setSimSeats(undefined);setDeclaredProvs(undefined);setSimProgress(0);setSimProvFractions({});setSimProvVotes({});setSimResult(null);setSimNatPcts(null);}}
                   className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">Reset</button>
               )}
             </div>
