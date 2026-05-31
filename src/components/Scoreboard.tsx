@@ -1,4 +1,5 @@
 import { useMemo, useState, useRef, useEffect, useLayoutEffect, forwardRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useElectionStore } from '../store/useElectionStore';
 import { PARTIES, LEADER_WIKI_TITLES, BASELINE_2024_LEADERS } from '../data/parties';
 import type { PartyId } from '../data/parties';
@@ -74,7 +75,7 @@ function LeaderDropdown({ options, value, color, onChange }: {
           <path d="M0.5 0.5L3.5 3.5L6.5 0.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       </button>
-      {open && pos && (
+      {open && pos && createPortal(
         <>
           <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
           <div className="fixed z-[9999] bg-white border border-default rounded-lg shadow-xl py-1"
@@ -92,7 +93,8 @@ function LeaderDropdown({ options, value, color, onChange }: {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </>
   );
