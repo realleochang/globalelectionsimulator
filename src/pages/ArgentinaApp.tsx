@@ -295,7 +295,7 @@ function Ar2027CandTile({ party, votes, votePct, isLeader, isWinner, isR1, picke
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   useEffect(() => {
     const local = AR_LOCAL_PHOTOS[pickedCandidate];
-    if (local) { setPhotoUrl(`${import.meta.env.BASE_URL}${local}`); return; }
+    if (local) { setPhotoUrl(local); return; }
     setPhotoUrl(null);
     const title = AR_2027_WIKI_TITLES[pickedCandidate];
     if (!title) return;

@@ -53,7 +53,7 @@ function LeaderDropdown({ options, value, color, onChange }: {
   onChange: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number; maxH: number } | null>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const lastName = value.trim().split(/\s+/).pop() ?? value;
 
@@ -61,20 +61,7 @@ function LeaderDropdown({ options, value, color, onChange }: {
     e.stopPropagation();
     if (!open && btnRef.current) {
       const r = btnRef.current.getBoundingClientRect();
-      // Clamp within the scoreboard strip so the list never falls under the map
-      const strip = btnRef.current.closest<HTMLElement>('.relative.bg-white.border-b');
-      const stripBottom = strip ? strip.getBoundingClientRect().bottom : window.innerHeight;
-      const ITEM_H = 36;
-      const MENU_H = options.length * ITEM_H + 8;
-      // Space available below the button (inside the strip)
-      const spaceBelow = stripBottom - r.bottom - 4;
-      const openUp = MENU_H > spaceBelow;
-      const top = openUp ? r.top - MENU_H - 4 : r.bottom + 4;
-      // maxH: never let the list exceed the strip
-      const maxH = openUp
-        ? Math.min(MENU_H, r.top - 8)
-        : Math.min(MENU_H, spaceBelow);
-      setPos({ top, left: r.left + r.width / 2, maxH: Math.max(maxH, ITEM_H * 2) });
+      setPos({ top: r.bottom + 4, left: r.left + r.width / 2 });
     }
     setOpen(o => !o);
   };
@@ -89,12 +76,13 @@ function LeaderDropdown({ options, value, color, onChange }: {
       </button>
       {open && pos && (
         <>
-          <div className="fixed inset-0 z-[1999]" onClick={() => setOpen(false)} />
-          <div className="fixed z-[2000] border border-default rounded-lg shadow-xl py-1 overflow-y-auto"
+          {/* Full-screen scrim below the dropdown but above the map */}
+          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
+          {/* Dropdown renders above map (Leaflet z-index peaks ~600) and above scrim */}
+          <div className="fixed z-[9999] border border-default rounded-lg shadow-xl py-1"
             style={{
               top: pos.top, left: pos.left, transform: 'translateX(-50%)', minWidth: 190,
               background: 'var(--color-canvas, #fff)',
-              maxHeight: pos.maxH,
             }}>
             {options.map(opt => (
               <button key={opt} onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
