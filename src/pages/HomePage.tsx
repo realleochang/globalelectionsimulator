@@ -79,6 +79,7 @@ export const COUNTRIES = [
     parties: [
       { color: '#1F6FE5', abbr: 'DEM' }, { color: '#DD2B2B', abbr: 'GOP' },
     ],
+    locked: true, lockLabel: 'Release Imminent',
   },
   {
     id: 'australia', path: '/australia', name: 'Australia', flag: '🇦🇺', demonym: 'Australian', mapColor: '#003893',
@@ -856,6 +857,7 @@ function WorldMapContainer({ dark, enlarged, onEnlargeChange }: {
 export function CountryCard({ country }: { country: Country }) {
   const navigate = useNavigate();
   const locked = (country as { locked?: true }).locked === true;
+  const lockLabel = (country as { lockLabel?: string }).lockLabel ?? 'Release Pending';
   return (
     <button
       onClick={() => { if (locked) return; navigate(country.path); }}
@@ -875,7 +877,7 @@ export function CountryCard({ country }: { country: Country }) {
         {locked && (
           <div className="absolute top-2.5 right-2.5 px-2 py-1 rounded-full text-[7.5px] font-mono font-black uppercase tracking-[0.14em] text-white"
             style={{ background: 'rgba(250,166,26,0.92)', boxShadow: '0 2px 8px rgba(0,0,0,0.30)' }}>
-            Release Pending
+            {lockLabel}
           </div>
         )}
       </div>
@@ -892,7 +894,7 @@ export function CountryCard({ country }: { country: Country }) {
         <div className="flex-1 h-px hp-card-divider" />
         {locked ? (
           <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em]" style={{ color: '#FAA61A' }}>
-            Release Pending
+            {lockLabel}
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-gold group-hover:text-gold-deep transition-colors">
