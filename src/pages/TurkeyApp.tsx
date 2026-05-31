@@ -1559,9 +1559,6 @@ function TrSimulationPanel({
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2.5">
 
         {/* Realism warning */}
-        <div className="tutorial-note rounded-[5px] px-2.5 py-2 text-[9px] font-mono leading-relaxed">
-          <span className="font-bold">Realistic scenarios only.</span> This is a serious election simulator using real province-level data and swing modelling. Absurd inputs (e.g. a fringe candidate at 99%) will produce meaningless projections — garbage in, garbage out.
-        </div>
 
         {/* ── R1 OUTRIGHT WINNER ── */}
         {simState === 'r1_winner' && r1WinnerInfo && (

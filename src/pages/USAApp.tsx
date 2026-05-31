@@ -1757,9 +1757,6 @@ function UsaSimulationPanel({
       <div className="flex-1 overflow-y-auto thin-scroll">
         <section className="px-3.5 pt-3 pb-1">
           <div className="text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 mb-2">National vote share</div>
-          <div className="mb-3 rounded-[5px] border border-amber-200 bg-amber-50 px-2.5 py-2 text-[9px] font-mono text-amber-800 leading-relaxed">
-            <span className="font-bold">Realistic inputs only.</span> This simulator uses real 2024 state-level data to project results via swing modelling. Absurd vote shares (e.g. Libertarian 99%) will produce meaningless projections — garbage in, garbage out.
-          </div>
           {/* Candidate matchup */}
           <div className="mb-3 flex items-center justify-center gap-2">
             <div className="flex items-center gap-1.5">

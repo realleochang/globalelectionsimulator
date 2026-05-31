@@ -1360,9 +1360,6 @@ function BrSimulationPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3 space-y-2.5">
-        <div className="tutorial-note rounded-[5px] px-2.5 py-2 text-[9px] font-mono leading-relaxed">
-          <span className="font-bold">Realistic scenarios only.</span> This simulator uses real state-level data and regional swing modelling. Absurd inputs will produce meaningless projections — garbage in, garbage out.
-        </div>
 
         {(simState === 'r2_input' || simState === 'r2_running') && (
           <>

@@ -1648,9 +1648,6 @@ function CaSimulationPanel({
       </div>
 
       <div className="flex-1 overflow-y-auto thin-scroll">
-        <div className="mx-3.5 mt-3 mb-1 rounded-[5px] border border-amber-200 bg-amber-50 px-2.5 py-2 text-[9px] font-mono text-amber-800 leading-relaxed">
-          <span className="font-bold">Realistic scenarios only.</span> This is a serious election simulator using real riding-level data and swing modelling. Absurd inputs (e.g. NDP 99%) will produce meaningless projections — garbage in, garbage out.
-        </div>
         <section className="px-3.5 pt-3 pb-1">
           <div className="text-[9px] font-mono font-bold uppercase tracking-[0.14em] text-ink-3 mb-2.5">
             National vote share
