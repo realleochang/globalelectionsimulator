@@ -1010,11 +1010,11 @@ function EuCoalitionPanel({ seats, onClose, exiting, dark: _dark }: {
 }
 
 // ── Groups panel (hide/show) ──────────────────────────────────────────────────
-function EuGroupsPanel({ hiddenParties, onToggle, onClose, dark: _dark }: {
+function EuGroupsPanel({ hiddenParties, onToggle, onClose, dark }: {
   hiddenParties: Set<EuGroupId>; onToggle: (id: EuGroupId) => void; onClose: () => void; dark?: boolean;
 }) {
   return (
-    <aside className="absolute right-3 top-3 z-[60] w-72 bg-white border border-default rounded-[6px] shadow-lg overflow-hidden">
+    <aside className={`absolute right-3 top-3 z-[1003] w-72 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border border-default rounded-[6px] shadow-lg overflow-hidden`}>
       <div className="flex items-center justify-between px-3 py-2 border-b border-default">
         <h2 className="text-[12px] font-bold text-ink">Political Groups</h2>
         <button onClick={onClose} className="w-5 h-5 flex items-center justify-center rounded-[4px] hover:bg-hover text-ink-3 hover:text-ink text-base">×</button>
@@ -1130,9 +1130,18 @@ function EuCountryPanel({
 
   const effectiveLocks = useMemo(() => new Set<EuGroupId>([...locks, ...(hiddenParties ?? [])]), [locks, hiddenParties]);
   const displayPv  = isBlankMode ? draftPcts : calcCountryVotes(natPcts, constId, constOverride);
-  const [sortedIds] = useState<EuGroupId[]>(() =>
-    EU_GROUPS.map(p => p.id).filter(id => (baseVotes[id] ?? 0) > 0)
-      .sort((a, b) => (baseVotes[b] ?? 0) - (baseVotes[a] ?? 0)));
+  // The slider list must include every group present in the active override too,
+  // not just those with 2024 base votes — e.g. a group that exists only in the
+  // 2026 projection (Bulgaria's Non-Inscrits: zero 2024 votes, 11 projected seats)
+  // would otherwise never get a slider. Order by the initial displayed share.
+  const [sortedIds] = useState<EuGroupId[]>(() => {
+    const init = constOverride && Object.keys(constOverride).length > 0
+      ? calcCountryVotes(natPcts, constId, constOverride)
+      : baseVotes;
+    return EU_GROUPS.map(p => p.id)
+      .filter(id => (baseVotes[id] ?? 0) > 0 || (init[id] ?? 0) > 0)
+      .sort((a, b) => (init[b] ?? 0) - (init[a] ?? 0));
+  });
   const c           = EU_COUNTRY_MAP[constId];
   const winner      = EU_GROUPS.filter(p=>!p.noSeats).reduce((best, p) => (displayPv[p.id] ?? 0) > (displayPv[best.id] ?? 0) ? p : best, EU_GROUPS[0]);
   const hasOverride = !!constOverride && Object.keys(constOverride).length > 0;
@@ -1932,12 +1941,6 @@ export default function EUApp() {
 
       {/* ── Body ── */}
       <div className="flex flex-1 min-h-0 overflow-hidden">
-        {leftPanel === 'parties' && (
-          <EuGroupsPanel
-            hiddenParties={hiddenParties}
-            onToggle={id => setHiddenParties(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
-            onClose={() => openLeft('parties')} dark={dark} />
-        )}
         {showParli     && <EuParliamentPanel seats={displaySeats} onClose={() => openLeft('parli')}     exiting={exitLeft  === 'parli'}     dark={dark} />}
 
         {/* MAP */}
@@ -1980,6 +1983,14 @@ export default function EUApp() {
               </div>
             );
           })()}
+
+          {/* Groups dropdown — floats over the map (top-right), above every Leaflet pane */}
+          {leftPanel === 'parties' && (
+            <EuGroupsPanel
+              hiddenParties={hiddenParties}
+              onToggle={id => setHiddenParties(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; })}
+              onClose={() => openLeft('parties')} dark={dark} />
+          )}
         </div>
 
         {/* RIGHT panels */}
