@@ -67,9 +67,14 @@ interface ArCandTileProps {
   isWinner: boolean;
 }
 
+const AR_CAND_LOCAL_PHOTOS: Partial<Record<string, string>> = {
+  MIL: '/leaders/javier-milei.jpg',
+};
+
 function ArCandTile({ cand, votes, votePct, isLeader, isWinner }: ArCandTileProps) {
   const [photoUrl, setPhotoUrl] = useState<string | null>(null);
   useEffect(() => {
+    if (AR_CAND_LOCAL_PHOTOS[cand.id]) { setPhotoUrl(AR_CAND_LOCAL_PHOTOS[cand.id]!); return; }
     const title = AR_WIKI_TITLES[cand.id];
     if (!title) return;
     let cancelled = false;
@@ -201,7 +206,9 @@ function ArgentinaScoreboard({ deptResults, round }: {
   );
 }
 
-const AR_LOCAL_PHOTOS: Record<string, string> = {};
+const AR_LOCAL_PHOTOS: Record<string, string> = {
+  'Javier Milei': '/leaders/javier-milei.jpg',
+};
 
 // ── Floating leader dropdown ──────────────────────────────────────────────────
 function LeaderDropdown({ options, value, color, onChange }: {
