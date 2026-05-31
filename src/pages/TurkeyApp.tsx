@@ -354,8 +354,15 @@ function Tr2028Scoreboard({ deptResults, election, allPartyIds, picks, onPick, p
   [allPartyIds, partyMap, popularVote]);
 
   const top2Ids = useMemo(() => grandTotal > 0 ? new Set(parties.slice(0, 2).map(p => p.id)) : new Set<string>(), [parties, grandTotal]);
-  // Both R1 and R2: only show badge when statistically projected
-  const winnerIds = useMemo<Set<string>>(() => projectedAdvancers ?? new Set(), [projectedAdvancers]);
+  const winnerIds = useMemo<Set<string>>(() => {
+    // R1: Turkey requires >50% for a first-round win. If the leader is there,
+    // show only their checkmark instead of two "ADVANCE" badges.
+    if (election === '2028R1' && grandTotal > 0 && parties.length >= 1) {
+      const top1Pct = ((popularVote[parties[0].id] ?? 0) / grandTotal) * 100;
+      if (top1Pct > 50) return new Set([parties[0].id]);
+    }
+    return projectedAdvancers ?? new Set();
+  }, [election, parties, popularVote, grandTotal, projectedAdvancers]);
 
   return (
     <div className="relative bg-white border-b border-default shrink-0 select-none z-[45]">
@@ -2603,6 +2610,7 @@ export default function TurkeyApp() {
     setSimBatchFractionsR2({});
 
     setActiveElection('2028R2');
+    setShowSimPanel(false);   // hide panel so map is visible during R2 counting
     setSimState('r2_running');
     setSimProgress(0);
     setSimTotal(deptCodesR2.length);
@@ -2630,6 +2638,7 @@ export default function TurkeyApp() {
     }
 
     timers.push(setTimeout(() => {
+      setShowSimPanel(true);  // reopen after counting done
       // Compute R2 national winner from final totals
       const natTotals: Record<string, number> = {};
       for (const r of Object.values(r2Results as Record<string, Partial<Record<string,number>>>)) {
@@ -2833,9 +2842,11 @@ export default function TurkeyApp() {
                 picks={picks2028}
                 onPick={handlePick2028}
                 projectedAdvancers={
-                  activeElection === '2028R1' ? r2028Reporting.projectedSet
-                  : activeElection === '2028R2' ? r2028R2Reporting.projectedWinner
-                  : undefined
+                  simState === 'r1_winner' && simR1WinnerId
+                    ? new Set([simR1WinnerId])
+                    : activeElection === '2028R1' ? r2028Reporting.projectedSet
+                    : activeElection === '2028R2' ? r2028R2Reporting.projectedWinner
+                    : undefined
                 }
               />
             )}

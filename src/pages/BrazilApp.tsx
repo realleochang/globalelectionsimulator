@@ -2159,6 +2159,7 @@ export default function BrazilApp() {
     const totalMs    = duration * 1000;
     const BATCHES    = 10;
     setActiveElection('2026R2');
+    setShowSimPanel(false);   // hide panel so map is visible during R2 counting
     setSimState('r2_running');
     setSimProgress(0);
     setSimTotal(stateCodes.length);

@@ -371,8 +371,18 @@ function Ar2027Scoreboard({ deptResults, election, allPartyIds, picks, onPick, p
   [allPartyIds, partyMap, popularVote]);
 
   const top2Ids = useMemo(() => grandTotal > 0 ? new Set(parties.slice(0, 2).map(p => p.id)) : new Set<string>(), [parties, grandTotal]);
-  // Both R1 and R2: only show badge when statistically projected
-  const winnerIds = useMemo<Set<string>>(() => projectedAdvancers ?? new Set(), [projectedAdvancers]);
+  const winnerIds = useMemo<Set<string>>(() => {
+    // R1: apply Argentina's win threshold — if the leader clears >45%, or >40% with
+    // a 10-pt lead, show only their checkmark (outright win, no balotaje needed).
+    if (election === '2027R1' && grandTotal > 0 && parties.length >= 1) {
+      const top1 = parties[0];
+      const top1Pct = ((popularVote[top1.id] ?? 0) / grandTotal) * 100;
+      const top2Pct = parties[1] ? ((popularVote[parties[1].id] ?? 0) / grandTotal) * 100 : 0;
+      if (top1Pct > 45 || (top1Pct > 40 && top1Pct - top2Pct >= 10))
+        return new Set([top1.id]);
+    }
+    return projectedAdvancers ?? new Set();
+  }, [election, parties, popularVote, grandTotal, projectedAdvancers]);
 
   return (
     <div className="relative bg-white border-b border-default shrink-0 select-none z-[45]">
@@ -2642,6 +2652,7 @@ export default function ArgentinaApp() {
     const totalMs = duration * 1000;
 
     setActiveElection('2027R2');
+    setShowSimPanel(false);   // hide panel so map is visible during R2 counting
     setSimState('r2_running');
     setSimProgress(0);
     setSimTotal(deptCodesR2.length);
@@ -2672,7 +2683,7 @@ export default function ArgentinaApp() {
       }
     }
 
-    timers.push(setTimeout(() => setSimState('idle'), totalMs + 200));
+    timers.push(setTimeout(() => { setSimState('idle'); setShowSimPanel(true); }, totalMs + 200));
     simTimersRef.current = timers;
   }, [r2AwaitCandidates]);
 
