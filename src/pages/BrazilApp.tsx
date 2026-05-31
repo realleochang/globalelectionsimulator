@@ -2634,7 +2634,14 @@ function Br2026Scoreboard({ stateResults, election, allPartyIds, picks, onPick, 
   [allPartyIds, popularVote]);
 
   const top2Ids = useMemo(() => grandTotal > 0 ? new Set(parties.slice(0, 2).map(p => p.id)) : new Set<string>(), [parties, grandTotal]);
-  const winnerIds = useMemo<Set<string>>(() => projectedAdvancers ?? new Set(), [projectedAdvancers]);
+  const winnerIds = useMemo<Set<string>>(() => {
+    // R1: if one candidate already exceeds 50%, show only their checkmark (outright win).
+    if (election === '2026R1' && grandTotal > 0) {
+      const majority = parties.find(p => (popularVote[p.id] ?? 0) / grandTotal > 0.5);
+      if (majority) return new Set([majority.id]);
+    }
+    return projectedAdvancers ?? new Set();
+  }, [election, parties, popularVote, grandTotal, projectedAdvancers]);
 
   return (
     <div className="relative bg-white border-b border-default shrink-0 select-none z-[45]">
