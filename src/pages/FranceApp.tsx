@@ -204,13 +204,10 @@ function LeaderShuffle({ options, value, onChange }: {
     <button
       onClick={e => { e.stopPropagation(); const idx=options.indexOf(value); onChange(options[(idx+1)%options.length]); }}
       className="cand-leader-wrap" style={{ background:'none', border:'none', padding:0 }}
-      title="Cycle candidate"
+      title="Switch candidate"
     >
       <span className="cand-leader-name">{lastName}</span>
-      <svg width="8" height="8" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ opacity:0.55, flexShrink:0 }}>
-        <path d="M2 8a6 6 0 1 0 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-        <path d="M2 4v4h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
+      <svg width="10" height="8" viewBox="0 0 14 10" fill="none" aria-hidden="true" style={{ opacity:0.65, flexShrink:0 }}><path d="M0 2.5h11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M9 0.5l3 2-3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/><path d="M14 7.5H3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/><path d="M5 5.5l-3 2 3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/></svg>
     </button>
   );
 }
