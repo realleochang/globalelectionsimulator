@@ -108,39 +108,49 @@ const EU_PCT_BY_COUNTRY: Record<EuCountryId, Record<EuGroupId, number>> = (() =>
   return out;
 })();
 
-// ── 2026 polling scenario ─────────────────────────────────────────────────────
-// EU-wide national voting intention — Europe Elects, April 2026 (sums to 100).
+// ── 2026 polling scenario — Europe Elects EP2029 projection ───────────────────
+// Source: https://europeelects.eu/ep2029 (live seat projection, scraped via its Flourish
+// data; eu_src/gen-2026.cjs). The per-country distributions below are that projection's
+// seats per group per member state (normalised to local vote-share for the map); the
+// EU-wide seat totals (EU_2026_SEATS) are shown directly on the 2026 scoreboard.
+// EU-wide voting-intention headline (Europe Elects vote estimate, sums to 100):
 const EU_VOTE_PCT_2026: Record<EuGroupId, number> = {
   LEFT: 9.8, GREENS: 6.9, SD: 16.9, RE: 8.8, EPP: 21.7, ECR: 10.7, PfE: 11.3, ESN: 7.0, NI: 3.8, OTH: 3.1,
 };
-
-// Modelled 2026 LOCAL group distribution for member states whose national picture has
-// diverged sharply from a naive uniform swing — grounded in 2025/26 elections & polling.
-// (Countries not listed here use a uniform national swing from their 2024 result.)
-// Each row is normalised before use; values are local vote-share %.
+// Europe Elects EP2029 EU-wide seat projection (720 seats):
+const EU_2026_SEATS: Record<Exclude<EuGroupId,'OTH'>, number> = {
+  LEFT: 54, GREENS: 41, SD: 127, RE: 67, EPP: 173, ECR: 83, PfE: 100, ESN: 38, NI: 37,
+};
+// Per-country group seat projection (Europe Elects EP2029, all 27 states). Used both for
+// the 2026 map (winner per country) and as the live baseline the simulation plays out.
 const EU_CLIMATE_2026: Partial<Record<EuCountryId, Partial<Record<EuGroupId, number>>>> = {
-  // Germany: AfD (ESN) overtakes CDU/CSU (EPP) — AfD ~27.5%, CDU ~23-25%, Linke surges,
-  // BSW (NI) collapses. (Current 2026 polling.) → flips Germany to ESN-led.
-  DE: { ESN: 27.5, EPP: 25, GREENS: 14, SD: 12.5, LEFT: 10.5, RE: 4.5, NI: 3.5, OTH: 2.5 },
-  // France: RN (PfE) strengthens further (~33%), Renew (Macron camp) keeps falling.
-  FR: { PfE: 33, SD: 14, RE: 13, LEFT: 13, EPP: 10, GREENS: 6, ECR: 5, OTH: 6 },
-  // Netherlands: D66 (Renew) surge after the Oct-2025 election; PVV (PfE) down, NSC wiped.
-  NL: { RE: 30, EPP: 16, PfE: 16, GREENS: 8, SD: 8, ECR: 7, LEFT: 5, OTH: 10 },
-  // Czechia: ANO (PfE, Babiš) won the Oct-2025 election decisively; SPD (ESN) in coalition talks.
-  CZ: { PfE: 36, EPP: 16, ECR: 13, ESN: 8, GREENS: 8, NI: 4, SD: 3, OTH: 12 },
-  // Hungary: Tisza (EPP, Magyar) landslide on 12 Apr 2026 (53.6% vs Fidesz 37.8%) — ends
-  // Orbán's 16 years. → flips Hungary from PfE (Fidesz) to EPP (Tisza).
-  HU: { EPP: 53, PfE: 38, ESN: 5, SD: 2, OTH: 2 },
-  // Italy: Meloni (ECR/FdI) holds the lead; PD (S&D) and M5S (Left) recover slightly.
-  IT: { ECR: 29, SD: 23, LEFT: 13, EPP: 10, PfE: 9, GREENS: 6, RE: 4, OTH: 6 },
-  // Spain: PP (EPP) ahead of PSOE (S&D); Vox (PfE) up.
-  ES: { EPP: 34, SD: 28, PfE: 13, LEFT: 10, NI: 7, GREENS: 3, RE: 2, OTH: 3 },
-  // Poland: KO (EPP) edges PiS (ECR) in a tight race; Konfederacja (ESN) rising.
-  PL: { EPP: 31, ECR: 29, ESN: 13, RE: 6, SD: 6, NI: 4, OTH: 11 },
-  // Austria: FPÖ (PfE) leads ahead of SPÖ (S&D) and ÖVP (EPP).
-  AT: { PfE: 28, SD: 22, EPP: 21, GREENS: 10, RE: 10, LEFT: 4, OTH: 5 },
-  // Romania: AUR-led nationalist right (ECR) surges past PSD (S&D). → flips Romania to ECR.
-  RO: { ECR: 30, SD: 22, EPP: 17, RE: 13, NI: 4, GREENS: 2, OTH: 12 },
+  AT: { GREENS:2, SD:4, RE:1, EPP:4, PfE:9 },
+  BE: { LEFT:3, GREENS:1, SD:4, RE:4, EPP:2, ECR:4, PfE:4 },
+  BG: { RE:2, EPP:4, NI:11 },
+  CY: { LEFT:2, SD:1, EPP:2, ECR:1 },
+  CZ: { GREENS:2, EPP:4, ECR:4, PfE:9, ESN:2 },
+  DE: { LEFT:11, GREENS:16, SD:12, RE:6, EPP:22, ESN:25, NI:4 },
+  DK: { LEFT:1, GREENS:2, SD:4, RE:3, EPP:2, ECR:1, PfE:2 },
+  EE: { SD:1, RE:3, EPP:2, PfE:1 },
+  EL: { SD:3, EPP:6, ECR:2, PfE:1, NI:9 },
+  ES: { LEFT:4, GREENS:3, SD:19, EPP:22, PfE:12, NI:1 },
+  FI: { LEFT:2, GREENS:1, SD:5, RE:2, EPP:3, ECR:2 },
+  FR: { LEFT:12, SD:10, RE:15, EPP:10, PfE:34 },
+  HR: { GREENS:2, SD:4, EPP:5, ECR:1 },
+  HU: { EPP:15, PfE:5, ESN:1 },
+  IE: { LEFT:4, SD:2, RE:4, EPP:3, NI:1 },
+  IT: { LEFT:13, GREENS:4, SD:21, EPP:6, ECR:26, PfE:6 },
+  LT: { GREENS:1, SD:2, RE:1, EPP:3, ECR:2, PfE:1, NI:1 },
+  LU: { SD:1, RE:2, EPP:2, ECR:1 },
+  LV: { GREENS:1, RE:1, EPP:2, ECR:2, PfE:2, NI:1 },
+  MT: { SD:3, EPP:3 },
+  NL: { GREENS:3, SD:3, RE:9, EPP:4, ECR:3, PfE:5, ESN:4 },
+  PL: { SD:4, EPP:22, ECR:15, PfE:3, ESN:4, NI:5 },
+  PT: { GREENS:1, SD:7, RE:1, EPP:6, PfE:6 },
+  RO: { SD:9, RE:4, EPP:6, ECR:14 },
+  SE: { LEFT:2, GREENS:2, SD:7, RE:1, EPP:5, ECR:4 },
+  SI: { SD:1, RE:4, EPP:4 },
+  SK: { RE:4, EPP:4, ECR:1, ESN:2, NI:4 },
 };
 
 // All seat-winning groups contest every country (no landlock). Kept for parity with
@@ -1630,8 +1640,11 @@ export default function EUApp() {
     setSimSeats(undefined); setDeclaredConsts(undefined);
     setConstOverrides({}); setProjectedConsts(new Set());
     setConstReportingPct({}); setSimConstFractions({}); setSimConstVotes({});
-    setConstDraft(null); setSimNatPcts(null); stopSim();
+    setConstDraft(null); setSimNatPcts(null); setScenarioEdited(false); stopSim();
   }
+  // True once the user has hand-edited a country, so the 2026 scoreboard stops showing the
+  // pristine EP2029 seat totals and recomputes from the (now-modified) per-country results.
+  const [scenarioEdited, setScenarioEdited] = useState(false);
 
   // ── Country overrides (blank map) ────────────────────────────────────────────
   const [constOverrides, setConstOverrides]       = useState<Partial<Record<EuCountryId, Partial<Record<EuGroupId, number>>>>>(
@@ -1772,8 +1785,9 @@ export default function EUApp() {
     const events: Ev[] = [];
     EU_COUNTRIES.forEach((c, idx) => {
       const cId = c.id;
-      // True final votes for this country under the simulated national shares (incl. Others).
-      const finalPv = calcCountryVotes(simDraftPcts, cId);
+      // Each country's final result = its per-country projection (the Europe Elects EP2029
+      // distribution when on the 2026 preset, or a user override / national swing otherwise).
+      const finalPv = calcCountryVotes(simDraftPcts, cId, constOverrides[cId]);
       const finalVotes = {} as Record<EuGroupId, number>;
       for (const g of EU_GROUPS) finalVotes[g.id] = Math.round((finalPv[g.id] ?? 0) / 100 * c.validVotes);
       const cuts = [0, ...Array.from({ length: PARTS - 1 }, () => Math.random()).sort((a, b) => a - b), 1];
@@ -1816,15 +1830,18 @@ export default function EUApp() {
     simTimersRef.current = timers;
   }
 
-  // Baseline display shows the REAL official seats; any edit/projection/sim uses D'Hondt.
+  // Baseline shows the REAL official seats; the pristine 2026 view shows the Europe Elects
+  // EP2029 seat totals; any edit/projection/sim recomputes per country.
   const hasOverrides = Object.values(constOverrides).some(o => o && Object.keys(o).length > 0);
   const isPureBaseline = preset === 'baseline' && !hasOverrides && simSeats == null && simNatPcts == null;
+  const isPure2026 = preset === 'polling2026' && !scenarioEdited && simNatPcts == null;
   const displaySeats = useMemo(
     // During a sim only the live tally is shown (no leak of the final result before counting).
     () => simNatPcts != null ? (simSeats ?? {})
       : (isPureBaseline ? (EU_BASELINE_SEATS as Partial<Record<EuGroupId, number>>)
+        : isPure2026 ? (EU_2026_SEATS as Partial<Record<EuGroupId, number>>)
         : calcAllCountrySeats(displayPcts, hasOverrides ? constOverrides : undefined)),
-    [simNatPcts, simSeats, isPureBaseline, displayPcts, hasOverrides, constOverrides],
+    [simNatPcts, simSeats, isPureBaseline, isPure2026, displayPcts, hasOverrides, constOverrides],
   );
 
   // Live national tally = the actual sum of the noisy per-country counts. Percentages
@@ -2044,7 +2061,7 @@ export default function EUApp() {
         {showConst && selectedConst && (
           <EuCountryPanel key={selectedConst} constId={selectedConst} natPcts={natPcts}
             constOverride={constOverrides[selectedConst]}
-            onOverride={pcts => setConstOverrides(prev => ({ ...prev, [selectedConst]: pcts }))}
+            onOverride={pcts => { setScenarioEdited(true); setConstOverrides(prev => ({ ...prev, [selectedConst]: pcts })); }}
             onResetOverride={() => {
               setConstOverrides(prev => { const n = { ...prev }; delete n[selectedConst]; return n; });
               setProjectedConsts(prev => { const n = new Set(prev); n.delete(selectedConst); return n; });
