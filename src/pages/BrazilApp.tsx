@@ -2562,7 +2562,7 @@ function BrWinnerOverlay({ winnerId, winnerPct, runnerUpPct, roundLabel, noteTex
       <div onClick={e => e.stopPropagation()}
         className="relative flex flex-col items-center text-center px-10 py-10 rounded-[24px] max-w-[480px] w-full mx-4"
         style={{ background:`linear-gradient(170deg,rgba(18,22,38,0.97) 0%,${c}22 100%)`, border:`2px solid ${c}55`, boxShadow:`0 0 80px ${c}44,0 24px 60px rgba(0,0,0,0.6)` }}>
-        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background:c }} />
+        
         <div className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] mb-5" style={{ color:c }}>🇧🇷 {roundLabel}</div>
         <div className="mb-5 relative">
           <div className="w-32 h-32 rounded-full overflow-hidden border-4 mx-auto" style={{ borderColor:c, boxShadow:`0 0 32px ${c}88` }}>

@@ -3185,7 +3185,7 @@ function ArR1WinnerOverlay({
         }}
       >
         {/* confetti-style accent line */}
-        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background: c }} />
+        
 
         {/* ROUND 1 WINNER label */}
         <div className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] mb-5" style={{ color: c }}>
