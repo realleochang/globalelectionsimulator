@@ -515,18 +515,19 @@ function BrMapView({
         })()}
       </MapContainer>
 
-      {/* Reporting badge — bottom-left like Argentina */}
-      {reportingPct !== undefined && reportingPct > 0 && (
-        <div className="absolute bottom-12 left-3 z-[1000] rounded-[10px] overflow-hidden select-none pointer-events-none"
+      {/* Reporting badge — bottom-left, always shown for 2026 elections */}
+      {reportingPct !== undefined && (
+        <div className="absolute bottom-12 left-3 z-[1000] w-52 rounded-[14px] overflow-hidden select-none pointer-events-none"
           style={{
-            background: dark ? 'rgba(12,18,36,0.92)' : 'rgba(255,255,255,0.96)',
-            border: `1px solid ${dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)'}`,
-            boxShadow: dark ? '0 6px 28px rgba(0,0,0,0.5)' : '0 6px 28px rgba(0,0,0,0.12)',
-            minWidth: 130,
+            background: dark ? 'rgba(12,20,46,0.97)' : 'rgba(255,255,255,0.95)',
+            boxShadow: dark
+              ? '0 6px 28px rgba(0,0,0,0.5), 0 0 0 1px rgba(80,120,220,0.18)'
+              : '0 6px 28px rgba(0,0,0,0.18), 0 0 0 1px rgba(0,0,0,0.07)',
           }}>
-          <div className="px-3 pt-2.5 pb-2">
-            <div className="text-[8px] font-mono uppercase tracking-[0.16em] mb-2"
-              style={{ color: dark ? 'rgba(140,170,220,0.65)' : 'rgba(0,0,0,0.42)' }}>
+          <div className="h-[3px]" style={{ background: 'linear-gradient(90deg,#009C3B 0%,#FFDF00 50%,#009C3B 100%)' }} />
+          <div className="px-4 pt-3 pb-3.5">
+            <div className="text-[7.5px] font-mono font-bold uppercase tracking-[0.15em] mb-1.5"
+              style={{ color: dark ? 'rgba(140,170,220,0.65)' : undefined }}>
               {reportingLabel ?? 'Reporting'}
             </div>
             <div className="flex items-baseline gap-1.5 mb-2.5">
@@ -557,7 +558,7 @@ function BrMapView({
         </div>
       )}
 
-      <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono">
+      <div className="absolute bottom-2 right-2 text-[10px] text-ink-3 select-none z-[1000] font-mono pointer-events-none">
         Scroll to zoom · Drag to pan · Click to open
       </div>
 
