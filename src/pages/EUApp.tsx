@@ -69,6 +69,8 @@ const EU_GROUPS: EuGroup[] = [
 const EU_GROUP_MAP = Object.fromEntries(EU_GROUPS.map(g=>[g.id,g])) as Record<EuGroupId,EuGroup>;
 // Order used in slider panels / simulation inputs / vote displays (includes Others).
 const EU_SLIDER_ORDER: EuGroupId[] = [...EU_LR_ORDER, 'OTH'];
+// All-zero national shares — shown on the dashboard before any votes have been counted.
+const EU_ZERO_PCTS = Object.fromEntries(EU_SLIDER_ORDER.map(id => [id, 0])) as Record<EuGroupId, number>;
 
 // All 9 seat-winning groups are pan-European (no landlocking); Others is non-seat.
 const EU_PROSPECTIVE: EuGroupId[] = EU_SLIDER_ORDER;
@@ -223,15 +225,16 @@ function calcAllCountrySeats(
 
 // ── Simulation helpers ────────────────────────────────────────────────────────
 function euRandNormal():number{let u=0,v=0;while(u===0)u=Math.random();while(v===0)v=Math.random();return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);}
-// Argentina-style per-country batch schedule: every country starts reporting almost
-// immediately (first batch within ~2.5s), then the remaining batches trickle in on a
-// random bell curve across the whole run — so all 27 report together in a random order.
-const EU_SIM_BATCHES = 15;
+// Per-country batch schedule. Each country FIRST reports at a random moment somewhere in
+// the first half of the night (staggered — some open at t=0, others not until mid-count),
+// then its remaining batches trickle in on a random bell curve through to the end.
+const EU_SIM_BATCHES = 30;
 function euCountryBatchTimes(totalMs:number):number[]{
-  const firstT = Math.round(Math.random()*Math.min(totalMs*0.05, 2500));
+  const startT = Math.round(Math.random()*0.5*totalMs);        // first report: anywhere in the first half
+  const span = Math.max(1, totalMs - startT);
   const rest = Array.from({length:EU_SIM_BATCHES-1}, () =>
-    Math.round(Math.max(0.02, Math.min(0.99, 0.5+euRandNormal()*0.19))*totalMs));
-  return [firstT, ...rest].sort((a,b)=>a-b);
+    startT + Math.round(Math.max(0.02, Math.min(0.99, 0.5+euRandNormal()*0.22))*span));
+  return [startT, ...rest].sort((a,b)=>a-b);
 }
 // Precompute monotonic, noisy cumulative vote snapshots for one country. Each group's
 // running count is strictly non-decreasing batch→batch; early batches are deliberately
@@ -457,7 +460,7 @@ function zoomScale(zoom:number):number{return Math.max(0.30,Math.min(2.2,(zoom-3
 function EuBubbleLayer({
   geoData,natPcts,containerRef,setTooltip,onSelect,natPctsRef,
   declaredConsts,constOverrides,constOverridesRef,blankMode,projectedConsts,
-  simConstFractions,simNatPctsRef,
+  simConstFractions,simNatPctsRef,simConstVotes,
 }:{
   geoData:any;natPcts:Record<EuGroupId,number>;
   containerRef:React.RefObject<HTMLDivElement|null>;
@@ -469,11 +472,14 @@ function EuBubbleLayer({
   blankMode?:boolean;projectedConsts?:Set<EuCountryId>;
   simConstFractions?:Partial<Record<EuCountryId,number>>;
   simNatPctsRef?:React.MutableRefObject<Record<EuGroupId,number>|null>;
+  simConstVotes?:Partial<Record<EuCountryId,Record<EuGroupId,number>>>;
 }) {
   const map=useMap();
   const bubblesRef=useRef<BubbleEntry[]>([]);
   const simFracRef=useRef(simConstFractions??{});
   useEffect(()=>{simFracRef.current=simConstFractions??{};},[simConstFractions]);
+  const simVotesRefB=useRef(simConstVotes??{});
+  useEffect(()=>{simVotesRefB.current=simConstVotes??{};},[simConstVotes]);
 
   useEffect(()=>{
     const onZoom=()=>{const scale=zoomScale(map.getZoom());for(const{marker,baseRadius}of bubblesRef.current)marker.setRadius(baseRadius*scale);};
@@ -490,19 +496,23 @@ function EuBubbleLayer({
       const geoId:string=path.feature?.properties?.code??'';
       const constId=EU_GEOID_TO_ID[String(geoId)];
       if(!constId)return;
-      if(declaredConsts&&!declaredConsts.has(constId))return;
+      const liveV=euLiveVotes(simConstVotes,constId);   // live counts (sim) take precedence
+      // A country shows a bubble once it is declared, projected, or (during a sim) reporting.
+      if(declaredConsts&&!declaredConsts.has(constId)&&!liveV)return;
       if(!declaredConsts&&blankMode&&!(projectedConsts?.has(constId)))return;
       const bounds=(layer as any).getBounds?.();if(!bounds?.isValid())return;
       const c0=bounds.getCenter();
       const off=EU_MARKER_OFFSET[constId];
       const center=off?L.latLng(c0.lat+off[1],c0.lng+off[0]):c0;
-      const pv=calcCountryVotes(natPcts,constId,constOverrides?.[constId]);
+      const c=EU_COUNTRY_MAP[constId];
+      const pv=liveV?euPctsFromVotes(liveV):calcCountryVotes(natPcts,constId,constOverrides?.[constId]);
       const sorted=(Object.entries(pv) as [EuGroupId,number][]).filter(([id,v])=>v>0&&!EU_GROUP_MAP[id]?.noSeats).sort(([,a],[,b])=>b-a);
       if(sorted.length===0)return;
       const[winId,winPct]=sorted[0];
-      const c=EU_COUNTRY_MAP[constId];
-      // Radius reflects the RAW vote margin (winner − runner-up), not total turnout.
-      const rawMargin=(winPct-(sorted[1]?.[1]??0))/100*(c?.validVotes??0);
+      // Radius reflects the RAW vote margin (winner − runner-up); during a sim it grows as
+      // the actual counted votes arrive.
+      const totVotes=liveV?Object.values(liveV).reduce((s,v)=>s+v,0):(c?.validVotes??0);
+      const rawMargin=(winPct-(sorted[1]?.[1]??0))/100*totVotes;
       const baseRadius=Math.min(34,5+0.013*Math.sqrt(Math.max(0,rawMargin)));
       const color=partyColor(winId);
 
@@ -513,13 +523,14 @@ function EuBubbleLayer({
       marker.on('click',()=>{setTooltip(null);onSelect(constId);});
       marker.on('mousemove',(e:L.LeafletMouseEvent)=>{
         const rect=containerRef.current?.getBoundingClientRect();if(!rect)return;
-        const cur=calcCountryVotes(simNatPctsRef?.current??natPctsRef.current,constId,constOverridesRef.current?.[constId]);
+        const lv=euLiveVotes(simVotesRefB.current,constId);
+        const cur=lv?euPctsFromVotes(lv):calcCountryVotes(simNatPctsRef?.current??natPctsRef.current,constId,constOverridesRef.current?.[constId]);
         const fraction=simFracRef.current[constId]??1;
         const cVotes=c?.validVotes ?? 0;
-        const projSeats=calcDHondtCountry(cur,c?.seats??0,constId);
+        const projSeats=calcDHondtCountry(lv??cur,c?.seats??0,constId);
         const parties=(Object.entries(cur) as [EuGroupId,number][])
           .filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,6)
-          .map(([id,pct])=>({id:id as EuGroupId,pct,rawVotes:Math.round(pct/100*cVotes*fraction),projSeats:projSeats[id as EuGroupId]??0}));
+          .map(([id,pct])=>({id:id as EuGroupId,pct,rawVotes:lv?(lv[id]??0):Math.round(pct/100*cVotes*fraction),projSeats:projSeats[id as EuGroupId]??0}));
         setTooltip({x:e.originalEvent.clientX-rect.left,y:e.originalEvent.clientY-rect.top,
           name:c?.name??geoId,code:c?.id??geoId,seats:c?.seats??0,
           parties,leader:parties[0]?.id??null,reportingPct:Math.round(fraction*100)});
@@ -529,7 +540,7 @@ function EuBubbleLayer({
     });
     return()=>{for(const{marker}of bubblesRef.current)marker.remove();bubblesRef.current=[];};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[map,geoData,natPcts,blankMode,projectedConsts,declaredConsts]);
+  },[map,geoData,natPcts,blankMode,projectedConsts,declaredConsts,simConstVotes]);
 
   return null;
 }
@@ -538,7 +549,7 @@ function EuBubbleLayer({
 function EuSeatDotsLayer({
   geoData,natPcts,containerRef,setTooltip,onSelect,natPctsRef,
   declaredConsts,constOverrides,constOverridesRef,blankMode,projectedConsts,
-  simConstFractions,simNatPctsRef,
+  simConstFractions,simNatPctsRef,simConstVotes,
 }:{
   geoData:any;natPcts:Record<EuGroupId,number>;
   containerRef:React.RefObject<HTMLDivElement|null>;
@@ -550,11 +561,14 @@ function EuSeatDotsLayer({
   blankMode?:boolean;projectedConsts?:Set<EuCountryId>;
   simConstFractions?:Partial<Record<EuCountryId,number>>;
   simNatPctsRef?:React.MutableRefObject<Record<EuGroupId,number>|null>;
+  simConstVotes?:Partial<Record<EuCountryId,Record<EuGroupId,number>>>;
 }) {
   const map=useMap();
   const dotsRef=useRef<L.CircleMarker[]>([]);
   const simFracRef=useRef(simConstFractions??{});
   useEffect(()=>{simFracRef.current=simConstFractions??{};},[simConstFractions]);
+  const simVotesRefD=useRef(simConstVotes??{});
+  useEffect(()=>{simVotesRefD.current=simConstVotes??{};},[simConstVotes]);
 
   useEffect(()=>{
     const layout=()=>{
@@ -568,15 +582,15 @@ function EuSeatDotsLayer({
         const geoId:string=path.feature?.properties?.code??'';
         const constId=EU_GEOID_TO_ID[String(geoId)];
         if(!constId)return;
-        if(declaredConsts&&!declaredConsts.has(constId))return;
+        const liveV=euLiveVotes(simConstVotes,constId);
+        if(declaredConsts&&!declaredConsts.has(constId)&&!liveV)return;
         if(!declaredConsts&&blankMode&&!(projectedConsts?.has(constId)))return;
         const bounds=(layer as any).getBounds?.();if(!bounds?.isValid())return;
         const c0=bounds.getCenter();
         const off=EU_MARKER_OFFSET[constId];
         const center=off?L.latLng(c0.lat+off[1],c0.lng+off[0]):c0;
         const c=EU_COUNTRY_MAP[constId];
-        const pv=calcCountryVotes(natPcts,constId,constOverrides?.[constId]);
-        const alloc=calcDHondtCountry(pv,c?.seats??0,constId);
+        const alloc=calcDHondtCountry(liveV??calcCountryVotes(natPcts,constId,constOverrides?.[constId]),c?.seats??0,constId);
         const colors:string[]=[];
         for(const id of EU_LR_ORDER){const n=alloc[id]??0;for(let i=0;i<n;i++)colors.push(partyColor(id));}
         if(colors.length===0)return;
@@ -595,13 +609,14 @@ function EuSeatDotsLayer({
           m.on('click',()=>{setTooltip(null);onSelect(constId);});
           m.on('mousemove',(e:L.LeafletMouseEvent)=>{
             const rect=containerRef.current?.getBoundingClientRect();if(!rect)return;
-            const cur=calcCountryVotes(simNatPctsRef?.current??natPctsRef.current,constId,constOverridesRef.current?.[constId]);
+            const lv=euLiveVotes(simVotesRefD.current,constId);
+            const cur=lv?euPctsFromVotes(lv):calcCountryVotes(simNatPctsRef?.current??natPctsRef.current,constId,constOverridesRef.current?.[constId]);
             const fraction=simFracRef.current[constId]??1;
             const cVotes=c?.validVotes??0;
-            const projSeats=calcDHondtCountry(cur,c?.seats??0,constId);
+            const projSeats=calcDHondtCountry(lv??cur,c?.seats??0,constId);
             const parties=(Object.entries(cur) as [EuGroupId,number][])
               .filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,7)
-              .map(([id,pct])=>({id:id as EuGroupId,pct,rawVotes:Math.round(pct/100*cVotes*fraction),projSeats:projSeats[id as EuGroupId]??0}));
+              .map(([id,pct])=>({id:id as EuGroupId,pct,rawVotes:lv?(lv[id]??0):Math.round(pct/100*cVotes*fraction),projSeats:projSeats[id as EuGroupId]??0}));
             setTooltip({x:e.originalEvent.clientX-rect.left,y:e.originalEvent.clientY-rect.top,
               name:c?.name??geoId,code:c?.id??geoId,seats:c?.seats??0,
               parties,leader:parties[0]?.id??null,reportingPct:Math.round(fraction*100)});
@@ -615,7 +630,7 @@ function EuSeatDotsLayer({
     map.on('zoomend',layout);
     return()=>{map.off('zoomend',layout);for(const m of dotsRef.current)m.remove();dotsRef.current=[];};
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  },[map,geoData,natPcts,blankMode,projectedConsts,declaredConsts,constOverrides]);
+  },[map,geoData,natPcts,blankMode,projectedConsts,declaredConsts,constOverrides,simConstVotes]);
 
   return null;
 }
@@ -718,6 +733,13 @@ function EuMapView({
         if (!hasOverride && !hasDraft && !hasSim) { setTooltip(null); return; }
       }
       const rect = containerRef.current?.getBoundingClientRect(); if (!rect) return;
+      // During a sim, a country that hasn't started reporting must NOT reveal its result.
+      if (simNatPctsRef2.current != null && !euLiveVotes(simVotesRef2.current, constId) && !((simFracRef2.current[constId] ?? 0) > 0)) {
+        const c0 = EU_COUNTRY_MAP[constId];
+        setTooltip({ x:e.originalEvent.clientX-rect.left, y:e.originalEvent.clientY-rect.top,
+          name:c0?.name??geoId, code:c0?.id??geoId, seats:c0?.seats??0, parties:[], leader:null, reportingPct:0 });
+        return;
+      }
       const overrideToUse = hasDraft ? draft!.pcts : constOverridesRef.current?.[constId];
       const fraction      = hasDraft ? draft!.rptPct/100 : simFracRef2.current[constId] ?? (declaredRef.current?.has(constId) ? 1 : undefined);
       const effectiveNatPcts = simNatPctsRef2.current ?? natPctsRef.current;
@@ -772,7 +794,7 @@ function EuMapView({
             declaredConsts={declaredConsts} constOverrides={constOverrides}
             constOverridesRef={constOverridesRef} blankMode={blankMode}
             projectedConsts={projectedConsts} simConstFractions={simConstFractions}
-            simNatPctsRef={simNatPctsRef2}
+            simNatPctsRef={simNatPctsRef2} simConstVotes={simConstVotes}
           />
         )}
         {geoData && seatDots && (
@@ -782,7 +804,7 @@ function EuMapView({
             declaredConsts={declaredConsts} constOverrides={constOverrides}
             constOverridesRef={constOverridesRef} blankMode={blankMode}
             projectedConsts={projectedConsts} simConstFractions={simConstFractions}
-            simNatPctsRef={simNatPctsRef2}
+            simNatPctsRef={simNatPctsRef2} simConstVotes={simConstVotes}
           />
         )}
       </MapContainer>
@@ -806,7 +828,7 @@ function EuMapView({
                 return (
                   <div className={live ? 'animate-pulse' : ''} style={{ fontSize:10, fontFamily:'"JetBrains Mono",monospace', fontWeight:800, letterSpacing:'0.04em', marginTop:2, color: live ? '#FFCC00' : '#16a34a', display:'flex', alignItems:'center', gap:5 }}>
                     {live && <span style={{ width:6, height:6, borderRadius:99, background:'#ef4444', boxShadow:'0 0 6px #ef4444', display:'inline-block' }} />}
-                    {live ? `${rp}% REPORTING` : '✓ 100% REPORTING'}
+                    {rp === 0 ? 'AWAITING RESULTS' : live ? `${rp}% REPORTING` : '✓ 100% REPORTING'}
                   </div>
                 );
               })()}
@@ -1798,9 +1820,11 @@ export default function EUApp() {
   const hasOverrides = Object.values(constOverrides).some(o => o && Object.keys(o).length > 0);
   const isPureBaseline = preset === 'baseline' && !hasOverrides && simSeats == null && simNatPcts == null;
   const displaySeats = useMemo(
-    () => simSeats ?? (isPureBaseline ? (EU_BASELINE_SEATS as Partial<Record<EuGroupId, number>>)
-      : calcAllCountrySeats(displayPcts, hasOverrides ? constOverrides : undefined)),
-    [simSeats, isPureBaseline, displayPcts, hasOverrides, constOverrides],
+    // During a sim only the live tally is shown (no leak of the final result before counting).
+    () => simNatPcts != null ? (simSeats ?? {})
+      : (isPureBaseline ? (EU_BASELINE_SEATS as Partial<Record<EuGroupId, number>>)
+        : calcAllCountrySeats(displayPcts, hasOverrides ? constOverrides : undefined)),
+    [simNatPcts, simSeats, isPureBaseline, displayPcts, hasOverrides, constOverrides],
   );
 
   // Live national tally = the actual sum of the noisy per-country counts. Percentages
@@ -1881,7 +1905,7 @@ export default function EUApp() {
       {/* ── Scoreboard ── */}
       {scoreboardVisible && (
         <EuScoreboard
-          natPcts={simPartialPcts ?? (simNatPcts ?? displayPcts)}
+          natPcts={simNatPcts != null ? (simPartialPcts ?? EU_ZERO_PCTS) : displayPcts}
           simSeats={displaySeats}
           isBaseline={preset === 'baseline' && !simNatPcts}
           dark={dark}
