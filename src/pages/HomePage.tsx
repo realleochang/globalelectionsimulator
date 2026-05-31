@@ -234,7 +234,8 @@ export const COUNTRIES = [
     accent: 'linear-gradient(90deg,#008C45,#FFFFFF,#CD212A)',
     parties: [
       { color: '#E63946', abbr: 'PD' }, { color: '#F2C200', abbr: 'M5S' },
-      { color: '#1B9E4B', abbr: 'Lega' }, { color: '#214A7B', abbr: 'FdI' },
+      { color: '#0F73B9', abbr: 'FI' }, { color: '#1B9E4B', abbr: 'Lega' },
+      { color: '#214A7B', abbr: 'FdI' },
     ],
   },
   {
@@ -244,8 +245,7 @@ export const COUNTRIES = [
     lat: -38, lng: -64,
     accent: 'linear-gradient(90deg,#74ACDF,#FFFFFF,#74ACDF)',
     parties: [
-      { color: '#3FA9F5', abbr: 'UxP' }, { color: '#6A2C8E', abbr: 'LLA' },
-      { color: '#F2C200', abbr: 'JxC' },
+      { color: '#3FA9F5', abbr: 'FP' }, { color: '#6A2C8E', abbr: 'LLA' },
     ],
   },
 ];
