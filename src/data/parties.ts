@@ -19,7 +19,7 @@ export type Party = {
 export const PARTIES: Record<PartyId, Party> = {
   // ── Original 2024 parties ──────────────────────────────────────────
   // Only Labour retains alternative leaders; all others have one leader.
-  LAB:  { id: 'LAB',  name: 'Labour',                        color: '#E4003B', defaultLeader: 'Keir Starmer',     alternativeLeaders: ['Andy Burnham', 'Angela Rayner'] },
+  LAB:  { id: 'LAB',  name: 'Labour',                        color: '#E4003B', defaultLeader: 'Keir Starmer',     alternativeLeaders: ['Andy Burnham'] },
   CON:  { id: 'CON',  name: 'Conservative',                  color: '#0087DC', defaultLeader: 'Kemi Badenoch',    alternativeLeaders: [] },
   LD:   { id: 'LD',   name: 'Liberal Democrats',             color: '#FAA61A', defaultLeader: 'Ed Davey',         alternativeLeaders: [] },
   RFM:  { id: 'RFM',  name: 'Reform UK',                     color: '#12B6CF', defaultLeader: 'Nigel Farage',     alternativeLeaders: [] },
@@ -92,7 +92,6 @@ export const LEADER_WIKI_TITLES: Record<string, string> = {
   // Labour
   'Keir Starmer':      'Keir_Starmer',
   'Andy Burnham':      'Andy_Burnham',
-  'Angela Rayner':     'Angela_Rayner',
   'Wes Streeting':     'Wes_Streeting',
   'Lisa Nandy':        'Lisa_Nandy',
   'Yvette Cooper':     'Yvette_Cooper',

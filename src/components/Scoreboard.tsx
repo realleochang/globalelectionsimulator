@@ -1,5 +1,4 @@
 import { useMemo, useState, useRef, useEffect, useLayoutEffect, forwardRef } from 'react';
-import { createPortal } from 'react-dom';
 import { useElectionStore } from '../store/useElectionStore';
 import { PARTIES, LEADER_WIKI_TITLES, BASELINE_2024_LEADERS } from '../data/parties';
 import type { PartyId } from '../data/parties';
@@ -46,57 +45,26 @@ interface CandTileProps {
   isWinner: boolean;
 }
 
-// ── Floating leader dropdown (replaces native <select>) ──────────────────
-function LeaderDropdown({ options, value, color, onChange }: {
+// ── Shuffle leader button — cycles to the next candidate on click ─────────
+function LeaderShuffle({ options, value, onChange }: {
   options: string[];
   value: string;
-  color: string;
   onChange: (v: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
   const lastName = value.trim().split(/\s+/).pop() ?? value;
-
-  const handleToggle = (e: React.MouseEvent) => {
+  const handleShuffle = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setPos({ top: r.bottom + 4, left: r.left + r.width / 2 });
-    }
-    setOpen(o => !o);
+    const idx = options.indexOf(value);
+    onChange(options[(idx + 1) % options.length]);
   };
-
   return (
-    <>
-      <button ref={btnRef} onClick={handleToggle} className="cand-leader-wrap" style={{ background: 'none', border: 'none', padding: 0 }}>
-        <span className="cand-leader-name">{lastName}</span>
-        <svg className="leader-chevron" width="7" height="4" viewBox="0 0 7 4" fill="none" aria-hidden="true">
-          <path d="M0.5 0.5L3.5 3.5L6.5 0.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      </button>
-      {open && pos && createPortal(
-        <>
-          <div className="fixed inset-0 z-[9998]" onClick={() => setOpen(false)} />
-          <div className="fixed z-[9999] bg-white border border-default rounded-lg shadow-xl py-1"
-            style={{ top: pos.top, left: pos.left, transform: 'translateX(-50%)', minWidth: 190 }}>
-            {options.map(opt => (
-              <button key={opt} onClick={e => { e.stopPropagation(); onChange(opt); setOpen(false); }}
-                className={`flex items-center gap-2 w-full px-3 py-2 text-left transition-colors ${opt === value ? 'bg-[#f8f7f4]' : 'hover:bg-hover'}`}>
-                <div className="w-2 h-2 rounded-full shrink-0" style={{ background: color }} />
-                <span className="text-[10px] font-mono text-ink leading-none flex-1">{opt}</span>
-                {opt === value && (
-                  <svg className="shrink-0 ml-1" width="8" height="8" viewBox="0 0 8 8" fill="none">
-                    <path d="M1.5 4L3.2 5.8L6.5 2.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-                  </svg>
-                )}
-              </button>
-            ))}
-          </div>
-        </>,
-        document.body
-      )}
-    </>
+    <button onClick={handleShuffle} className="cand-leader-wrap" style={{ background: 'none', border: 'none', padding: 0 }} title="Cycle candidate">
+      <span className="cand-leader-name">{lastName}</span>
+      <svg width="8" height="8" viewBox="0 0 16 16" fill="none" aria-hidden="true" style={{ opacity: 0.55, flexShrink: 0 }}>
+        <path d="M2 8a6 6 0 1 0 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        <path d="M2 4v4h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </button>
   );
 }
 
@@ -191,7 +159,7 @@ const CandTile = forwardRef<HTMLDivElement, CandTileProps>(
 
         {/* 2. Leader name (last name only) */}
         {hasAlt ? (
-          <LeaderDropdown options={options} value={leader} color={color} onChange={v => setLeader(partyId, v)} />
+          <LeaderShuffle options={options} value={leader} onChange={v => setLeader(partyId, v)} />
         ) : (
           <span className="cand-leader-name" title={leader}>{isDash ? '' : leader.trim().split(/\s+/).pop() ?? leader}</span>
         )}
