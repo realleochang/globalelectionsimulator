@@ -19,9 +19,15 @@ type EsParty = {
   leader2026?: string; wikiTitle2026?: string; name2026?: string; fullName2026?: string; regional?: boolean;
 };
 
+// Current (2026) party leaders where they differ from June 2023 — shown on the 2026 Polling view.
+// Only SYRIZA changed: Alexis Tsipras (2023) → Stefanos Kasselakis → Sokratis Famellos (Nov 2024–).
+const GR_LEADER_2026: Partial<Record<GrPartyId, { leader: string; wiki: string }>> = {
+  SYRIZA: { leader: 'Sokratis Famellos', wiki: 'Sokratis_Famellos' },
+};
 const ES_PARTIES: EsParty[] = GR_PARTIES.map(p => ({
   id: p.id, name: p.name, fullName: p.full, color: p.color, seats2023: p.seats2023,
   ideo: p.ideo, leader: p.leader, wikiTitle: p.wiki,
+  leader2026: GR_LEADER_2026[p.id]?.leader, wikiTitle2026: GR_LEADER_2026[p.id]?.wiki,
 }));
 
 // Ideological order left → right for the parliament hemicycle
@@ -36,9 +42,12 @@ const ES_VOTE_PCT_2023 = Object.fromEntries(GR_PARTIES.map(p => [p.id, p.pct2023
 const ES_VOTE_RAW_2023 = Object.fromEntries(GR_PARTIES.map(p => [p.id, p.votes2023])) as Record<EsPartyId, number>;
 const ES_GRAND_TOTAL_VOTES = GR_META.valid;
 
-// 2026 polling projection (May 2026 — ND weakened post-Tempi, opposition fragmented). Modelled scenario.
+// 2026 polling — latest national poll average from Wikipedia "Next Greek legislative election"
+// (PolitPro aggregate, Nov 2025): a swing is applied per constituency from the 2023 baseline.
+// SYRIZA has collapsed (17.8%→5.4%); Greek Solution & Course of Freedom surged; Spartans defunct.
+// The remaining ~20% sits with new/minor parties (Movement for Democracy, Voice of Reason, New Left).
 const ES_VOTE_PCT_2026: Record<EsPartyId, number> = {
-  ND: 26.0, PASOK: 14.0, SYRIZA: 12.5, KKE: 9.0, EL: 11.0, NIKI: 4.5, PE: 3.5, SPAR: 1.0,
+  ND: 29.6, PASOK: 13.5, SYRIZA: 5.4, KKE: 8.7, EL: 10.3, NIKI: 2.3, PE: 9.3, SPAR: 0.5,
 };
 
 // ── Constituency types ─────────────────────────────────────────────────────────
@@ -183,6 +192,25 @@ function calcPartialSeats(
 ): Partial<Record<EsPartyId, number>> {
   if (Object.keys(provFractions).length === 0) return {};
   return grAllocate(grNationalPcts(natPcts, provOverrides, provFractions));
+}
+
+// Total votes a constituency casts (raw-vote scale, others included).
+function grProvVotes(provId: EsProvId): number {
+  return ES_GRAND_TOTAL_VOTES * (ES_PROVINCE_MAP[provId]?.weight ?? 0) / ES_TOTAL_PROV_WEIGHT;
+}
+// Live national %s from per-constituency cumulative vote counts (8 parties), scaled so the
+// 8-party total reads as `modelledSharePct` of valid (others implicit) — matches the scenario.
+function grNatPctsFromVotes(
+  simVotes: Partial<Record<EsProvId, Partial<Record<EsPartyId, number>>>>,
+  modelledSharePct: number,
+): Record<EsPartyId, number> {
+  const agg = {} as Record<EsPartyId, number>; for (const p of ES_PARTIES) agg[p.id] = 0;
+  let tot8 = 0;
+  for (const k in simVotes) { const pv = simVotes[k as unknown as EsProvId]; if (!pv) continue;
+    for (const p of ES_PARTIES) { const v = pv[p.id] ?? 0; agg[p.id] += v; tot8 += v; } }
+  const out = {} as Record<EsPartyId, number>;
+  for (const p of ES_PARTIES) out[p.id] = tot8 > 0 ? agg[p.id] / tot8 * modelledSharePct : 0;
+  return out;
 }
 
 function esRandNormal(): number {
@@ -341,11 +369,6 @@ function EsScoreboardTile({
 }
 
 // ── Scoreboard ────────────────────────────────────────────────────────────────
-// Greek blocs: progressive/left (KKE + SYRIZA + Course of Freedom + PASOK) vs the
-// centre-right & right (ND + Greek Solution + Niki + Spartans). No regional bloc.
-const ES_LEFT_IDS:     EsPartyId[] = ['KKE','SYRIZA','PE','PASOK'];
-const ES_RIGHT_IDS:    EsPartyId[] = ['ND','EL','NIKI','SPAR'];
-const ES_REGIONAL_IDS: EsPartyId[] = [];
 
 function EsScoreboard({
   natPcts, simSeats, isBaseline, is2026, dark, reportedVoteScale,
@@ -363,20 +386,11 @@ function EsScoreboard({
   const seats = useMemo(() => simSeats ?? calcAllProvinceSeats(natPcts), [simSeats, natPcts]);
   const scale    = reportedVoteScale ?? 1;
 
-  const leftSeats     = ES_LEFT_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
-  const rightSeats    = ES_RIGHT_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
-  const regionalSeats = ES_REGIONAL_IDS.reduce((s,id)=>s+(seats[id]??0), 0);
-
-  const leftMajority  = leftSeats  >= ES_MAJORITY;
-  const rightMajority = rightSeats >= ES_MAJORITY;
-  const maxGroup = Math.max(leftSeats, rightSeats, regionalSeats);
-  const leftLeading   = maxGroup > 0 && leftSeats  === maxGroup;
-  const rightLeading  = maxGroup > 0 && rightSeats === maxGroup;
-
   const visible = useMemo(
     () => ES_LR_ORDER.filter(id => (seats[id]??0)>0 || (natPcts[id]??0)>=0.1),
     [seats, natPcts],
   );
+  const topSeats = visible.reduce((m,id)=>Math.max(m, seats[id]??0), 0);
 
   const makeTile = (id: EsPartyId) => {
     const s   = seats[id] ?? 0;
@@ -384,45 +398,20 @@ function EsScoreboard({
     const rawVotes = isBaseline
       ? Math.round((ES_VOTE_RAW_2023[id]??0)*scale)
       : Math.round((natPcts[id]??0)/100*ES_GRAND_TOTAL_VOTES*scale);
-    const inLeft   = ES_LEFT_IDS.includes(id);
-    const inRight  = ES_RIGHT_IDS.includes(id);
-    const isWinner = inLeft ? leftMajority : inRight ? rightMajority : false;
-    const isLeader = inLeft  ? (leftLeading  && !leftMajority)
-                   : inRight ? (rightLeading && !rightMajority) : false;
+    const isWinner = s >= ES_MAJORITY;                      // single-party majority
+    const isLeader = !isWinner && s > 0 && s === topSeats;  // largest party, no majority
     return <EsScoreboardTile key={id} partyId={id} seats={s} pct={pct} rawVotes={rawVotes}
       isLeader={isLeader} isWinner={isWinner} is2026={is2026} dark={dark} />;
   };
 
-  const sortedBloc = (ids: EsPartyId[]) =>
-    ids.filter(id=>visible.includes(id)).sort((a,b)=>(seats[b]??0)-(seats[a]??0));
-
-  const renderBloc = (ids: EsPartyId[], label: string, isLeading: boolean, isMajority: boolean) => {
-    const shown = sortedBloc(ids); if (shown.length===0) return null;
-    const accent = partyColor(shown[0]);
-    const groupStyle: React.CSSProperties = isMajority
-      ? { borderColor:hexToRgba(accent,0.72), background:hexToRgba(accent,0.08) }
-      : isLeading ? { borderColor:hexToRgba(accent,0.42), background:hexToRgba(accent,0.04) } : {};
-    const labelStyle: React.CSSProperties = (isMajority||isLeading) ? { color:hexToRgba(accent,0.85) } : {};
-    return (
-      <div key={label} className="ni-group" style={groupStyle}>
-        <span className="ni-group-label" style={labelStyle}>{label}</span>
-        <div className="ni-group-tiles">{shown.map(id=>makeTile(id))}</div>
-      </div>
-    );
-  };
-
-  // Blocs listed by combined seat size (largest first). Empty blocs are dropped.
-  const blocDefs = [
-    { ids: ES_LEFT_IDS,     label: 'Progressive Bloc',  total: leftSeats,     isLeading: leftLeading  && !leftMajority,  isMajority: leftMajority },
-    { ids: ES_REGIONAL_IDS, label: 'Other',             total: regionalSeats, isLeading: false,                          isMajority: false },
-    { ids: ES_RIGHT_IDS,    label: 'Conservative & Right', total: rightSeats, isLeading: rightLeading && !rightMajority, isMajority: rightMajority },
-  ].filter(b => b.ids.length > 0).sort((a,b)=>b.total-a.total);
+  // Individual parties, largest first — no bloc grouping.
+  const ordered = visible.slice().sort((a,b)=>(seats[b]??0)-(seats[a]??0) || (natPcts[b]??0)-(natPcts[a]??0));
 
   return (
     <div className="shrink-0 border-b border-default bg-canvas select-none z-[45]">
       <div ref={scrollRef} className="overflow-x-auto scroll-none">
         <div className="flex gap-1.5 px-3 pt-2 pb-2 mx-auto w-fit items-stretch">
-          {blocDefs.map(b=>renderBloc(b.ids, b.label, b.isLeading, b.isMajority))}
+          {ordered.map(id=>makeTile(id))}
         </div>
       </div>
     </div>
@@ -618,7 +607,7 @@ type EsProvDraft = { provId: EsProvId; pcts: Record<EsPartyId,number>; rptPct: n
 // ── Map view ──────────────────────────────────────────────────────────────────
 function EsMapView({
   natPcts, selectedProv, onSelect, dark, bubbleMap, seatDots,
-  declaredProvs, provOverrides, blankMode, projectedProvs, simProvFractions,
+  declaredProvs, provOverrides, blankMode, projectedProvs, simProvFractions, simProvVotes,
   provDraft, simNatPcts,
 }: {
   natPcts: Record<EsPartyId,number>; selectedProv: EsProvId|null;
@@ -627,6 +616,7 @@ function EsMapView({
   provOverrides?: Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>;
   blankMode?: boolean; projectedProvs?: Set<EsProvId>;
   simProvFractions?: Partial<Record<EsProvId,number>>;
+  simProvVotes?: Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>;
   provDraft?: EsProvDraft|null; simNatPcts?: Record<EsPartyId,number>|null;
 }) {
   const containerRef    = useRef<HTMLDivElement>(null);
@@ -643,6 +633,7 @@ function EsMapView({
   const blankModeRef    = useRef(blankMode ?? false);
   const projectedRef    = useRef(projectedProvs ?? new Set<EsProvId>());
   const simFracRef2     = useRef(simProvFractions ?? {});
+  const simVotesRef2    = useRef(simProvVotes ?? {});
   const provDraftRef2   = useRef<EsProvDraft|null>(provDraft ?? null);
   const simNatPctsRef2  = useRef<Record<EsPartyId,number>|null>(simNatPcts ?? null);
 
@@ -655,6 +646,7 @@ function EsMapView({
   useEffect(() => { blankModeRef.current      = blankMode ?? false;    }, [blankMode]);
   useEffect(() => { projectedRef.current      = projectedProvs ?? new Set(); }, [projectedProvs]);
   useEffect(() => { simFracRef2.current       = simProvFractions ?? {}; }, [simProvFractions]);
+  useEffect(() => { simVotesRef2.current      = simProvVotes ?? {};     }, [simProvVotes]);
   useEffect(() => { provDraftRef2.current     = provDraft ?? null;      }, [provDraft]);
   useEffect(() => { simNatPctsRef2.current    = simNatPcts ?? null;     }, [simNatPcts]);
 
@@ -684,10 +676,16 @@ function EsMapView({
     if (!isDeclared && !hasSimData) return { fillColor:dark?'#1f2937':'#d1d5db', fillOpacity:0.7, weight:0.4, color:border, opacity:1 };
 
     const effectiveNatPcts = simNatPcts ?? natPcts;
-    const fill    = getProvFill(effectiveNatPcts, provId, dark, provOverrides?.[provId]);
+    const live = simProvVotes?.[provId];                        // live noisy counts → winner can flicker early
+    let fill: string;
+    if (live) {
+      let win: EsPartyId|null = null, mx = 0;
+      for (const p of ES_PARTIES) { const v = live[p.id] ?? 0; if (v > mx) { mx = v; win = p.id; } }
+      fill = win ? partyColor(win) : getProvFill(effectiveNatPcts, provId, dark, provOverrides?.[provId]);
+    } else fill = getProvFill(effectiveNatPcts, provId, dark, provOverrides?.[provId]);
     const opacity = isDeclared ? 0.78 : Math.max(0.35, 0.78*(simFrac??1));
     return { fillColor:fill, fillOpacity:opacity, weight:isSel?2:0.4, color:isSel?'#c8a020':border, opacity:1 };
-  }, [natPcts, selectedProv, dark, bubbleMap, seatDots, declaredProvs, provOverrides, blankMode, simProvFractions, simNatPcts]);
+  }, [natPcts, selectedProv, dark, bubbleMap, seatDots, declaredProvs, provOverrides, blankMode, simProvFractions, simProvVotes, simNatPcts]);
 
   useEffect(() => { layerRef.current?.setStyle((f:any)=>getStyle(f)); }, [getStyle]);
 
@@ -710,10 +708,14 @@ function EsMapView({
       const effectiveNatPcts = simNatPctsRef2.current ?? natPctsRef.current;
       const prov     = ES_PROVINCE_MAP[provId];
       const provVots = ES_GRAND_TOTAL_VOTES * (prov?.weight??0) / ES_TOTAL_PROV_WEIGHT;
-      const pv       = calcProvVotes(effectiveNatPcts, provId, overrideToUse);
-      const parties  = (Object.entries(pv) as [EsPartyId,number][])
-        .filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8)
-        .map(([id,pct]) => ({ id:id as EsPartyId, pct, rawVotes:Math.round(pct/100*provVots*(fraction??1)) }));
+      const live     = simVotesRef2.current[provId];          // live noisy counts during a simulation
+      const liveTot  = live ? (ES_PARTIES.reduce((s,p)=>s+(live[p.id]??0),0)||1) : 1;
+      const parties  = live
+        ? ES_PARTIES.map(p=>({ id:p.id, pct:(live[p.id]??0)/liveTot*100, rawVotes:live[p.id]??0 }))
+            .filter(x=>x.rawVotes>0).sort((a,b)=>b.rawVotes-a.rawVotes).slice(0,8)
+        : (Object.entries(calcProvVotes(effectiveNatPcts, provId, overrideToUse)) as [EsPartyId,number][])
+            .filter(([,v])=>v>0).sort(([,a],[,b])=>b-a).slice(0,8)
+            .map(([id,pct]) => ({ id:id as EsPartyId, pct, rawVotes:Math.round(pct/100*provVots*(fraction??1)) }));
       setTooltip({ x:e.originalEvent.clientX-rect.left, y:e.originalEvent.clientY-rect.top,
         name:prov?.name??geoId, parties, leader:parties[0]?.id??null,
         reportingPct:fraction!=null ? Math.round(fraction*100) : undefined });
@@ -851,20 +853,12 @@ function EsParliamentPanel({ seats: seatsMap, onClose, exiting, dark }: {
             <div className="px-3.5 pb-4">
               {(() => {
                 const dot=dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.25)';
-                const blocs=[
-                  {label:'Prog',    seats:ES_LEFT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0),     color:'#E4003B'},
-                  {label:'Regional',seats:ES_REGIONAL_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0), color:'#007442'},
-                  {label:'Cons',    seats:ES_RIGHT_IDS.reduce((s,id)=>s+(seatsMap[id]??0),0),    color:'#0066CC'},
-                ].sort((a,b)=>b.seats-a.seats);
+                const top=[...legend].sort((a,b)=>b.count-a.count)[0];
+                const maj=top&&top.count>=ES_MAJORITY;
                 return (
                   <div className="flex items-center gap-1.5 mb-3 text-[9px] font-mono">
-                    {blocs.map((b,i)=>(
-                      <React.Fragment key={b.label}>
-                        {i>0&&<span style={{color:dot}}>·</span>}
-                        <span style={{color:b.color,fontWeight:700}}>{b.label} {b.seats}</span>
-                      </React.Fragment>
-                    ))}
-                    <span style={{color:dot,marginLeft:'auto'}}>need {ES_MAJORITY}</span>
+                    {top&&<span style={{color:top.color,fontWeight:700}}>{ES_PARTY_MAP[top.id].name} largest · {top.count}</span>}
+                    <span style={{color:maj?'#16a34a':dot,marginLeft:'auto',fontWeight:maj?700:400}}>{maj?'✓ majority':`need ${ES_MAJORITY} for majority`}</span>
                   </div>
                 );
               })()}
@@ -1146,8 +1140,6 @@ function EsBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
 }) {
   const totalS=ES_LR_ORDER.reduce((s,id)=>s+(seats[id]??0),0);
   const totalV=ES_PARTIES.reduce((s,p)=>s+(natPcts[p.id]??0),0);
-  const leftS   =ES_LEFT_IDS.reduce((s,id)=>s+(seats[id]??0),0);
-  const rightS  =ES_RIGHT_IDS.reduce((s,id)=>s+(seats[id]??0),0);
 
   const enp = totalS>0 ? 1/ES_LR_ORDER.reduce((s,id)=>{const sh=(seats[id]??0)/totalS;return s+sh*sh;},0) : 0;
   const gallagher = Math.sqrt(ES_PARTIES.reduce((s,p)=>{
@@ -1158,7 +1150,6 @@ function EsBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
   const largest=[...ES_LR_ORDER].sort((a,b)=>(seats[b]??0)-(seats[a]??0))[0];
   const shortOf=ES_MAJORITY-(seats[largest]??0);
 
-  const ink2=dark?'rgba(255,255,255,0.42)':'rgba(0,0,0,0.42)';
   const ink3=dark?'rgba(255,255,255,0.25)':'rgba(0,0,0,0.25)';
   const cardBg=dark?'rgba(255,255,255,0.04)':'rgba(0,0,0,0.03)';
 
@@ -1182,26 +1173,23 @@ function EsBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
         <div className="flex items-center justify-center flex-1 text-[11px] font-mono text-ink-3 px-4 text-center">Load results or run simulation first</div>
       ):(
         <div className="flex-1 overflow-y-auto thin-scroll px-3.5 py-3.5 space-y-5">
-          <Section title="Left vs Right">
-            {[
-              {label:'Progressive Bloc',    desc:'KKE + SYRIZA + Course of Freedom + PASOK', seats:leftS, color:'#E14B8A'},
-              {label:'Conservative & Right', desc:'ND + Greek Solution + Niki + Spartans',    seats:rightS,color:'#1C7FE0'},
-            ].sort((a,b)=>b.seats-a.seats).map(b=>(
-              <div key={b.label} style={{background:cardBg,borderRadius:5,padding:'6px 8px',borderLeft:`3px solid ${b.color}`}}>
+          <Section title="Seats by Party">
+            {ES_LR_ORDER.filter(id=>(seats[id]??0)>0).sort((a,b)=>(seats[b]??0)-(seats[a]??0)).map(id=>{
+              const sc=seats[id]??0; const col=partyColor(id);
+              return (
+              <div key={id} style={{background:cardBg,borderRadius:5,padding:'6px 8px',borderLeft:`3px solid ${col}`}}>
                 <div className="flex items-center justify-between">
-                  <div><div className="text-[10px] font-bold text-ink">{b.label}</div><div className="text-[8px] font-mono" style={{color:ink2}}>{b.desc}</div></div>
-                  <div className="text-right">
-                    <span className="text-[18px] font-black font-mono" style={{color:b.color}}>{b.seats}</span>
-                    <div className="text-[7.5px] font-mono" style={{color:b.seats>=ES_MAJORITY?'#16a34a':ink3}}>
-                      {b.seats>=ES_MAJORITY?'✓ majority':`need ${ES_MAJORITY-b.seats} more`}
-                    </div>
+                  <div className="text-[10px] font-bold text-ink truncate">{ES_PARTY_MAP[id].name}</div>
+                  <div className="text-right shrink-0 pl-2">
+                    <span className="text-[16px] font-black font-mono" style={{color:col}}>{sc}</span>
+                    <span className="text-[8px] font-mono ml-1" style={{color:ink3}}>{(sc/ES_TOTAL_SEATS*100).toFixed(1)}%</span>
                   </div>
                 </div>
                 <div className="mt-1.5 h-1.5 rounded-full overflow-hidden" style={{background:dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)'}}>
-                  <div style={{width:`${Math.min(b.seats/ES_TOTAL_SEATS*100,100)}%`,height:'100%',borderRadius:4,background:b.color}}/>
+                  <div style={{width:`${Math.min(sc/ES_TOTAL_SEATS*100,100)}%`,height:'100%',borderRadius:4,background:col}}/>
                 </div>
               </div>
-            ))}
+            );})}
           </Section>
           <Section title="Electoral Statistics">
             <Stat label="Effective No. of Parties (ENP)" value={enp.toFixed(2)} sub="1/Σsᵢ² · higher = more fragmented"/>
@@ -1446,7 +1434,7 @@ export default function GreeceApp() {
   function resetMapState() {
     setSimSeats(undefined); setDeclaredProvs(undefined);
     setProvOverrides({}); setProjectedProvs(new Set());
-    setProvReportingPct({}); setSimProvFractions({});
+    setProvReportingPct({}); setSimProvFractions({}); setSimProvVotes({});
     setProvDraft(null); setSimNatPcts(null); stopSim();
   }
 
@@ -1551,6 +1539,7 @@ export default function GreeceApp() {
   const [simRunning,     setSimRunning]     = useState(false);
   const [declaredProvs,  setDeclaredProvs]  = useState<Set<EsProvId>|undefined>();
   const [simProvFractions,setSimProvFractions] = useState<Partial<Record<EsProvId,number>>>({});
+  const [simProvVotes,setSimProvVotes] = useState<Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>>({});
   const simTimersRef  = useRef<ReturnType<typeof setTimeout>[]>([]);
   const simNatPctsRef = useRef<Record<EsPartyId,number>>(natPcts);
 
@@ -1564,33 +1553,53 @@ export default function GreeceApp() {
   function runSim() {
     stopSim(); setSimDraftTouched(false);
     simNatPctsRef.current={...simDraftPcts}; setSimNatPcts({...simDraftPcts});
-    const PARTS=5; const totalProvs=ES_PROVINCES.length;
+    const PARTS=15; const totalProvs=ES_PROVINCES.length;                         // 15 random batches / constituency
+    const modelledSharePct=Math.max(1,ES_PARTIES.reduce((s,p)=>s+(simDraftPcts[p.id]??0),0)); // 8-party share of valid
+    const modelledShare=modelledSharePct/100;
     const allTimes=esBellCurveTimes(PARTS*totalProvs,simDuration);
     const provIds=[...ES_PROVINCES.map(p=>p.id)].sort(()=>Math.random()-0.5);
-    const events:{pId:EsProvId;cumFrac:number;t:number}[]=[];
+    // Each batch carries the constituency's CUMULATIVE per-party vote counts. Counts only ever rise
+    // (raw votes never decrease) but parties accrue along independent noisy paths, so the live %s wobble.
+    const events:{pId:EsProvId;votes:Partial<Record<EsPartyId,number>>;frac:number;t:number;done:boolean}[]=[];
     for(let pi=0;pi<totalProvs;pi++){
       const pId=provIds[pi];
+      const provVotes=grProvVotes(pId);
+      const pv=calcProvVotes(simNatPctsRef.current,pId);                          // final % (sum 100)
+      const fin:Partial<Record<EsPartyId,number>>={};
+      for(const p of ES_PARTIES) fin[p.id]=(pv[p.id]??0)/100*provVotes*modelledShare;
+      const cuts=[0,...Array.from({length:PARTS-1},()=>Math.random()),1].sort((a,b)=>a-b);
+      const size=cuts.slice(1).map((c,i)=>c-cuts[i]);                             // 15 random batch sizes (Σ=1)
+      const cf:Partial<Record<EsPartyId,number[]>>={};                            // per-party monotonic 0→1 path
+      for(const p of ES_PARTIES){
+        const inc=size.map(s=>s*(1+(Math.random()*1.4-0.7)));                     // noisy positive increments
+        const tot=inc.reduce((a,b)=>a+b,0)||1; let cum=0;
+        cf[p.id]=inc.map(v=>{cum+=v; return cum/tot;});
+      }
       const pTimes=allTimes.slice(pi*PARTS,(pi+1)*PARTS).sort((a,b)=>a-b);
-      const cuts=[0,Math.random(),Math.random(),Math.random(),Math.random(),1].sort((a,b)=>a-b);
-      const sizes=cuts.slice(1).map((c,i)=>c-cuts[i]);
       let cumFrac=0;
-      for(let b=0;b<PARTS;b++){ cumFrac=Math.min(1,cumFrac+sizes[b]); events.push({pId,cumFrac,t:pTimes[b]}); }
+      for(let b=0;b<PARTS;b++){
+        cumFrac=Math.min(1,cumFrac+size[b]);
+        const votes:Partial<Record<EsPartyId,number>>={};
+        for(const p of ES_PARTIES) votes[p.id]=Math.round((fin[p.id]??0)*(cf[p.id]![b]));
+        events.push({pId,votes,frac:cumFrac,t:pTimes[b],done:b===PARTS-1});
+      }
     }
     events.sort((a,b)=>a.t-b.t);
     setSimRunning(true); setSimProgress(0);
-    setSimSeats(undefined); setDeclaredProvs(new Set()); setSimProvFractions({});
+    setSimSeats(undefined); setDeclaredProvs(new Set()); setSimProvFractions({}); setSimProvVotes({});
     const localFrac:Partial<Record<EsProvId,number>>={};
+    const localVotes:Partial<Record<EsProvId,Partial<Record<EsPartyId,number>>>>={};
     const localDecl=new Set<EsProvId>();
     const timers:ReturnType<typeof setTimeout>[]=[];
     for(const ev of events){
       timers.push(setTimeout(()=>{
-        localFrac[ev.pId]=ev.cumFrac;
-        if(ev.cumFrac>=0.999) localDecl.add(ev.pId);
-        const fracSnap={...localFrac}; const declSnap=new Set(localDecl);
-        setSimProvFractions(fracSnap); setDeclaredProvs(declSnap);
+        localFrac[ev.pId]=ev.frac; localVotes[ev.pId]=ev.votes;
+        if(ev.done) localDecl.add(ev.pId);
+        const fracSnap={...localFrac}; const votesSnap={...localVotes}; const declSnap=new Set(localDecl);
+        setSimProvFractions(fracSnap); setSimProvVotes(votesSnap); setDeclaredProvs(declSnap);
         setSimProgress(Object.keys(fracSnap).length);
-        setSimSeats(calcPartialSeats(simNatPctsRef.current,fracSnap));
-        if(Object.values(fracSnap).every(f=>(f??0)>=0.999)&&Object.keys(fracSnap).length>=totalProvs){
+        setSimSeats(grAllocate(grNatPctsFromVotes(votesSnap,modelledSharePct)));
+        if(declSnap.size>=totalProvs){
           setSimSeats(calcAllProvinceSeats(simNatPctsRef.current)); setSimRunning(false);
         }
       },ev.t));
@@ -1600,29 +1609,20 @@ export default function GreeceApp() {
 
   const displaySeats=useMemo(()=>simSeats??blankSeats??calcAllProvinceSeats(displayPcts),[simSeats,blankSeats,displayPcts]);
 
+  // Live national %s aggregated from the actual (noisy, monotonic) per-constituency counts → they wobble.
+  const simModelledSharePct=useMemo(()=>simNatPcts?Math.max(1,ES_PARTIES.reduce((s,p)=>s+(simNatPcts[p.id]??0),0)):0,[simNatPcts]);
   const simPartialPcts=useMemo<Record<EsPartyId,number>|null>(()=>{
-    if(!simNatPcts) return null;
-    const entries=Object.entries(simProvFractions) as unknown as [EsProvId,number][];
-    if(entries.length===0) return null;
-    const weighted:Partial<Record<EsPartyId,number>>={};
-    let totalW=0;
-    for(const [pId,frac] of entries){
-      if(!frac) continue;
-      const w=(ES_PROVINCE_MAP[pId]?.weight??0)*frac;
-      const cv=calcProvVotes(simNatPcts,pId);
-      for(const p of ES_PARTIES) weighted[p.id]=(weighted[p.id]??0)+(cv[p.id]??0)*w;
-      totalW+=w;
-    }
-    if(totalW===0) return null;
-    return Object.fromEntries(ES_PARTIES.map(p=>[p.id,(weighted[p.id]??0)/totalW])) as Record<EsPartyId,number>;
-  },[simNatPcts,simProvFractions]);
+    if(!simNatPcts || Object.keys(simProvVotes).length===0) return null;
+    return grNatPctsFromVotes(simProvVotes,simModelledSharePct);
+  },[simNatPcts,simProvVotes,simModelledSharePct]);
 
+  // Scale that turns the live %s back into the exact aggregated (monotonic) raw vote counts on the scoreboard.
   const simVoteScale=useMemo(()=>{
     if(!simNatPcts) return undefined;
-    const reportedW=(Object.entries(simProvFractions) as unknown as [EsProvId,number][])
-      .reduce((s,[pId,frac])=>s+(ES_PROVINCE_MAP[pId]?.weight??0)*(frac??0),0);
-    return Math.min(1,reportedW/ES_TOTAL_PROV_WEIGHT);
-  },[simNatPcts,simProvFractions]);
+    let tot8=0; for(const k in simProvVotes){const pv=simProvVotes[k as unknown as EsProvId]; if(pv) for(const p of ES_PARTIES) tot8+=(pv[p.id]??0);}
+    const total8=ES_GRAND_TOTAL_VOTES*simModelledSharePct/100;
+    return total8>0?Math.min(1,tot8/total8):0;
+  },[simNatPcts,simProvVotes,simModelledSharePct]);
 
   // ── Derived display state ─────────────────────────────────────────────────
   const showProv      = !!selectedProv && rightPanel!=='sim' && !simRunning;
@@ -1695,7 +1695,7 @@ export default function GreeceApp() {
             dark={dark} bubbleMap={bubbleMap} seatDots={seatDots}
             declaredProvs={declaredProvs} provOverrides={provOverrides}
             blankMode={preset==='blank'} projectedProvs={projectedProvs}
-            simProvFractions={simProvFractions}
+            simProvFractions={simProvFractions} simProvVotes={simProvVotes}
             provDraft={preset==='blank'?provDraft:null}
             simNatPcts={simNatPcts}
           />
@@ -1760,7 +1760,7 @@ export default function GreeceApp() {
                 {simRunning?`${simProgress}/${ES_PROVINCES.length} reporting…`:'▶ Run Simulation'}
               </button>
               {(simSeats||declaredProvs)&&(
-                <button onClick={()=>{stopSim();setSimSeats(undefined);setDeclaredProvs(undefined);setSimProgress(0);setSimProvFractions({});setSimNatPcts(null);}}
+                <button onClick={()=>{stopSim();setSimSeats(undefined);setDeclaredProvs(undefined);setSimProgress(0);setSimProvFractions({});setSimProvVotes({});setSimNatPcts(null);}}
                   className="w-full h-7 rounded-[4px] border border-default text-ink-3 text-[10px] font-mono uppercase tracking-wide hover:bg-hover transition-colors">Reset</button>
               )}
             </div>
