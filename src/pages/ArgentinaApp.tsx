@@ -1226,13 +1226,20 @@ function trRandNormal(): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-function trBellCurveTimes(n: number, totalMs: number): number[] {
-  const mean = totalMs / 2;
-  const std  = totalMs / 6;
-  // Start from 0 — first batch fires immediately; rest spread on bell curve
-  return Array.from({ length: n }, (_, i) =>
-    i === 0 ? 0 : Math.max(1, Math.min(totalMs - 100, Math.round(mean + std * trRandNormal())))
-  ).sort((a, b) => a - b);
+// Generate 10 batch fire-times for one province.
+// All provinces start near the beginning (first batch in first 20% of total).
+// The remaining 9 batches land at fully random times up to totalMs.
+// This means every province is reporting from near t=0, but individual
+// batches trickle in unpredictably until the very end — creating maximum suspense.
+function arProvBatchTimes(totalMs: number): number[] {
+  const BATCHES = 10;
+  // First batch: random in [0, 20% of totalMs]
+  const firstT = Math.round(Math.random() * totalMs * 0.20);
+  // Remaining 9: fully random in [firstT, totalMs], independently shuffled
+  const rest = Array.from({ length: BATCHES - 1 }, () =>
+    firstT + Math.round(Math.random() * (totalMs - firstT))
+  );
+  return [firstT, ...rest].sort((a, b) => a - b);
 }
 
 // Build noisy partial votes for a province at batch fraction f (0-1).
@@ -2372,7 +2379,8 @@ export default function ArgentinaApp() {
   const [r2AwaitCandidates, setR2AwaitCandidates] = useState<[string, string]>(['', '']);
   const [r2AwaitR1Pcts, setR2AwaitR1Pcts] = useState<[number, number]>([0, 0]);
   // Batch reporting: fraction 0-1 per province, drives partial results on map/tooltip
-  const [simBatchFractions, setSimBatchFractions] = useState<Record<string, number>>({});
+  const [simBatchFractions,   setSimBatchFractions]   = useState<Record<string, number>>({});
+  const [simBatchFractionsR2, setSimBatchFractionsR2] = useState<Record<string, number>>({});
   const r1ResultsRef = useRef<Record<string, Partial<Record<string, number>>>>({});
   const simTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const partyFilterRef = useRef<HTMLDivElement>(null);
@@ -2427,12 +2435,23 @@ export default function ArgentinaApp() {
     if (activeElection === '2027R2') {
       const out: Record<string, Partial<Record<string, number>>> = {};
       for (const [code, r] of Object.entries(workingDeptResults)) {
-        if (projected2027R2.has(code)) out[code] = r;
+        if (projected2027R2.has(code)) {
+          out[code] = r;
+        } else {
+          const f = simBatchFractionsR2[code];
+          if (f && f > 0) {
+            const final = Object.fromEntries(
+              Object.entries(r).map(([id, v]) => [id, (v as number) ?? 0])
+            ) as Record<string, number>;
+            const seed = Object.keys(PROV_2023R2_TOTALS).indexOf(code);
+            out[code] = arPartialVotes(final, f, seed);
+          }
+        }
       }
       return out;
     }
     return workingDeptResults;
-  }, [activeElection, workingDeptResults, projected2027, projected2027R2, simBatchFractions]);
+  }, [activeElection, workingDeptResults, projected2027, projected2027R2, simBatchFractions, simBatchFractionsR2]);
 
   // ── 2027 R1 projection engine — always live, drives both R1 ADVANCE badges and R2 panel ──
   const r2027Reporting = useMemo(() => {
@@ -2559,6 +2578,7 @@ export default function ArgentinaApp() {
     simTimersRef.current.forEach(t => clearTimeout(t));
     simTimersRef.current = [];
     setSimBatchFractions({});
+    setSimBatchFractionsR2({});
     setSimState('idle');
   }, []);
 
@@ -2567,6 +2587,7 @@ export default function ArgentinaApp() {
     simTimersRef.current = [];
     setSimState('idle');
     setSimBatchFractions({});
+    setSimBatchFractionsR2({});
     setProjected2027(new Set());
     setProjected2027R2(new Set());
     setOverrides(prev => ({ ...prev, '2027R1': {}, '2027R2': {} }));
@@ -2607,7 +2628,6 @@ export default function ArgentinaApp() {
 
     const BATCHES = 10;
     const deptCodesR1 = Object.keys(PROV_2023R1_TOTALS);
-    const shuffledR1 = [...deptCodesR1].sort(() => Math.random() - 0.5);
     const totalMs = duration * 1000;
 
     setSimState('r1_running');
@@ -2617,22 +2637,17 @@ export default function ArgentinaApp() {
     const timers: ReturnType<typeof setTimeout>[] = [];
     let r1Declared = 0;
 
-    for (let pi = 0; pi < shuffledR1.length; pi++) {
-      const code = shuffledR1[pi];
-      // Generate random batch cut-points (10 batches, random sizes)
+    for (const code of deptCodesR1) {
+      // Random cumulative fractions for 10 batches
       const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
-      // Spread all 10 batch events on a bell curve scoped to this province's window
-      // Provinces themselves arrive in random order; within each province the 10 batches span its window
-      const provWindow = totalMs / shuffledR1.length;
-      const provOffset = pi * provWindow;
-      const batchTimes = trBellCurveTimes(BATCHES, provWindow).map(t => provOffset + t);
+      // Every province starts early, batches land randomly over the full duration
+      const batchTimes = arProvBatchTimes(totalMs);
 
       for (let b = 0; b < BATCHES; b++) {
-        const cumFrac = cuts[b + 1]; // 0..1
-        const isLast = b === BATCHES - 1;
+        const cumFrac = cuts[b + 1];
+        const isLast  = b === BATCHES - 1;
         timers.push(setTimeout(() => {
           if (isLast) {
-            // Final batch: snap to exact result, mark province fully reported
             setSimBatchFractions(prev => ({ ...prev, [code]: 1 }));
             setProjected2027(prev => new Set([...prev, code]));
             r1Declared++;
@@ -2670,11 +2685,11 @@ export default function ArgentinaApp() {
 
     const r2Results = simulateArgentinaR2WithTarget(r1ResultsRef.current, r2AwaitCandidates, pcts);
     setOverrides(prev => ({ ...prev, '2027R2': { ...prev['2027R2'], ...r2Results } }));
+    setSimBatchFractionsR2({});
 
+    const BATCHES = 10;
     const deptCodesR2 = Object.keys(PROV_2023R2_TOTALS);
-    const shuffledR2 = [...deptCodesR2].sort(() => Math.random() - 0.5);
     const totalMs = duration * 1000;
-    const r2Times = trBellCurveTimes(deptCodesR2.length, totalMs);
 
     setActiveElection('2027R2');
     setSimState('r2_running');
@@ -2683,16 +2698,28 @@ export default function ArgentinaApp() {
 
     const timers: ReturnType<typeof setTimeout>[] = [];
     let r2Declared = 0;
-    for (let i = 0; i < shuffledR2.length; i++) {
-      const code = shuffledR2[i];
-      timers.push(setTimeout(() => {
-        setProjected2027R2(prev => new Set([...prev, code]));
-        r2Declared++;
-        setSimProgress(r2Declared);
-      }, r2Times[i]));
+
+    for (const code of deptCodesR2) {
+      const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      const batchTimes = arProvBatchTimes(totalMs);
+
+      for (let b = 0; b < BATCHES; b++) {
+        const cumFrac = cuts[b + 1];
+        const isLast  = b === BATCHES - 1;
+        timers.push(setTimeout(() => {
+          if (isLast) {
+            setSimBatchFractionsR2(prev => ({ ...prev, [code]: 1 }));
+            setProjected2027R2(prev => new Set([...prev, code]));
+            r2Declared++;
+            setSimProgress(r2Declared);
+          } else {
+            setSimBatchFractionsR2(prev => ({ ...prev, [code]: cumFrac }));
+          }
+        }, batchTimes[b]));
+      }
     }
 
-    timers.push(setTimeout(() => setSimState('idle'), totalMs + 2000));
+    timers.push(setTimeout(() => setSimState('idle'), totalMs + 200));
     simTimersRef.current = timers;
   }, [r2AwaitCandidates]);
 
@@ -3071,7 +3098,11 @@ export default function ArgentinaApp() {
             selectedCodes={selectedDepts}
             onMultiSelect={handleMultiSelect}
             bubbleMapMode={bubbleMapMode}
-            simBatchFractions={activeElection === '2027R1' ? simBatchFractions : undefined}
+            simBatchFractions={
+              activeElection === '2027R1' ? simBatchFractions
+              : activeElection === '2027R2' ? simBatchFractionsR2
+              : undefined
+            }
             dark={dark}
           />
         </div>
