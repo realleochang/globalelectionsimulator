@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, GeoJSON as ReactGeoJSON, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
@@ -605,8 +606,8 @@ function BrMapView({
               <div className="text-[9px] font-mono uppercase tracking-wide mb-2.5" style={{ color: tt.sub }}>
                 {total > 0 ? total.toLocaleString() + ' votes' : 'No data'}
                 {isPartial && (
-                  <span className="ml-1.5 px-1 py-[1px] rounded-[3px] text-[8px] font-bold uppercase"
-                    style={{ background: 'rgba(250,166,26,0.18)', color: '#FAA61A', letterSpacing: '0.06em' }}>
+                  <span className="ml-1.5 inline-flex items-center gap-1" style={{ color:'#D4A017', fontWeight:700 }}>
+                    <span style={{ display:'inline-block', width:5, height:5, borderRadius:'50%', background:'#D4A017', animation:'ar-live-blink 0.9s ease-in-out infinite' }}/>
                     {(stRptPct * 100).toFixed(0)}% reporting
                   </span>
                 )}
@@ -905,12 +906,41 @@ function brRandNormal(): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-function brBellCurveTimes(n: number, totalMs: number): number[] {
-  const mean = totalMs / 2;
-  const std  = totalMs / 6;
-  return Array.from({ length: n }, () =>
-    Math.max(500, Math.min(totalMs - 200, Math.round(mean + std * brRandNormal())))
-  ).sort((a, b) => a - b);
+
+// Every state starts reporting in the first 20% of the sim; its 10 batches
+// land at fully random times up to totalMs — maximum suspense, maximum randomness.
+function brProvBatchTimes(totalMs: number): number[] {
+  const BATCHES = 10;
+  const firstT = Math.round(Math.random() * totalMs * 0.20);
+  const rest = Array.from({ length: BATCHES - 1 }, () =>
+    firstT + Math.round(Math.random() * (totalMs - firstT))
+  );
+  return [firstT, ...rest].sort((a, b) => a - b);
+}
+
+// Noisy partial votes during counting — drifts toward the true final answer.
+// At fraction=1 snaps exactly to finalVotes.
+function brPartialVotes(finalVotes: Record<string, number>, f: number, seed: number): Record<string, number> {
+  const ids = Object.keys(finalVotes);
+  const finalTotal = ids.reduce((s, id) => s + finalVotes[id], 0);
+  if (finalTotal === 0 || f <= 0) return Object.fromEntries(ids.map(id => [id, 0]));
+  if (f >= 1) return { ...finalVotes };
+  const counted = Math.round(finalTotal * f);
+  const noiseAmp = 0.18 * (1 - f);
+  let shareSum = 0;
+  const noisyShares: Record<string, number> = {};
+  ids.forEach((id, i) => {
+    const trueShare = finalVotes[id] / finalTotal;
+    const phase = (seed * 7919 + i * 1301) % 1;
+    const noise = noiseAmp * Math.sin(phase * Math.PI * 2 + f * Math.PI);
+    noisyShares[id] = Math.max(0.001, trueShare + noise);
+    shareSum += noisyShares[id];
+  });
+  const raw = ids.map(id => Math.round((noisyShares[id] / shareSum) * counted));
+  const diff = counted - raw.reduce((s, v) => s + v, 0);
+  const maxIdx = raw.reduce((bi, v, i) => v > raw[bi] ? i : bi, 0);
+  raw[maxIdx] = Math.max(0, raw[maxIdx] + diff);
+  return Object.fromEntries(ids.map((id, i) => [id, raw[i]]));
 }
 
 // Maps 2026 party to the closest 2022 R1 candidate for the baseline regional swing model
@@ -1850,6 +1880,10 @@ export default function BrazilApp() {
   const [r2AwaitCandidates, setR2AwaitCandidates] = useState<[string, string]>(['', '']);
   const [r2AwaitR1Pcts, setR2AwaitR1Pcts] = useState<[number, number]>([0, 0]);
   const [stateReportingPct2026R1, setStateReportingPct2026R1] = useState<Record<string, number>>({});
+  const [stateReportingPct2026R2, setStateReportingPct2026R2] = useState<Record<string, number>>({});
+  const [simR1WinnerId, setSimR1WinnerId]         = useState<string>('');
+  const [simR1Pcts, setSimR1Pcts]                 = useState<[number, number]>([0, 0]);
+  const [winnerOverlayDismissed, setWinnerOverlayDismissed] = useState(false);
   const r1ResultsRef   = useRef<Record<string, Partial<Record<string, number>>>>({});
   const simTimersRef   = useRef<ReturnType<typeof setTimeout>[]>([]);
   const partyFilterRef = useRef<HTMLDivElement>(null);
@@ -1917,12 +1951,14 @@ export default function BrazilApp() {
     let reportedVotes = 0;
     const tally: Record<string, number> = {};
     for (const [code, r] of Object.entries(overrides['2026R1'])) {
-      if (!projected2026R1.has(code)) continue;
+      const provTotal = STATE_2022R1_TOTALS[code] ?? 0;
+      const frac = projected2026R1.has(code) ? 1 : (stateReportingPct2026R1[code] ?? 0);
+      if (frac <= 0) continue;
       const dSum = Object.values(r).reduce((s: number, v) => s + (v ?? 0), 0);
       if (dSum > 0) {
-        reportedVotes += dSum;
+        reportedVotes += (provTotal || dSum) * frac;
         for (const [pid, v] of Object.entries(r))
-          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number);
+          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number) * frac;
       }
     }
     const reportingPct    = totalVotes > 0 ? reportedVotes / totalVotes : 0;
@@ -1940,20 +1976,22 @@ export default function BrazilApp() {
       if (p2votes > thirdVotes + LOCK_SHARE * remainingVotes) projectedSet.add(p2id);
     }
     return { reportingPct, projectedSet };
-  }, [overrides, projected2026R1]);
+  }, [overrides, projected2026R1, stateReportingPct2026R1]);
 
-  // Live reporting tracker for 2026R2 — drives winner badge
+  // Live reporting tracker for 2026R2 — drives winner badge + reporting widget
   const r2026R2Reporting = useMemo(() => {
     const totalVotes = Object.values(STATE_2022R2_TOTALS).reduce((s, v) => s + v, 0);
     let reportedVotes = 0;
     const tally: Record<string, number> = {};
     for (const [code, r] of Object.entries(overrides['2026R2'])) {
-      if (!projected2026R2.has(code)) continue;
+      const provTotal = STATE_2022R2_TOTALS[code] ?? 0;
+      const frac = projected2026R2.has(code) ? 1 : (stateReportingPct2026R2[code] ?? 0);
+      if (frac <= 0) continue;
       const dSum = Object.values(r).reduce((s: number, v) => s + (v ?? 0), 0);
       if (dSum > 0) {
-        reportedVotes += STATE_2022R2_TOTALS[code] ?? dSum;
+        reportedVotes += (provTotal || dSum) * frac;
         for (const [pid, v] of Object.entries(r))
-          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number);
+          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number) * frac;
       }
     }
     const reportingPct   = totalVotes > 0 ? reportedVotes / totalVotes : 0;
@@ -1966,7 +2004,7 @@ export default function BrazilApp() {
       if (p1votes > p2votes + 0.65 * remainingVotes) projectedWinner.add(p1id);
     }
     return { reportingPct, projectedWinner };
-  }, [overrides, projected2026R2]);
+  }, [overrides, projected2026R2, stateReportingPct2026R2]);
 
   const panelAllIds = useMemo(() => {
     if (activeElection === '2022R1') return BR_CANDIDATES.map(c => c.id as string);
@@ -2005,6 +2043,7 @@ export default function BrazilApp() {
     simTimersRef.current = [];
     setSimState('idle');
     setStateReportingPct2026R1({});
+    setStateReportingPct2026R2({});
   }, []);
 
   const reset2026 = useCallback(() => {
@@ -2015,6 +2054,7 @@ export default function BrazilApp() {
     setProjected2026R2(new Set());
     setOverrides(prev => ({ ...prev, '2026R1': {}, '2026R2': {} }));
     setStateReportingPct2026R1({});
+    setStateReportingPct2026R2({});
     setActiveElection('2026R1');
     setShowRefPanel(false);
   }, []);
@@ -2045,64 +2085,35 @@ export default function BrazilApp() {
 
     const stateCodes = Object.keys(STATE_2022R1_TOTALS);
     const totalMs    = duration * 1000;
-    const N_BATCHES  = 5;
-
     setSimState('r1_running');
     setSimProgress(0);
     setSimTotal(stateCodes.length);
 
     const timers: ReturnType<typeof setTimeout>[] = [];
 
-    // Bell-curve final times: when each state's last batch fires.
-    // Mean at 50% of duration, std at 20% — most states finish in the middle.
-    // Clamp to [100ms, totalMs - 200ms] so some states fire almost immediately.
-    const mean = totalMs * 0.50;
-    const std  = totalMs * 0.20;
-    const finalTimes = stateCodes.map(() =>
-      Math.max(100, Math.min(totalMs - 200, Math.round(mean + std * brRandNormal())))
-    );
-
-    for (let si = 0; si < stateCodes.length; si++) {
-      const code = stateCodes[si];
+    // Every state starts in first 20% of sim; 10 batches land randomly over full duration.
+    const BATCHES = 10;
+    setStateReportingPct2026R1({});
+    for (const code of stateCodes) {
       const fullResults = r1Results[code] ?? {};
-      const finalTime   = finalTimes[si];
-
-      // 5 random batch sizes summing to 1
-      const rands   = Array.from({ length: N_BATCHES }, () => 0.2 + Math.random() * 0.8);
-      const randSum = rands.reduce((s, v) => s + v, 0);
-      const cumPcts: number[] = [];
-      let acc = 0;
-      for (let i = 0; i < N_BATCHES; i++) {
-        acc += rands[i] / randSum;
-        cumPcts.push(i === N_BATCHES - 1 ? 1.0 : acc);
-      }
-
-      // Batch times: first batch fires immediately (t≈0), rest spread to finalTime.
-      // This gives instant visual feedback while keeping the bell-curve distribution
-      // for when states finish reporting.
-      const batchTimes: number[] = [
-        0,
-        Math.round(finalTime * 0.25),
-        Math.round(finalTime * 0.50),
-        Math.round(finalTime * 0.75),
-        finalTime,
-      ];
-
-      for (let bi = 0; bi < N_BATCHES; bi++) {
-        const cumPct   = cumPcts[bi];
-        const fireAt   = batchTimes[bi];
-        const isFinal  = bi === N_BATCHES - 1;
-
+      const seed = stateCodes.indexOf(code);
+      const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      const batchTimes = brProvBatchTimes(totalMs);
+      for (let b = 0; b < BATCHES; b++) {
+        const cumFrac = cuts[b + 1];
+        const isLast  = b === BATCHES - 1;
         timers.push(setTimeout(() => {
-          const scaledResults: Partial<Record<string, number>> = {};
-          for (const [pid, v] of Object.entries(fullResults))
-            scaledResults[pid] = Math.round((v as number) * cumPct);
-
-          setOverrides(prev => ({ ...prev, '2026R1': { ...prev['2026R1'], [code]: scaledResults } }));
-          setProjected2026R1(prev => { const n = new Set(prev); n.add(code); return n; });
-          setStateReportingPct2026R1(prev => ({ ...prev, [code]: cumPct }));
-          if (isFinal) setSimProgress(prev => prev + 1);
-        }, fireAt));
+          if (isLast) {
+            setOverrides(prev => ({ ...prev, '2026R1': { ...prev['2026R1'], [code]: fullResults } }));
+            setProjected2026R1(prev => { const n = new Set(prev); n.add(code); return n; });
+            setStateReportingPct2026R1(prev => ({ ...prev, [code]: 1 }));
+            setSimProgress(prev => prev + 1);
+          } else {
+            const partial = brPartialVotes(fullResults as Record<string,number>, cumFrac, seed);
+            setOverrides(prev => ({ ...prev, '2026R1': { ...prev['2026R1'], [code]: partial } }));
+            setStateReportingPct2026R1(prev => ({ ...prev, [code]: cumFrac }));
+          }
+        }, batchTimes[b]));
       }
     }
 
@@ -2111,11 +2122,14 @@ export default function BrazilApp() {
       setR2AwaitR1Pcts(top2Pcts);
       setShowSimPanel(true);
       if (top2Pcts[0] >= 50) {
+        setSimR1WinnerId(top2Ids[0]);
+        setSimR1Pcts([top2Pcts[0], top2Pcts[1]]);
+        setWinnerOverlayDismissed(false);
         setSimState('r1_won');
       } else {
         setSimState('r2_input');
       }
-    }, totalMs + 2000));
+    }, totalMs + 200));
     simTimersRef.current = timers;
   }, []);
 
@@ -2125,28 +2139,41 @@ export default function BrazilApp() {
     const r2Results = simulateBrazilR2WithTarget(r1ResultsRef.current, r2AwaitCandidates, pcts);
     setOverrides(prev => ({ ...prev, '2026R2': { ...prev['2026R2'], ...r2Results } }));
     const stateCodes = Object.keys(STATE_2022R2_TOTALS);
-    const shuffled   = [...stateCodes].sort(() => Math.random() - 0.5);
     const totalMs    = duration * 1000;
-    const NCHUNKS    = 10;
-    const chunkTimes = brBellCurveTimes(NCHUNKS, totalMs);
-    const chunks: string[][] = Array.from({ length: NCHUNKS }, () => []);
-    shuffled.forEach((code, i) => chunks[i % NCHUNKS].push(code));
+    const BATCHES    = 10;
     setActiveElection('2026R2');
     setSimState('r2_running');
     setSimProgress(0);
     setSimTotal(stateCodes.length);
+    setStateReportingPct2026R2({});
     const timers: ReturnType<typeof setTimeout>[] = [];
-    let declared = 0;
-    for (let ci = 0; ci < NCHUNKS; ci++) {
-      const chunk = chunks[ci];
-      const t     = chunkTimes[ci];
-      timers.push(setTimeout(() => {
-        setProjected2026R2(prev => { const n = new Set(prev); for (const c of chunk) n.add(c); return n; });
-        declared += chunk.length;
-        setSimProgress(declared);
-      }, t));
+    for (const code of stateCodes) {
+      const fullResults = r2Results[code] ?? {};
+      const seed = stateCodes.indexOf(code);
+      const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      const batchTimes = brProvBatchTimes(totalMs);
+      for (let b = 0; b < BATCHES; b++) {
+        const cumFrac = cuts[b + 1];
+        const isLast  = b === BATCHES - 1;
+        timers.push(setTimeout(() => {
+          if (isLast) {
+            setOverrides(prev => ({ ...prev, '2026R2': { ...prev['2026R2'], [code]: fullResults } }));
+            setProjected2026R2(prev => { const n = new Set(prev); n.add(code); return n; });
+            setStateReportingPct2026R2(prev => ({ ...prev, [code]: 1 }));
+            setSimProgress(prev => prev + 1);
+          } else {
+            const partial = brPartialVotes(fullResults as Record<string,number>, cumFrac, seed);
+            setOverrides(prev => ({ ...prev, '2026R2': { ...prev['2026R2'], [code]: partial } }));
+            setStateReportingPct2026R2(prev => ({ ...prev, [code]: cumFrac }));
+          }
+        }, batchTimes[b]));
+      }
     }
-    timers.push(setTimeout(() => setSimState('idle'), totalMs + 2000));
+    // After R2: show winner overlay
+    timers.push(setTimeout(() => {
+      setSimState('idle');
+      setShowSimPanel(true);
+    }, totalMs + 200));
     simTimersRef.current = timers;
   }, [r2AwaitCandidates]);
 
@@ -2244,6 +2271,12 @@ export default function BrazilApp() {
               </svg>
               Simulation
             </button>
+          )}
+          {isSimRunning && (
+            <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-[4px] bg-red-600 text-white select-none shrink-0">
+              <span style={{ display:'inline-block', width:7, height:7, borderRadius:'50%', background:'#fff', animation:'ar-live-blink 0.9s ease-in-out infinite' }}/>
+              <span className="text-[11px] font-mono font-bold tracking-widest uppercase">Live</span>
+            </div>
           )}
 
           <button className={summaryOpen ? `${btnBase} bg-ink/8 border border-default text-ink` : btnMuted}
@@ -2376,7 +2409,7 @@ export default function BrazilApp() {
             reportingLabel={activeElection === '2026R1' ? 'Round 1 Reporting' : 'Round 2 Reporting'}
             reportingStates={reportingStates}
             reportingTotal={reportingTotal}
-            stateReportingPct={activeElection === '2026R1' ? stateReportingPct2026R1 : undefined}
+            stateReportingPct={activeElection === '2026R1' ? stateReportingPct2026R1 : activeElection === '2026R2' ? stateReportingPct2026R2 : undefined}
             bubbleMode={bubbleMode}
             dark={dark}
             othersIds={activeElection === '2022R1' ? BR_R1_OTHER_IDS : undefined}
@@ -2475,6 +2508,77 @@ export default function BrazilApp() {
             onClose={() => setShowSimPanel(false)}
           />
         )}
+      </div>
+
+      {/* ── R1 winner overlay ─────────────────────────────────────────── */}
+      {simState === 'r1_won' && simR1WinnerId && !winnerOverlayDismissed && createPortal(
+        <BrWinnerOverlay
+          winnerId={simR1WinnerId}
+          winnerPct={simR1Pcts[0]}
+          runnerUpPct={simR1Pcts[1]}
+          roundLabel="Round 1 — Outright Winner"
+          noteText={`Crossed 50% — no runoff needed.`}
+          getCandInfo={getCandInfo}
+          onDismiss={() => setWinnerOverlayDismissed(true)}
+        />,
+        document.body
+      )}
+    </div>
+  );
+}
+
+// ── Winner overlay ─────────────────────────────────────────────────────────────
+function BrWinnerOverlay({ winnerId, winnerPct, runnerUpPct, roundLabel, noteText, getCandInfo, onDismiss }: {
+  winnerId: string; winnerPct: number; runnerUpPct: number;
+  roundLabel: string; noteText: string;
+  getCandInfo: (id: string) => { name: string; color: string };
+  onDismiss: () => void;
+}) {
+  const info = getCandInfo(winnerId);
+  const margin = winnerPct - runnerUpPct;
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const party = BR_2026_PARTY_MAP[winnerId as Br2026PartyId];
+    const cand  = party?.candidates[0] ?? winnerId;
+    const local = BR_2026_LOCAL_PHOTOS[cand];
+    if (local) { setPhotoUrl(local); return; }
+    const title = BR_2026_WIKI_TITLES[cand] ?? cand.replace(/ /g,'_');
+    let cancelled = false;
+    fetchWikiPhoto(title).then(url => { if (!cancelled) setPhotoUrl(url); });
+    return () => { cancelled = true; };
+  }, [winnerId]);
+
+  const c = info.color;
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background:'rgba(0,0,0,0.82)', backdropFilter:'blur(10px)' }}
+      onClick={onDismiss}>
+      <div onClick={e => e.stopPropagation()}
+        className="relative flex flex-col items-center text-center px-10 py-10 rounded-[24px] max-w-[480px] w-full mx-4"
+        style={{ background:`linear-gradient(170deg,rgba(18,22,38,0.97) 0%,${c}22 100%)`, border:`2px solid ${c}55`, boxShadow:`0 0 80px ${c}44,0 24px 60px rgba(0,0,0,0.6)` }}>
+        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background:c }} />
+        <div className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] mb-5" style={{ color:c }}>🇧🇷 {roundLabel}</div>
+        <div className="mb-5 relative">
+          <div className="w-32 h-32 rounded-full overflow-hidden border-4 mx-auto" style={{ borderColor:c, boxShadow:`0 0 32px ${c}88` }}>
+            {photoUrl ? <img src={photoUrl} alt={info.name} className="w-full h-full object-cover object-top"/> : <div className="w-full h-full flex items-center justify-center text-[36px]" style={{ background:`${c}22` }}>🇧🇷</div>}
+          </div>
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-mono font-bold text-white" style={{ background:c }}>✓ ELECTED</div>
+        </div>
+        <div className="text-[28px] font-black text-white leading-tight mb-1">{info.name}</div>
+        <div className="text-[12px] font-mono text-white/50 mb-6">{BR_2026_PARTY_MAP[winnerId as Br2026PartyId]?.name ?? ''}</div>
+        <div className="flex gap-6 mb-8">
+          <div className="flex flex-col items-center">
+            <div className="text-[32px] font-black tabular-nums leading-none" style={{ color:c }}>{winnerPct.toFixed(1)}%</div>
+            <div className="text-[10px] font-mono text-white/40 mt-1 uppercase tracking-wide">National vote</div>
+          </div>
+          <div className="w-px bg-white/10" />
+          <div className="flex flex-col items-center">
+            <div className="text-[32px] font-black tabular-nums leading-none text-white">+{margin.toFixed(1)}</div>
+            <div className="text-[10px] font-mono text-white/40 mt-1 uppercase tracking-wide">Point margin</div>
+          </div>
+        </div>
+        <div className="text-[10px] font-mono text-white/35 mb-8 leading-relaxed">{noteText}</div>
+        <button onClick={onDismiss} className="h-9 px-8 rounded-full text-[12px] font-mono font-bold uppercase tracking-wider text-white hover:opacity-80 transition-all" style={{ background:c, boxShadow:`0 4px 20px ${c}66` }}>Continue →</button>
       </div>
     </div>
   );
