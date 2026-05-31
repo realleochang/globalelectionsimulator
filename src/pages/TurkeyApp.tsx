@@ -512,6 +512,7 @@ function TurkeyMapView({
   selectedCodes,
   onMultiSelect,
   bubbleMapMode = false,
+  simBatchFractions,
   dark = false,
 }: {
   deptResults: Record<string, Partial<Record<string, number>>>;
@@ -526,6 +527,7 @@ function TurkeyMapView({
   selectedCodes?: Set<string>;
   onMultiSelect?: (code: string) => void;
   bubbleMapMode?: boolean;
+  simBatchFractions?: Record<string, number>;
   dark?: boolean;
 }) {
   const containerRef    = useRef<HTMLDivElement>(null);
@@ -732,7 +734,20 @@ function TurkeyMapView({
               padding: '12px 14px',
             }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: tt.title, lineHeight: 1.2 }}>{tooltip.nom}</div>
-              <div style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 3 }}>Province {tooltip.code}</div>
+              {(() => {
+                const bFrac = simBatchFractions?.[tooltip.code];
+                if (bFrac === undefined || bFrac <= 0) return (
+                  <div style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 3 }}>Province {tooltip.code}</div>
+                );
+                const isPartial = bFrac < 1;
+                const GOLD = '#D4A017';
+                return (
+                  <div style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: GOLD, fontWeight: 700, marginTop: 3, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <span style={{ display: 'inline-block', width: 6, height: 6, borderRadius: '50%', background: GOLD, animation: isPartial ? 'ar-live-blink 0.9s ease-in-out infinite' : 'none' }} />
+                    {isPartial ? `${(bFrac * 100).toFixed(0)}% reporting` : '100% reporting'}
+                  </div>
+                );
+              })()}
               <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
                 {sorted.map(([id, votes], i) => {
                   const info = getCandInfo(id);
@@ -2952,6 +2967,11 @@ export default function TurkeyApp() {
             selectedCodes={selectedDepts}
             onMultiSelect={handleMultiSelect}
             bubbleMapMode={bubbleMapMode}
+            simBatchFractions={
+              activeElection === '2028R1' ? simBatchFractions
+              : activeElection === '2028R2' ? simBatchFractionsR2
+              : undefined
+            }
             dark={dark}
           />
         </div>
