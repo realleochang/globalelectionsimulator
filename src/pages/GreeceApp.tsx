@@ -1288,9 +1288,10 @@ function EsBreakdownPanel({ seats, natPcts, isBaseline, onClose, exiting, dark }
 
 // ── Distributions panel ───────────────────────────────────────────────────────
 // Left popup: per-province D'Hondt seat allocation for every party.
-function EsDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting, dark }: {
+function EsDistributionsPanel({ natPcts, provOverrides, simProvVotes, is2026, onClose, exiting, dark }: {
   natPcts: Record<EsPartyId,number>;
   provOverrides: Partial<Record<EsProvId, Partial<Record<EsPartyId, number>>>>;
+  simProvVotes?: Partial<Record<EsProvId, Partial<Record<EsPartyId, number>>>>;
   is2026?: boolean;
   onClose:()=>void; exiting?:boolean; dark?:boolean;
 }) {
@@ -1305,10 +1306,20 @@ function EsDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting
     return is2026 && p.name2026 ? p.name2026 : p.name;
   };
 
-  // Per-province seat allocations + national totals, computed from the current scenario.
+  // Per-constituency seat allocations + national totals. During a simulation these come from the
+  // LIVE per-constituency counts (only constituencies that have reported), so the panel updates live.
   const { rows, natTotals, totalSeats } = useMemo(() => {
+    const live = !!simProvVotes && Object.keys(simProvVotes).length > 0;
     const rows = ES_PROVINCES.map(prov => {
-      const votes = calcProvVotes(natPcts, prov.id, provOverrides[prov.id]);
+      let votes: Record<EsPartyId,number>;
+      if (live) {
+        const lv = simProvVotes![prov.id];
+        if (!lv) return { prov, alloc: [] as [EsPartyId,number][] };          // not reporting yet
+        const tot = Math.max(1, ES_PARTIES.reduce((s,p)=>s+(lv[p.id]??0),0));
+        votes = Object.fromEntries(ES_PARTIES.map(p=>[p.id,(lv[p.id]??0)/tot*100])) as Record<EsPartyId,number>;
+      } else {
+        votes = calcProvVotes(natPcts, prov.id, provOverrides[prov.id]);
+      }
       const seats = calcDHondtProv(votes, prov.seats);
       const alloc = (Object.entries(seats) as [EsPartyId,number][])
         .filter(([,s]) => (s??0) > 0)
@@ -1320,7 +1331,7 @@ function EsDistributionsPanel({ natPcts, provOverrides, is2026, onClose, exiting
     for (const { alloc } of rows)
       for (const [id,s] of alloc) { natTotals[id] = (natTotals[id]??0)+s; totalSeats += s; }
     return { rows, natTotals, totalSeats };
-  }, [natPcts, provOverrides]);
+  }, [natPcts, provOverrides, simProvVotes]);
 
   const natSorted = (Object.entries(natTotals) as [EsPartyId,number][])
     .filter(([,s]) => s>0).sort((a,b) => b[1]-a[1]);
@@ -1907,7 +1918,7 @@ export default function GreeceApp() {
             hiddenParties={hiddenParties} dark={dark}/>
         )}
 
-        {showDistrib  &&<EsDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} is2026={preset!=='baseline'} onClose={()=>openRight('distributions')} exiting={exitRight==='distributions'} dark={dark}/>}
+        {showDistrib  &&<EsDistributionsPanel natPcts={displayPcts} provOverrides={provOverrides} simProvVotes={simProvVotes} is2026={preset!=='baseline'} onClose={()=>openRight('distributions')} exiting={exitRight==='distributions'} dark={dark}/>}
         {showTutorial &&<EsTutorialPanel  onClose={()=>openRight('tutorial')}  exiting={exitRight==='tutorial'}  dark={dark}/>}
         {showCoalition&&<EsCoalitionPanel seats={displaySeats} onClose={()=>openRight('coalition')} exiting={exitRight==='coalition'} dark={dark}/>}
       </div>
