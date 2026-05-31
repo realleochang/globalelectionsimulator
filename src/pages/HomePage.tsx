@@ -9,6 +9,19 @@ import * as topojson from 'topojson-client';
 // ── Country data ──────────────────────────────────────────────────────────────
 export const COUNTRIES = [
   {
+    id: 'eu', path: '/eu', name: 'European Union', flag: '🇪🇺', demonym: 'European', mapColor: '#003399',
+    flagSrc: 'eu-flag.png', flagStyle: {} as React.CSSProperties,
+    electionType: 'EU Parliament Election', subtitle: 'European Parliament · 720 seats',
+    lat: 50, lng: 10,
+    accent: 'linear-gradient(90deg,#003399,#FFCC00,#003399)',
+    locked: true as true,
+    parties: [
+      { color: '#0E408A', abbr: 'EPP' }, { color: '#E4003B', abbr: 'S&D' },
+      { color: '#00A3C7', abbr: 'RE'  }, { color: '#2E8B57', abbr: 'G/EFA' },
+      { color: '#1565C0', abbr: 'ECR' }, { color: '#6A2C8E', abbr: 'ID' },
+    ],
+  },
+  {
     id: 'uk', path: '/uk', name: 'United Kingdom', flag: '🇬🇧', demonym: 'British', mapColor: '#C8102E',
     flagSrc: 'uk-flag.webp', flagStyle: {} as React.CSSProperties,
     electionType: 'General Election', subtitle: 'House of Commons',
