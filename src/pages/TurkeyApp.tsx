@@ -2304,6 +2304,8 @@ export default function TurkeyApp() {
   const [simBatchFractionsR2, setSimBatchFractionsR2] = useState<Record<string, number>>({});
   const [simR1WinnerId, setSimR1WinnerId] = useState<string>('');
   const [simR1Pcts, setSimR1Pcts]         = useState<[number, number]>([0, 0]);
+  const [simR2WinnerId, setSimR2WinnerId] = useState<string>('');
+  const [simR2Pcts, setSimR2Pcts]         = useState<[number, number]>([0, 0]);
   const [winnerOverlayDismissed, setWinnerOverlayDismissed] = useState(false);
   const r1ResultsRef = useRef<Record<string, Partial<Record<string, number>>>>({});
   const simTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -2357,13 +2359,14 @@ export default function TurkeyApp() {
     let reportedVotes = 0;
     const tally: Record<string, number> = {};
     for (const [code, r] of Object.entries(overrides['2028R1'])) {
-      if (!projected2028.has(code)) continue;
+      const provTotal = PROV_2023R1_TOTALS[code] ?? 0;
+      const frac = projected2028.has(code) ? 1 : (simBatchFractions[code] ?? 0);
+      if (frac <= 0) continue;
       const deptSum = Object.values(r).reduce((s: number, v) => s + (v ?? 0), 0);
       if (deptSum > 0) {
-        reportedVotes += PROV_2023R1_TOTALS[code] ?? deptSum;
-        for (const [pid, v] of Object.entries(r)) {
-          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number);
-        }
+        reportedVotes += (provTotal || deptSum) * frac;
+        for (const [pid, v] of Object.entries(r))
+          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number) * frac;
       }
     }
     const reportingPct = totalVotes > 0 ? reportedVotes / totalVotes : 0;
@@ -2381,7 +2384,7 @@ export default function TurkeyApp() {
       if (p2votes > thirdVotes + LOCK_SHARE * remainingVotes) projectedSet.add(p2id);
     }
     return { reportingPct, projectedSet };
-  }, [overrides, projected2028]);
+  }, [overrides, projected2028, simBatchFractions]);
 
   // ── 2028 R2 projection engine — drives winner badge in scoreboard ──
   const r2028R2Reporting = useMemo(() => {
@@ -2389,13 +2392,14 @@ export default function TurkeyApp() {
     let reportedVotes = 0;
     const tally: Record<string, number> = {};
     for (const [code, r] of Object.entries(overrides['2028R2'])) {
-      if (!projected2028R2.has(code)) continue;
+      const provTotal = PROV_2023R2_TOTALS[code] ?? 0;
+      const frac = projected2028R2.has(code) ? 1 : (simBatchFractionsR2[code] ?? 0);
+      if (frac <= 0) continue;
       const deptSum = Object.values(r).reduce((s: number, v) => s + (v ?? 0), 0);
       if (deptSum > 0) {
-        reportedVotes += PROV_2023R2_TOTALS[code] ?? deptSum;
-        for (const [pid, v] of Object.entries(r)) {
-          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number);
-        }
+        reportedVotes += (provTotal || deptSum) * frac;
+        for (const [pid, v] of Object.entries(r))
+          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number) * frac;
       }
     }
     const reportingPct = totalVotes > 0 ? reportedVotes / totalVotes : 0;
@@ -2409,7 +2413,7 @@ export default function TurkeyApp() {
       if (p1votes > p2votes + LOCK_SHARE * remainingVotes) projectedWinner.add(p1id);
     }
     return { reportingPct, projectedWinner };
-  }, [overrides, projected2028R2]);
+  }, [overrides, projected2028R2, simBatchFractionsR2]);
 
   const panelAllIds = useMemo(() => {
     if (activeElection === '2023R1') return TR_CANDIDATES.map(c => c.id as string);
@@ -2610,7 +2614,21 @@ export default function TurkeyApp() {
       }
     }
 
-    timers.push(setTimeout(() => setSimState('idle'), totalMs + 200));
+    timers.push(setTimeout(() => {
+      // Compute R2 national winner from final totals
+      const natTotals: Record<string, number> = {};
+      for (const r of Object.values(r2Results as Record<string, Partial<Record<string,number>>>)) {
+        for (const [pid, v] of Object.entries(r)) if ((v ?? 0) > 0) natTotals[pid] = (natTotals[pid] ?? 0) + (v as number);
+      }
+      const sorted = Object.entries(natTotals).sort(([,a],[,b]) => b - a);
+      const grand = sorted.reduce((s,[,v]) => s + v, 0);
+      if (sorted.length >= 2 && grand > 0) {
+        setSimR2WinnerId(sorted[0][0]);
+        setSimR2Pcts([sorted[0][1]/grand*100, sorted[1][1]/grand*100]);
+        setWinnerOverlayDismissed(false);
+      }
+      setSimState('idle');
+    }, totalMs + 200));
     simTimersRef.current = timers;
   }, [r2AwaitCandidates]);
 
@@ -3048,6 +3066,21 @@ export default function TurkeyApp() {
           winnerId={simR1WinnerId}
           winnerPct={simR1Pcts[0]}
           runnerUpPct={simR1Pcts[1]}
+          roundLabel="Round 1 — Outright Winner"
+          note="Crossed 50% in Round 1 — no runoff needed."
+          getCandInfo={getCandInfo2028}
+          onDismiss={() => setWinnerOverlayDismissed(true)}
+        />,
+        document.body
+      )}
+      {/* R2 winner overlay */}
+      {simState === 'idle' && simR2WinnerId && !winnerOverlayDismissed && createPortal(
+        <TrWinnerOverlay
+          winnerId={simR2WinnerId}
+          winnerPct={simR2Pcts[0]}
+          runnerUpPct={simR2Pcts[1]}
+          roundLabel="Round 2 — Winner"
+          note={`Won the runoff with ${simR2Pcts[0].toFixed(1)}% of the vote.`}
           getCandInfo={getCandInfo2028}
           onDismiss={() => setWinnerOverlayDismissed(true)}
         />,
@@ -3058,8 +3091,9 @@ export default function TurkeyApp() {
 }
 
 // ── Turkey winner overlay ──────────────────────────────────────────────────────
-function TrWinnerOverlay({ winnerId, winnerPct, runnerUpPct, getCandInfo, onDismiss }: {
+function TrWinnerOverlay({ winnerId, winnerPct, runnerUpPct, roundLabel, note, getCandInfo, onDismiss }: {
   winnerId: string; winnerPct: number; runnerUpPct: number;
+  roundLabel: string; note: string;
   getCandInfo: (id: string) => { name: string; color: string };
   onDismiss: () => void;
 }) {
@@ -3083,7 +3117,7 @@ function TrWinnerOverlay({ winnerId, winnerPct, runnerUpPct, getCandInfo, onDism
         className="relative flex flex-col items-center text-center px-10 py-10 rounded-[24px] max-w-[480px] w-full mx-4"
         style={{ background:`linear-gradient(170deg,rgba(18,22,38,0.97) 0%,${c}22 100%)`, border:`2px solid ${c}55`, boxShadow:`0 0 80px ${c}44,0 24px 60px rgba(0,0,0,0.6)` }}>
         
-        <div className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] mb-5" style={{ color:c }}>🇹🇷 Round 1 — Outright Winner</div>
+        <div className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] mb-5" style={{ color:c }}>🇹🇷 {roundLabel}</div>
         <div className="mb-5 relative">
           <div className="w-32 h-32 rounded-full overflow-hidden border-4 mx-auto" style={{ borderColor:c, boxShadow:`0 0 32px ${c}88` }}>
             {photoUrl ? <img src={photoUrl} alt={info.name} className="w-full h-full object-cover object-top"/> : <div className="w-full h-full flex items-center justify-center text-[36px]" style={{ background:`${c}22` }}>🇹🇷</div>}
@@ -3103,7 +3137,7 @@ function TrWinnerOverlay({ winnerId, winnerPct, runnerUpPct, getCandInfo, onDism
             <div className="text-[10px] font-mono text-white/40 mt-1 uppercase tracking-wide">Point margin</div>
           </div>
         </div>
-        <div className="text-[10px] font-mono text-white/35 mb-8 leading-relaxed">Crossed 50% in Round 1 — no runoff needed.</div>
+        <div className="text-[10px] font-mono text-white/35 mb-8 leading-relaxed">{note}</div>
         <button onClick={onDismiss} className="h-9 px-8 rounded-full text-[12px] font-mono font-bold uppercase tracking-wider text-white hover:opacity-80 transition-all" style={{ background:c, boxShadow:`0 4px 20px ${c}66` }}>Continue →</button>
       </div>
     </div>
