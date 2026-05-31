@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
-import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
