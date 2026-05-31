@@ -1525,6 +1525,8 @@ export default function GreeceApp() {
   function loadBaseline()    { setNatPcts({...ES_VOTE_PCT_2023}); setPreset('baseline'); resetMapState(); }
   function loadPolling2026() { setNatPcts({...ES_VOTE_PCT_2026}); setPreset('polling2026'); resetMapState(); }
   function loadBlank()       { setNatPcts(Object.fromEntries(ES_PARTIES.map(p=>[p.id,100/ES_PARTIES.length])) as Record<EsPartyId,number>); setPreset('blank'); resetMapState(); }
+  // Opening the simulation drops you onto a blank map; the 2023/2026 views are locked while in sim mode.
+  function handleSimClick()  { if (rightPanel!=='sim' && !simRunning) loadBlank(); openRight('sim'); }
 
   function resetMapState() {
     setSimSeats(undefined); setDeclaredProvs(undefined);
@@ -1740,6 +1742,7 @@ export default function GreeceApp() {
   const btnGold  =`${btnBase} bg-gold text-white hover:bg-gold-deep`;
   const btnMuted =`${btnBase} border border-default text-ink-3 hover:bg-hover hover:text-ink`;
   const btnActive=`${btnBase} bg-ink/8 border border-default text-ink`;
+  const simMode  = rightPanel==='sim' || simRunning;   // in simulation mode → lock the 2023/2026 views
 
   return (
     <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="es">
@@ -1751,11 +1754,16 @@ export default function GreeceApp() {
           <img src={`${import.meta.env.BASE_URL}greece-flag.png`} alt="Greece" className="h-4 rounded-[2px] shrink-0 opacity-90"/>
           <span className="text-[11px] font-bold text-ink shrink-0 hidden sm:block">Greece</span>
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
-          <button onClick={loadBaseline}    className={preset==='baseline'   ?btnGold:btnMuted}>2023 Baseline</button>
-          <button onClick={loadPolling2026} className={preset==='polling2026'?btnGold:btnMuted}>2026 Polling</button>
-          <button onClick={loadBlank}       className={preset==='blank'      ?btnGold:btnMuted}>Blank Map</button>
+          <button onClick={()=>!simMode&&loadBaseline()}    disabled={simMode}
+            title={simMode?'Locked during simulation':''}
+            className={`${preset==='baseline'   ?btnGold:btnMuted}${simMode?' opacity-40 cursor-not-allowed':''}`}>2023 Baseline</button>
+          <button onClick={()=>!simMode&&loadPolling2026()} disabled={simMode}
+            title={simMode?'Locked during simulation':''}
+            className={`${preset==='polling2026'?btnGold:btnMuted}${simMode?' opacity-40 cursor-not-allowed':''}`}>2026 Polling</button>
+          <button onClick={()=>!simRunning&&loadBlank()}    disabled={simRunning}
+            className={`${preset==='blank'      ?btnGold:btnMuted}${simRunning?' opacity-40 cursor-not-allowed':''}`}>Blank Map</button>
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5"/>
-          <button onClick={()=>openRight('sim')}       className={rightPanel==='sim'      ?btnActive:btnMuted}>▶ Simulation</button>
+          <button onClick={handleSimClick}             className={rightPanel==='sim'      ?btnActive:btnMuted}>▶ Simulation</button>
           <button onClick={()=>!simRunning&&openLeft('parties')} disabled={simRunning} className={`${leftPanel==='parties'?btnActive:btnMuted}${simRunning?' opacity-40 cursor-not-allowed':''}`}>Parties</button>
           <button onClick={()=>setScoreboardVisible(v=>!v)} className={scoreboardVisible?btnActive:btnMuted}>Scoreboard</button>
           <button onClick={()=>openLeft('breakdown')}  className={leftPanel==='breakdown' ?btnActive:btnMuted}>Breakdown</button>
