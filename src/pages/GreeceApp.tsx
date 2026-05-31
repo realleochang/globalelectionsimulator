@@ -41,6 +41,7 @@ const ES_MAJORITY    = 151;
 const ES_VOTE_PCT_2023 = Object.fromEntries(GR_PARTIES.map(p => [p.id, p.pct2023])) as Record<EsPartyId, number>;
 const ES_VOTE_RAW_2023 = Object.fromEntries(GR_PARTIES.map(p => [p.id, p.votes2023])) as Record<EsPartyId, number>;
 const ES_GRAND_TOTAL_VOTES = GR_META.valid;
+const GR_ZERO_PCTS = Object.fromEntries(GR_PARTIES.map(p => [p.id, 0])) as Record<EsPartyId, number>;
 
 // 2026 polling — latest national poll average from Wikipedia "Next Greek legislative election"
 // (PolitPro aggregate, Nov 2025): a swing is applied per constituency from the 2023 baseline.
@@ -213,17 +214,6 @@ function grNatPctsFromVotes(
   return out;
 }
 
-function esRandNormal(): number {
-  let u = 0, v = 0;
-  while (u === 0) u = Math.random();
-  while (v === 0) v = Math.random();
-  return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
-}
-function esBellCurveTimes(n: number, totalMs: number): number[] {
-  return Array.from({ length: n }, () =>
-    Math.max(0.02, Math.min(0.98, 0.5 + esRandNormal() * 0.18))
-  ).sort((a, b) => a - b).map(t => Math.round(t * totalMs));
-}
 
 // Redistribute % when one slider moves; unlocked others absorb the change
 function redistributePcts(
@@ -1556,7 +1546,6 @@ export default function GreeceApp() {
     const PARTS=15; const totalProvs=ES_PROVINCES.length;                         // 15 random batches / constituency
     const modelledSharePct=Math.max(1,ES_PARTIES.reduce((s,p)=>s+(simDraftPcts[p.id]??0),0)); // 8-party share of valid
     const modelledShare=modelledSharePct/100;
-    const allTimes=esBellCurveTimes(PARTS*totalProvs,simDuration);
     const provIds=[...ES_PROVINCES.map(p=>p.id)].sort(()=>Math.random()-0.5);
     // Each batch carries the constituency's CUMULATIVE per-party vote counts. Counts only ever rise
     // (raw votes never decrease) but parties accrue along independent noisy paths, so the live %s wobble.
@@ -1575,7 +1564,12 @@ export default function GreeceApp() {
         const tot=inc.reduce((a,b)=>a+b,0)||1; let cum=0;
         cf[p.id]=inc.map(v=>{cum+=v; return cum/tot;});
       }
-      const pTimes=allTimes.slice(pi*PARTS,(pi+1)*PARTS).sort((a,b)=>a-b);
+      // Independent batch times: this constituency starts at a random moment (staggered — mostly the
+      // first half) and its 15 batches scatter from there to the end. So provinces INTERLEAVE — one
+      // batch here, others elsewhere, then back here for the next batch — rather than finishing in order.
+      const start=Math.random()*0.55;
+      const pTimes=Array.from({length:PARTS},()=>start+Math.random()*(1-start))
+        .map(f=>Math.round(Math.max(0.015,Math.min(0.99,f))*simDuration)).sort((a,b)=>a-b);
       let cumFrac=0;
       for(let b=0;b<PARTS;b++){
         cumFrac=Math.min(1,cumFrac+size[b]);
@@ -1607,7 +1601,9 @@ export default function GreeceApp() {
     simTimersRef.current=timers;
   }
 
-  const displaySeats=useMemo(()=>simSeats??blankSeats??calcAllProvinceSeats(displayPcts),[simSeats,blankSeats,displayPcts]);
+  // While a simulation is live, seats come ONLY from reported batches (empty until the first lands) —
+  // never a full-result fallback, which would briefly leak the outcome the instant the sim starts.
+  const displaySeats=useMemo(()=> simNatPcts!=null ? (simSeats??{}) : (blankSeats??calcAllProvinceSeats(displayPcts)),[simNatPcts,simSeats,blankSeats,displayPcts]);
 
   // Live national %s aggregated from the actual (noisy, monotonic) per-constituency counts → they wobble.
   const simModelledSharePct=useMemo(()=>simNatPcts?Math.max(1,ES_PARTIES.reduce((s,p)=>s+(simNatPcts[p.id]??0),0)):0,[simNatPcts]);
@@ -1672,7 +1668,7 @@ export default function GreeceApp() {
       {/* ── Scoreboard ── */}
       {scoreboardVisible&&(
         <EsScoreboard
-          natPcts={simPartialPcts??(simNatPcts??displayPcts)}
+          natPcts={simNatPcts!=null ? (simPartialPcts ?? GR_ZERO_PCTS) : displayPcts}
           simSeats={simSeats??blankSeats}
           isBaseline={preset==='baseline'&&!simNatPcts}
           is2026={preset!=='baseline'||!!simNatPcts}
