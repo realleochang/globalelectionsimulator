@@ -1928,22 +1928,28 @@ export default function BrazilApp() {
     [activeElection, baseStateData, overrides],
   );
 
-  // For 2026, only projected states appear on map/scoreboard
+  // For 2026: fully-projected states show exact final votes; partial-batch states
+  // (mid-count during sim) show their current noisy partial override so the map,
+  // tooltips and scoreboard all populate live as soon as the first batch fires.
   const stateResults = useMemo<Record<string, Partial<Record<string, number>>>>(() => {
     if (activeElection === '2026R1') {
       const out: Record<string, Partial<Record<string, number>>> = {};
-      for (const [code, r] of Object.entries(workingStateResults))
-        if (projected2026R1.has(code)) out[code] = r;
+      for (const [code, r] of Object.entries(workingStateResults)) {
+        if (projected2026R1.has(code) || (stateReportingPct2026R1[code] ?? 0) > 0)
+          out[code] = r;
+      }
       return out;
     }
     if (activeElection === '2026R2') {
       const out: Record<string, Partial<Record<string, number>>> = {};
-      for (const [code, r] of Object.entries(workingStateResults))
-        if (projected2026R2.has(code)) out[code] = r;
+      for (const [code, r] of Object.entries(workingStateResults)) {
+        if (projected2026R2.has(code) || (stateReportingPct2026R2[code] ?? 0) > 0)
+          out[code] = r;
+      }
       return out;
     }
     return workingStateResults;
-  }, [activeElection, workingStateResults, projected2026R1, projected2026R2]);
+  }, [activeElection, workingStateResults, projected2026R1, projected2026R2, stateReportingPct2026R1, stateReportingPct2026R2]);
 
   // Live reporting tracker for 2026R1 — drives ADVANCE badges
   const r2026Reporting = useMemo(() => {
