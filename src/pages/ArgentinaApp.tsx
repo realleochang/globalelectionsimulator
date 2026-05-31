@@ -2472,12 +2472,15 @@ export default function ArgentinaApp() {
     let reportedVotes = 0;
     const tally: Record<string, number> = {};
     for (const [code, r] of Object.entries(overrides['2027R1'])) {
-      if (!projected2027.has(code)) continue;
+      const provTotal = PROV_2023R1_TOTALS[code] ?? 0;
+      // fully projected provinces count 100%; partial batches count their fraction
+      const frac = projected2027.has(code) ? 1 : (simBatchFractions[code] ?? 0);
+      if (frac <= 0) continue;
       const deptSum = Object.values(r).reduce((s: number, v) => s + (v ?? 0), 0);
       if (deptSum > 0) {
-        reportedVotes += PROV_2023R1_TOTALS[code] ?? deptSum;
+        reportedVotes += (provTotal || deptSum) * frac;
         for (const [pid, v] of Object.entries(r)) {
-          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number);
+          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number) * frac;
         }
       }
     }
@@ -2496,7 +2499,7 @@ export default function ArgentinaApp() {
       if (p2votes > thirdVotes + LOCK_SHARE * remainingVotes) projectedSet.add(p2id);
     }
     return { reportingPct, projectedSet };
-  }, [overrides, projected2027]);
+  }, [overrides, projected2027, simBatchFractions]);
 
   // ── 2027 R2 projection engine — drives winner badge in scoreboard ──
   const r2027R2Reporting = useMemo(() => {
@@ -2504,12 +2507,14 @@ export default function ArgentinaApp() {
     let reportedVotes = 0;
     const tally: Record<string, number> = {};
     for (const [code, r] of Object.entries(overrides['2027R2'])) {
-      if (!projected2027R2.has(code)) continue;
+      const provTotal = PROV_2023R2_TOTALS[code] ?? 0;
+      const frac = projected2027R2.has(code) ? 1 : (simBatchFractionsR2[code] ?? 0);
+      if (frac <= 0) continue;
       const deptSum = Object.values(r).reduce((s: number, v) => s + (v ?? 0), 0);
       if (deptSum > 0) {
-        reportedVotes += PROV_2023R2_TOTALS[code] ?? deptSum;
+        reportedVotes += (provTotal || deptSum) * frac;
         for (const [pid, v] of Object.entries(r)) {
-          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number);
+          if ((v ?? 0) > 0) tally[pid] = (tally[pid] ?? 0) + (v as number) * frac;
         }
       }
     }
@@ -2524,7 +2529,7 @@ export default function ArgentinaApp() {
       if (p1votes > p2votes + LOCK_SHARE * remainingVotes) projectedWinner.add(p1id);
     }
     return { reportingPct, projectedWinner };
-  }, [overrides, projected2027R2]);
+  }, [overrides, projected2027R2, simBatchFractionsR2]);
 
   const panelAllIds = useMemo(() => {
     if (activeElection === '2023R1') return AR_CANDIDATES.map(c => c.id as string);
