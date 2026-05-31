@@ -7,6 +7,7 @@ const MAJORITY = 326;
 
 const LOCAL_LEADER_PHOTOS: Record<string, string> = {
   'Zack Polanski': '/leaders/zack-polanski.webp',
+  'Andy Burnham':  '/leaders/andy-burnham.jpg',
 };
 
 // Sorting tiers: 0 mainland → 1 NI → 2 IND → 3 OTH → 4 SPK (always last)
