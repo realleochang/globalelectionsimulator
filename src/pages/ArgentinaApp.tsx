@@ -943,7 +943,7 @@ function redistributePcts(
 
 // ── Province panel ──────────────────────────────────────────────────────────
 function ProvincePanel({
-  dept, results, allIds, getCandInfo, roundLabel, onClose, onUpdate, fixedTotal, isProjected, onProject, show2023Ref, onToggle2023Ref, refPanelLabel, showR1Ref, onToggleR1Ref,
+  dept, results, allIds, getCandInfo, roundLabel, onClose, onUpdate, fixedTotal, isProjected, onProject, show2023Ref, onToggle2023Ref, refPanelLabel, showR1Ref, onToggleR1Ref, dark = false,
 }: {
   dept: DeptInfo;
   results: Partial<Record<string, number>>;
@@ -960,6 +960,7 @@ function ProvincePanel({
   refPanelLabel?: string;
   showR1Ref?: boolean;
   onToggleR1Ref?: () => void;
+  dark?: boolean;
 }) {
   const [pcts, setPcts]           = useState<Record<string, number>>(() => toPcts(results, allIds));
   const [locks, setLocks]         = useState<Set<string>>(new Set());
@@ -1020,7 +1021,7 @@ function ProvincePanel({
   }
 
   return (
-    <aside className="w-72 shrink-0 bg-white border-l border-default flex flex-col overflow-hidden panel-slide">
+    <aside className={`w-72 shrink-0 ${dark ? 'bg-[#0d1b2e]' : 'bg-white'} border-l border-default flex flex-col overflow-hidden panel-slide`}>
 
       {/* ── Header ─────────────────────────────────────────────── */}
       <div className="px-3.5 pt-3.5 pb-2.5 border-b border-default">
@@ -1039,7 +1040,7 @@ function ProvincePanel({
           >×</button>
         </div>
         {winnerInfo && (
-          <div className="mt-2.5 flex items-center gap-2 px-2.5 py-2 rounded-[4px] bg-[#f8f7f4] border border-default">
+          <div className={`mt-2.5 flex items-center gap-2 px-2.5 py-2 rounded-[4px] border border-default ${dark ? 'bg-white/5' : 'bg-[#f8f7f4]'}`}>
             <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: previewFill }} />
             <span className="text-[12px] font-semibold text-ink flex-1 truncate">{winnerInfo.name}</span>
             <span className="font-mono text-[11px] font-semibold text-ink-2">{winnerPct.toFixed(1)}%</span>
@@ -1099,7 +1100,9 @@ function ProvincePanel({
             onClick={onToggle2023Ref}
             className={`w-full h-7 text-[10px] font-mono rounded-[5px] transition-colors uppercase tracking-wide ${
               show2023Ref
-                ? 'bg-[#f0f0f0] text-ink font-semibold border border-default'
+                ? dark
+                  ? 'bg-white/10 text-ink font-semibold border border-white/20'
+                  : 'bg-[#f0f0f0] text-ink font-semibold border border-default'
                 : 'border border-default text-ink-3 hover:bg-hover hover:text-ink'
             }`}
           >
@@ -3193,6 +3196,7 @@ export default function ArgentinaApp() {
                     ? () => setShow2027R1Ref(v => !v)
                     : undefined
                 }
+                dark={dark}
               />
             </>
           )
