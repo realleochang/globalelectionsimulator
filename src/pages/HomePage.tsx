@@ -71,6 +71,16 @@ export const COUNTRIES = [
     ],
   },
   {
+    id: 'usa-house', path: '/usa-house', name: 'U.S. House', flag: '🇺🇸', demonym: 'American', mapColor: '#1F6FE5',
+    flagSrc: 'usa-flag.png', flagStyle: { objectPosition: '0% 50%' } as React.CSSProperties,
+    electionType: 'House Election', subtitle: 'House of Representatives',
+    lat: 39.5, lng: -98,
+    accent: 'linear-gradient(90deg,#1F6FE5,white,#DD2B2B)',
+    parties: [
+      { color: '#1F6FE5', abbr: 'DEM' }, { color: '#DD2B2B', abbr: 'GOP' },
+    ],
+  },
+  {
     id: 'australia', path: '/australia', name: 'Australia', flag: '🇦🇺', demonym: 'Australian', mapColor: '#003893',
     flagSrc: 'australia-flag.png', flagStyle: {} as React.CSSProperties,
     electionType: 'Federal Election', subtitle: 'House of Representatives',

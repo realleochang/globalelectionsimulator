@@ -25,6 +25,7 @@ import TurkeyApp from './pages/TurkeyApp.tsx'
 import ItalyApp from './pages/ItalyApp.tsx'
 import ArgentinaApp from './pages/ArgentinaApp.tsx'
 import EUApp from './pages/EUApp.tsx'
+import USAHouseApp from './pages/USAHouseApp.tsx'
 import CountriesPage from './pages/CountriesPage.tsx'
 
 const splash = document.getElementById('splash')
@@ -60,6 +61,7 @@ createRoot(document.getElementById('root')!).render(
         <Route path="/italy" element={<ItalyApp />} />
         <Route path="/argentina" element={<ArgentinaApp />} />
         <Route path="/eu" element={<EUApp />} />
+        <Route path="/usa-house" element={<USAHouseApp />} />
         <Route path="/countries" element={<CountriesPage />} />
       </Routes>
     </HashRouter>
