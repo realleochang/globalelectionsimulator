@@ -160,11 +160,21 @@ function ArgentinaScoreboard({ deptResults, round }: {
 
   const topCandId = sorted[0]?.id;
 
-  // R1: top-2 advance to R2 → both get checkmark; R2: overall winner gets checkmark
+  // R1: apply Argentina's actual first-round win rule to the live (possibly edited) totals.
+  // If the leader clears >45%, or >40% with a 10-point lead → single winner checkmark.
+  // Otherwise top-2 advance → both get the checkmark.
+  // R2: simple plurality winner.
   const winnerIds = useMemo<Set<ArCandidateId>>(() => {
     if (round === 2) return new Set(topCandId ? [topCandId] : []);
-    return new Set(sorted.slice(0, 2).map(c => c.id));
-  }, [round, sorted, topCandId]);
+    if (sorted.length === 0 || grandTotal === 0) return new Set(sorted.slice(0, 2).map(c => c.id));
+    const top1Pct = grandTotal > 0 ? ((popularVote[sorted[0].id] ?? 0) / grandTotal) * 100 : 0;
+    const top2Pct = grandTotal > 0 ? ((popularVote[sorted[1]?.id ?? sorted[0].id] ?? 0) / grandTotal) * 100 : 0;
+    const lead = top1Pct - top2Pct;
+    if (top1Pct > 45 || (top1Pct > 40 && lead >= 10)) {
+      return new Set(topCandId ? [topCandId] : []);  // outright winner
+    }
+    return new Set(sorted.slice(0, 2).map(c => c.id));  // top-2 advance
+  }, [round, sorted, topCandId, popularVote, grandTotal]);
 
   return (
     <div className="relative bg-white border-b border-default shrink-0 select-none z-[45]">
@@ -2762,8 +2772,8 @@ export default function ArgentinaApp() {
         {/* Scrollable control strip */}
         <div ref={headerScrollRef} className="flex-1 min-w-0 header-scroll-strip flex items-center gap-2 px-2">
           <div className="w-px h-4 bg-black/8 shrink-0 mx-0.5" />
-          <button onClick={() => setActiveElection('2023R1')} disabled={isSimRunning} className={activeElection === '2023R1' ? btnGold : btnMuted}>2023 R1</button>
-          <button onClick={() => setActiveElection('2023R2')} disabled={isSimRunning} className={activeElection === '2023R2' ? btnGold : btnMuted}>2023 R2</button>
+          <button onClick={() => { setActiveElection('2023R1'); setOverrides(p => ({...p,'2023R1':{}})); setSelectedDept(null); }} disabled={isSimRunning} className={activeElection === '2023R1' ? btnGold : btnMuted}>2023 R1</button>
+          <button onClick={() => { setActiveElection('2023R2'); setOverrides(p => ({...p,'2023R2':{}})); setSelectedDept(null); }} disabled={isSimRunning} className={activeElection === '2023R2' ? btnGold : btnMuted}>2023 R2</button>
           <div className="w-px h-4 bg-black/8 shrink-0 mx-1" />
           {/* 2027 connected pair */}
           <div className="flex items-stretch shrink-0">
