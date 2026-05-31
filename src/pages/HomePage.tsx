@@ -16,10 +16,10 @@ export const COUNTRIES = [
     accent: 'linear-gradient(90deg,#003399,#FFCC00,#003399)',
     locked: true as true,
     parties: [
-      { color: '#8B0000', abbr: 'LEFT'  }, { color: '#4CAF50', abbr: 'G/EFA' },
-      { color: '#F0001C', abbr: 'S&D'   }, { color: '#FFD500', abbr: 'RE'    },
-      { color: '#3399FF', abbr: 'EPP'   }, { color: '#003D7A', abbr: 'ECR'   },
-      { color: '#6A2C8E', abbr: 'PfE'   },
+      { color: '#8B0000', abbr: 'LEFT'  }, { color: '#57B45F', abbr: 'G/EFA' },
+      { color: '#F0001C', abbr: 'S&D'   }, { color: '#FFD700', abbr: 'RE'    },
+      { color: '#3399FF', abbr: 'EPP'   }, { color: '#0054A5', abbr: 'ECR'   },
+      { color: '#1D2D5C', abbr: 'PfE'   },
     ],
   },
   {
