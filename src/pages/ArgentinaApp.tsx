@@ -2296,6 +2296,9 @@ export default function ArgentinaApp() {
   const [simState, setSimState] = useState<SimState>('idle');
   const [simProgress, setSimProgress] = useState(0);
   const [simTotal, setSimTotal] = useState(0);
+  const [simR1WinnerId, setSimR1WinnerId] = useState<string>('');
+  const [simR1Pcts, setSimR1Pcts] = useState<[number, number]>([0, 0]);  // [winner%, runner-up%]
+  const [winnerOverlayDismissed, setWinnerOverlayDismissed] = useState(false);
   const [r2AwaitCandidates, setR2AwaitCandidates] = useState<[string, string]>(['', '']);
   const [r2AwaitR1Pcts, setR2AwaitR1Pcts] = useState<[number, number]>([0, 0]);
   const r1ResultsRef = useRef<Record<string, Partial<Record<string, number>>>>({});
@@ -2540,6 +2543,9 @@ export default function ArgentinaApp() {
     timers.push(setTimeout(() => {
       const r1Lead = top2Pcts[0] - top2Pcts[1];
       if (top2Pcts[0] > 45 || (top2Pcts[0] > 40 && r1Lead >= 10)) {
+        setSimR1WinnerId(top2Ids[0]);
+        setSimR1Pcts([top2Pcts[0], top2Pcts[1]]);
+        setWinnerOverlayDismissed(false);
         setSimState('r1_winner');
       } else {
         setR2AwaitCandidates(top2Ids);
@@ -2669,6 +2675,15 @@ export default function ArgentinaApp() {
               </svg>
               Simulation
             </button>
+          )}
+          {isSimRunning && (
+            <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-[4px] bg-red-600 text-white select-none shrink-0" style={{animation:'none'}}>
+              <span style={{
+                display:'inline-block', width:7, height:7, borderRadius:'50%',
+                background:'#fff', animation:'ar-live-blink 0.9s ease-in-out infinite',
+              }}/>
+              <span className="text-[11px] font-mono font-bold tracking-widest uppercase">Live</span>
+            </div>
           )}
           <button
             disabled={isSimRunning}
@@ -2814,9 +2829,11 @@ export default function ArgentinaApp() {
                 picks={picks2027}
                 onPick={handlePick2027}
                 projectedAdvancers={
-                  activeElection === '2027R1' ? r2027Reporting.projectedSet
-                  : activeElection === '2027R2' ? r2027R2Reporting.projectedWinner
-                  : undefined
+                  simState === 'r1_winner' && simR1WinnerId
+                    ? new Set([simR1WinnerId])
+                    : activeElection === '2027R1' ? r2027Reporting.projectedSet
+                    : activeElection === '2027R2' ? r2027R2Reporting.projectedWinner
+                    : undefined
                 }
               />
             )}
@@ -3054,6 +3071,131 @@ export default function ArgentinaApp() {
       <div className="absolute bottom-0 left-0 right-0 pointer-events-none z-30 flex items-center justify-between px-3 py-1 bg-ink/60">
         <span className="text-[10px] text-white/70 font-mono tracking-wide uppercase">Global Election Simulator — Presidential Edition</span>
         <span className="text-[10px] text-white/40 font-mono">{typeof window !== 'undefined' ? window.location.hostname : ''}</span>
+      </div>
+
+      {/* ── R1 WINNER OVERLAY ────────────────────────────────────────── */}
+      {simState === 'r1_winner' && simR1WinnerId && !winnerOverlayDismissed && createPortal(
+        <ArR1WinnerOverlay
+          winnerId={simR1WinnerId}
+          winnerPct={simR1Pcts[0]}
+          runnerUpPct={simR1Pcts[1]}
+          getCandInfo={getCandInfo2027}
+          onDismiss={() => setWinnerOverlayDismissed(true)}
+        />,
+        document.body
+      )}
+    </div>
+  );
+}
+
+// ── R1 Winner fullscreen overlay ──────────────────────────────────────────────
+function ArR1WinnerOverlay({
+  winnerId, winnerPct, runnerUpPct, getCandInfo, onDismiss,
+}: {
+  winnerId: string;
+  winnerPct: number;
+  runnerUpPct: number;
+  getCandInfo: (id: string) => { name: string; color: string };
+  onDismiss: () => void;
+}) {
+  const info = getCandInfo(winnerId);
+  const margin = winnerPct - runnerUpPct;
+  // fetch winner photo
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const party = AR_2027_PARTY_MAP[winnerId as Ar2027PartyId];
+    const cand = party?.candidates[0] ?? winnerId;
+    const title = AR_2027_WIKI_TITLES[cand] ?? cand.replace(/ /g, '_');
+    let cancelled = false;
+    fetchWikiPhoto(title).then(url => { if (!cancelled) setPhotoUrl(url); });
+    return () => { cancelled = true; };
+  }, [winnerId]);
+
+  const c = info.color;
+  // transparent dark scrim + colour wash from bottom
+  return (
+    <div
+      className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(10px)' }}
+      onClick={onDismiss}
+    >
+      {/* stop propagation on card so only clicking outside dismisses */}
+      <div
+        onClick={e => e.stopPropagation()}
+        className="relative flex flex-col items-center text-center px-10 py-10 rounded-[24px] max-w-[480px] w-full mx-4"
+        style={{
+          background: `linear-gradient(170deg, rgba(18,22,38,0.97) 0%, ${c}22 100%)`,
+          border: `2px solid ${c}55`,
+          boxShadow: `0 0 80px ${c}44, 0 24px 60px rgba(0,0,0,0.6)`,
+        }}
+      >
+        {/* confetti-style accent line */}
+        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background: c }} />
+
+        {/* ROUND 1 WINNER label */}
+        <div className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] mb-5" style={{ color: c }}>
+          🇦🇷 Round 1 — Outright Winner
+        </div>
+
+        {/* Photo */}
+        <div className="mb-5 relative">
+          <div
+            className="w-32 h-32 rounded-full overflow-hidden border-4 mx-auto"
+            style={{ borderColor: c, boxShadow: `0 0 32px ${c}88` }}
+          >
+            {photoUrl
+              ? <img src={photoUrl} alt={info.name} className="w-full h-full object-cover object-top" />
+              : <div className="w-full h-full flex items-center justify-center text-[36px]"
+                     style={{ background: `${c}22` }}>🇦🇷</div>
+            }
+          </div>
+          {/* winner badge */}
+          <div
+            className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-mono font-bold text-white"
+            style={{ background: c }}
+          >
+            ✓ ELECTED
+          </div>
+        </div>
+
+        {/* Name */}
+        <div className="text-[28px] font-black text-white leading-tight mb-1">{info.name}</div>
+        <div className="text-[12px] font-mono text-white/50 mb-6">
+          {AR_2027_PARTY_MAP[winnerId as Ar2027PartyId]?.name ?? ''}
+        </div>
+
+        {/* Vote stats */}
+        <div className="flex gap-6 mb-8">
+          <div className="flex flex-col items-center">
+            <div className="text-[32px] font-black tabular-nums leading-none" style={{ color: c }}>
+              {winnerPct.toFixed(1)}%
+            </div>
+            <div className="text-[10px] font-mono text-white/40 mt-1 uppercase tracking-wide">National vote</div>
+          </div>
+          <div className="w-px bg-white/10" />
+          <div className="flex flex-col items-center">
+            <div className="text-[32px] font-black tabular-nums leading-none text-white">
+              +{margin.toFixed(1)}
+            </div>
+            <div className="text-[10px] font-mono text-white/40 mt-1 uppercase tracking-wide">Point margin</div>
+          </div>
+        </div>
+
+        {/* Win condition note */}
+        <div className="text-[10px] font-mono text-white/35 mb-8 leading-relaxed">
+          {winnerPct > 45
+            ? `Crossed the 45% threshold — no balotaje needed.`
+            : `Over 40% with a ${margin.toFixed(1)}-point lead — no balotaje needed.`}
+        </div>
+
+        {/* Dismiss */}
+        <button
+          onClick={onDismiss}
+          className="h-9 px-8 rounded-full text-[12px] font-mono font-bold uppercase tracking-wider text-white transition-all hover:opacity-80"
+          style={{ background: c, boxShadow: `0 4px 20px ${c}66` }}
+        >
+          Continue →
+        </button>
       </div>
     </div>
   );
