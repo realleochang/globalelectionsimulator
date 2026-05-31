@@ -103,7 +103,6 @@ export default function App() {
   const navigate = useNavigate();
   // ── Dark mode ─────────────────────────────────────────────────────
   const [dark, setDark] = useState(() => localStorage.getItem('darkMode') !== 'false');
-  const [contributorsOpen, setContributorsOpen] = useState(false);
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
     localStorage.setItem('darkMode', String(dark));
@@ -358,55 +357,6 @@ export default function App() {
 
         {/* Right controls — always anchored right */}
         <div className="shrink-0 flex items-center gap-2.5 pr-4">
-          {/* Contributors dropdown */}
-          <div className="relative">
-            <button
-              onClick={() => setContributorsOpen(o => !o)}
-              className={`w-7 h-7 flex items-center justify-center rounded-[4px] border transition-colors ${
-                contributorsOpen
-                  ? 'border-ink-3 text-ink bg-hover'
-                  : 'border-default text-ink-3 hover:border-ink-3 hover:text-ink'
-              }`}
-              title="Contributors"
-            >
-              <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-                <path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm10-9a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm1.5 7.5c.5-.25.5-.75.5-1s-.5-3-3-3.5a2.5 2.5 0 0 1 2.5 4.5z" fillRule="evenodd" clipRule="evenodd"/>
-              </svg>
-            </button>
-            {contributorsOpen && (
-              <>
-                <div className="fixed inset-0 z-[99]" onClick={() => setContributorsOpen(false)} />
-                <div
-                  className="absolute right-0 top-[calc(100%+6px)] z-[100] w-56 rounded-[10px] bg-white border border-default overflow-hidden"
-                  style={{ boxShadow: '0 8px 32px rgba(0,0,0,0.13), 0 0 0 1px rgba(0,0,0,0.06)' }}
-                >
-                  <div className="px-3.5 pt-3 pb-2 border-b border-default">
-                    <div className="text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-ink leading-none">Contributors</div>
-                  </div>
-                  <div className="px-3.5 py-2.5 space-y-2">
-                    {/* Creator */}
-                    <a href="https://x.com/realleochang" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-70 transition-opacity">
-                      <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="shrink-0 text-ink-3" aria-hidden="true">
-                        <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.259 5.66zm-1.161 17.52h1.833L7.084 4.126H5.117z"/>
-                      </svg>
-                      <span className="text-[11px] font-mono font-semibold text-ink">@realleochang</span>
-                    </a>
-                    {[
-                      { handle: 'RealAlbanianPat' },
-                      { handle: 'whitehat47' },
-                    ].map(c => (
-                      <div key={c.handle} className="flex items-center gap-2">
-                        <svg width="11" height="9" viewBox="0 0 24 19" fill="currentColor" className="shrink-0" style={{ color: '#5865F2' }} aria-hidden="true">
-                          <path d="M20.317 1.492A19.825 19.825 0 0 0 15.71.163a.074.074 0 0 0-.079.038c-.34.6-.719 1.384-.984 2-.184-.028-.366-.054-.548-.078a18.607 18.607 0 0 0-9.795.078 13.51 13.51 0 0 0-.995-2.018.077.077 0 0 0-.079-.038A19.736 19.736 0 0 0 1.624 1.492a.07.07 0 0 0-.032.027C.533 6.093-.32 10.555.099 14.961a.08.08 0 0 0 .031.055 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.026c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.442a.061.061 0 0 0-.031-.028zM8.02 12.278c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.095 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-                        </svg>
-                        <span className="text-[11px] font-mono font-semibold text-ink">{c.handle}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
-          </div>
 
           {/* Dark mode toggle */}
           <button

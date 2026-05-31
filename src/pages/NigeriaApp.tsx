@@ -1396,7 +1396,6 @@ function NgTutorialPanel({ onClose, exiting }: { onClose:()=>void; exiting:boole
 export default function NigeriaApp() {
   const navigate = useNavigate();
   const [dark, setDark]     = useState(() => localStorage.getItem('darkMode') !== 'false');
-  const [contributorsOpen, setContributorsOpen] = useState(false);
   const [geojson, setGeojson] = useState<GeoJsonObject | null>(null);
   const stateData             = useMemo(() => NG_STATE_DATA as NgStateData2[], []);
   const [activePreset, setActivePreset] = useState<'2023'|'2027'|'blank'|'sim'|null>(null);
@@ -1612,17 +1611,6 @@ export default function NigeriaApp() {
           <button onClick={()=>setTutorialOpen(v=>!v)} className={tutorialOpen?`${btnBase} border-[#c8a020] bg-[#c8a020] text-white`:btnMuted}>Tutorial</button>
         </div>
         <div className="shrink-0 flex items-center gap-2.5 pr-4">
-          <div className="relative">
-            <button onClick={()=>setContributorsOpen(o=>!o)}
-              className={`w-7 h-7 flex items-center justify-center rounded-[4px] border transition-colors ${contributorsOpen?'border-ink-3 text-ink bg-hover':'border-default text-ink-3 hover:border-ink-3 hover:text-ink'}`}>
-              <svg width="9" height="9" viewBox="0 0 16 16" fill="currentColor"><path d="M8 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 6s-1 0-1-1 1-4 6-4 6 3 6 4-1 1-1 1H3zm10-9a2 2 0 1 1-4 0 2 2 0 0 1 4 0zm1.5 7.5c.5-.25.5-.75.5-1s-.5-3-3-3.5a2.5 2.5 0 0 1 2.5 4.5z" fillRule="evenodd" clipRule="evenodd"/></svg>
-            </button>
-            {contributorsOpen&&(<><div className="fixed inset-0 z-[99]" onClick={()=>setContributorsOpen(false)}/>
-              <div className="absolute right-0 top-[calc(100%+6px)] z-[100] w-52 rounded-[10px] bg-white border border-default overflow-hidden" style={{boxShadow:'0 8px 32px rgba(0,0,0,0.13)'}}>
-                <div className="px-3.5 pt-3 pb-2 border-b border-default"><div className="text-[10px] font-mono font-bold uppercase tracking-[0.16em] text-ink">Contributors</div></div>
-                <div className="px-3.5 py-2.5"><a href="https://x.com/realleochang" target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 hover:opacity-70"><svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" className="shrink-0 text-ink-3"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-4.714-6.231-5.401 6.231H2.74l7.73-8.835L1.254 2.25H8.08l4.259 5.66zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg><span className="text-[11px] font-mono font-semibold text-ink">@realleochang</span></a></div>
-              </div></>)}
-          </div>
           <button onClick={()=>setDark(d=>!d)} className="w-7 h-7 flex items-center justify-center rounded-[4px] border border-default text-ink-3 hover:bg-hover hover:text-ink transition-colors">
             {dark?<svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="2.7" stroke="currentColor" strokeWidth="1.4" fill="none"/><line x1="7" y1="0.5" x2="7" y2="2.2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><line x1="7" y1="11.8" x2="7" y2="13.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><line x1="0.5" y1="7" x2="2.2" y2="7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><line x1="11.8" y1="7" x2="13.5" y2="7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><line x1="2.5" y1="2.5" x2="3.6" y2="3.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><line x1="10.4" y1="10.4" x2="11.5" y2="11.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><line x1="11.5" y1="2.5" x2="10.4" y2="3.6" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/><line x1="3.6" y1="10.4" x2="2.5" y2="11.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
               :<svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M11 7.8A5.5 5.5 0 0 1 5.2 2a5.5 5.5 0 1 0 5.8 5.8z" stroke="currentColor" strokeWidth="1.35" fill="none" strokeLinejoin="round"/></svg>}
