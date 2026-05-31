@@ -11,14 +11,15 @@ export const COUNTRIES = [
   {
     id: 'eu', path: '/eu', name: 'European Union', flag: '🇪🇺', demonym: 'European', mapColor: '#003399',
     flagSrc: 'eu-flag.png', flagStyle: {} as React.CSSProperties,
-    electionType: 'EU Parliament Election', subtitle: 'European Parliament · 720 seats',
+    electionType: 'EU Parliament Election', subtitle: 'European Parliament',
     lat: 50, lng: 10,
     accent: 'linear-gradient(90deg,#003399,#FFCC00,#003399)',
     locked: true as true,
     parties: [
-      { color: '#0E408A', abbr: 'EPP' }, { color: '#E4003B', abbr: 'S&D' },
-      { color: '#00A3C7', abbr: 'RE'  }, { color: '#2E8B57', abbr: 'G/EFA' },
-      { color: '#1565C0', abbr: 'ECR' }, { color: '#6A2C8E', abbr: 'ID' },
+      { color: '#8B0000', abbr: 'LEFT'  }, { color: '#4CAF50', abbr: 'G/EFA' },
+      { color: '#F0001C', abbr: 'S&D'   }, { color: '#FFD500', abbr: 'RE'    },
+      { color: '#3399FF', abbr: 'EPP'   }, { color: '#003D7A', abbr: 'ECR'   },
+      { color: '#6A2C8E', abbr: 'PfE'   },
     ],
   },
   {
@@ -864,7 +865,7 @@ export function CountryCard({ country }: { country: Country }) {
         {locked && (
           <div className="absolute top-2.5 right-2.5 px-2 py-1 rounded-full text-[7.5px] font-mono font-black uppercase tracking-[0.14em] text-white"
             style={{ background: 'rgba(250,166,26,0.92)', boxShadow: '0 2px 8px rgba(0,0,0,0.30)' }}>
-            Releasing Today
+            Release Pending
           </div>
         )}
       </div>
@@ -881,7 +882,7 @@ export function CountryCard({ country }: { country: Country }) {
         <div className="flex-1 h-px hp-card-divider" />
         {locked ? (
           <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em]" style={{ color: '#FAA61A' }}>
-            Releasing Today
+            Release Pending
           </div>
         ) : (
           <div className="flex items-center gap-1.5 text-[8.5px] font-mono font-bold uppercase tracking-[0.14em] text-gold group-hover:text-gold-deep transition-colors">
