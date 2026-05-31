@@ -566,6 +566,7 @@ function ArgentinaMapView({
   selectedCodes,
   onMultiSelect,
   bubbleMapMode = false,
+  simBatchFractions,
   dark = false,
 }: {
   deptResults: Record<string, Partial<Record<string, number>>>;
@@ -580,6 +581,7 @@ function ArgentinaMapView({
   selectedCodes?: Set<string>;
   onMultiSelect?: (code: string) => void;
   bubbleMapMode?: boolean;
+  simBatchFractions?: Record<string, number>;
   dark?: boolean;
 }) {
   const containerRef    = useRef<HTMLDivElement>(null);
@@ -760,8 +762,11 @@ function ArgentinaMapView({
           .sort(([, a], [, b]) => b - a)
           .slice(0, 4);
         const total = (Object.values(deptResults[tooltip.code] ?? {}) as number[]).reduce((s, v) => s + v, 0);
+        const batchFrac = simBatchFractions?.[tooltip.code];
+        const isPartial = batchFrac !== undefined && batchFrac > 0 && batchFrac < 1;
+        const reportingPctTip = isPartial ? batchFrac : (total > 0 ? 1 : 0);
         const cw = containerRef.current?.clientWidth ?? 9999;
-        const TW = 220;
+        const TW = 228;
         const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
         const tt = {
           bg:    dark ? 'rgba(18,24,44,0.96)'        : 'rgba(255,255,255,0.97)',
@@ -772,6 +777,7 @@ function ArgentinaMapView({
           body:  dark ? 'rgba(255,255,255,0.85)'     : 'rgba(0,0,0,0.78)',
           muted: dark ? 'rgba(255,255,255,0.35)'     : 'rgba(0,0,0,0.40)',
         };
+        const GOLD = '#D4A017';
         return (
           <div
             className="absolute pointer-events-none z-[1000]"
@@ -786,27 +792,54 @@ function ArgentinaMapView({
               padding: '12px 14px',
             }}>
               <div style={{ fontSize: 14, fontWeight: 700, color: tt.title, lineHeight: 1.2 }}>{tooltip.nom}</div>
-              <div style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 3 }}>Province {tooltip.code}</div>
-              <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
-                {sorted.map(([id, votes], i) => {
-                  const info = getCandInfo(id);
-                  const pct = total > 0 ? (votes / total) * 100 : 0;
-                  return (
-                    <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                      <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: info.color }} />
-                      <span style={{ flex: 1, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {getLastName(info.name)}
-                      </span>
-                      <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, marginRight: 4 }}>
-                        {votes.toLocaleString()}
-                      </span>
-                      <span style={{ fontSize: 12, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: info.color }}>
-                        {pct.toFixed(1)}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
+              {/* % reporting line — gold during live counting */}
+              {(isPartial || (simBatchFractions && total > 0)) && (
+                <div style={{
+                  fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace',
+                  color: GOLD, fontWeight: 700, marginTop: 3,
+                  display: 'flex', alignItems: 'center', gap: 4,
+                }}>
+                  <span style={{
+                    display: 'inline-block', width: 6, height: 6, borderRadius: '50%',
+                    background: GOLD,
+                    animation: isPartial ? 'ar-live-blink 0.9s ease-in-out infinite' : 'none',
+                  }} />
+                  {isPartial
+                    ? `${(reportingPctTip * 100).toFixed(0)}% reporting`
+                    : '100% reporting'}
+                </div>
+              )}
+              {!simBatchFractions && (
+                <div style={{ fontSize: 9.5, fontFamily: '"JetBrains Mono",monospace', color: tt.sub, marginTop: 3 }}>
+                  Province {tooltip.code}
+                </div>
+              )}
+              {sorted.length === 0 ? (
+                <div style={{ marginTop: 10, fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, fontStyle: 'italic' }}>
+                  No votes yet
+                </div>
+              ) : (
+                <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {sorted.map(([id, votes], i) => {
+                    const info = getCandInfo(id);
+                    const pct = total > 0 ? (votes / total) * 100 : 0;
+                    return (
+                      <div key={id} style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ width: 8, height: 8, borderRadius: '50%', flexShrink: 0, background: info.color }} />
+                        <span style={{ flex: 1, fontSize: 11, fontWeight: i === 0 ? 600 : 400, color: tt.body, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {getLastName(info.name)}
+                        </span>
+                        <span style={{ fontSize: 10, fontFamily: '"JetBrains Mono",monospace', color: tt.muted, marginRight: 4 }}>
+                          {votes.toLocaleString()}
+                        </span>
+                        <span style={{ fontSize: 12, fontFamily: '"JetBrains Mono",monospace', fontWeight: 700, color: info.color }}>
+                          {pct.toFixed(1)}%
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -1196,9 +1229,46 @@ function trRandNormal(): number {
 function trBellCurveTimes(n: number, totalMs: number): number[] {
   const mean = totalMs / 2;
   const std  = totalMs / 6;
-  return Array.from({ length: n }, () =>
-    Math.max(500, Math.min(totalMs - 200, Math.round(mean + std * trRandNormal())))
+  // Start from 0 — first batch fires immediately; rest spread on bell curve
+  return Array.from({ length: n }, (_, i) =>
+    i === 0 ? 0 : Math.max(1, Math.min(totalMs - 100, Math.round(mean + std * trRandNormal())))
   ).sort((a, b) => a - b);
+}
+
+// Build noisy partial votes for a province at batch fraction f (0-1).
+// Each candidate's running share drifts from a starting noise toward the true final value.
+// At f=1 the result snaps exactly to finalVotes.
+function arPartialVotes(
+  finalVotes: Record<string, number>,
+  f: number,   // fraction of votes counted (0–1)
+  seed: number, // stable per-province seed for noise direction
+): Record<string, number> {
+  const ids = Object.keys(finalVotes);
+  const finalTotal = ids.reduce((s, id) => s + finalVotes[id], 0);
+  if (finalTotal === 0 || f <= 0) return Object.fromEntries(ids.map(id => [id, 0]));
+  if (f >= 1) return { ...finalVotes };
+
+  const counted = Math.round(finalTotal * f);
+  // Each candidate gets a noisy share; noise amplitude shrinks as f→1
+  const noiseAmp = 0.18 * (1 - f);   // ±18% noise at start, collapses to 0 at end
+  const noisyShares: Record<string, number> = {};
+  let shareSum = 0;
+  ids.forEach((id, i) => {
+    const trueShare = finalVotes[id] / finalTotal;
+    // deterministic-ish noise per candidate per province using seed
+    const phase = (seed * 7919 + i * 1301) % 1;
+    const noise = noiseAmp * Math.sin(phase * Math.PI * 2 + f * Math.PI);
+    noisyShares[id] = Math.max(0.001, trueShare + noise);
+    shareSum += noisyShares[id];
+  });
+  // Normalise and round to integer votes
+  const raw = ids.map(id => Math.round((noisyShares[id] / shareSum) * counted));
+  // Fix rounding residual on the largest candidate
+  const rawSum = raw.reduce((s, v) => s + v, 0);
+  const diff = counted - rawSum;
+  const maxIdx = raw.reduce((bi, v, i) => v > raw[bi] ? i : bi, 0);
+  raw[maxIdx] = Math.max(0, raw[maxIdx] + diff);
+  return Object.fromEntries(ids.map((id, i) => [id, raw[i]]));
 }
 
 function simulateArgentinaR1(
@@ -2297,10 +2367,12 @@ export default function ArgentinaApp() {
   const [simProgress, setSimProgress] = useState(0);
   const [simTotal, setSimTotal] = useState(0);
   const [simR1WinnerId, setSimR1WinnerId] = useState<string>('');
-  const [simR1Pcts, setSimR1Pcts] = useState<[number, number]>([0, 0]);  // [winner%, runner-up%]
+  const [simR1Pcts, setSimR1Pcts] = useState<[number, number]>([0, 0]);
   const [winnerOverlayDismissed, setWinnerOverlayDismissed] = useState(false);
   const [r2AwaitCandidates, setR2AwaitCandidates] = useState<[string, string]>(['', '']);
   const [r2AwaitR1Pcts, setR2AwaitR1Pcts] = useState<[number, number]>([0, 0]);
+  // Batch reporting: fraction 0-1 per province, drives partial results on map/tooltip
+  const [simBatchFractions, setSimBatchFractions] = useState<Record<string, number>>({});
   const r1ResultsRef = useRef<Record<string, Partial<Record<string, number>>>>({});
   const simTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const partyFilterRef = useRef<HTMLDivElement>(null);
@@ -2330,12 +2402,25 @@ export default function ArgentinaApp() {
   );
 
   // Published results — what the map and scoreboard see.
-  // 2027R1/R2: only button-projected depts are included.
+  // 2027R1: fully projected depts show exact votes; partial batch depts show noisy partial votes.
+  // 2027R2: only fully projected depts shown.
   const deptResults = useMemo<Record<string, Partial<Record<string, number>>>>(() => {
     if (activeElection === '2027R1') {
       const out: Record<string, Partial<Record<string, number>>> = {};
       for (const [code, r] of Object.entries(workingDeptResults)) {
-        if (projected2027.has(code)) out[code] = r;
+        if (projected2027.has(code)) {
+          out[code] = r;  // fully reported — exact final votes
+        } else {
+          const f = simBatchFractions[code];
+          if (f && f > 0) {
+            // In-progress batch: noisy partial votes for suspense
+            const final = Object.fromEntries(
+              Object.entries(r).map(([id, v]) => [id, (v as number) ?? 0])
+            ) as Record<string, number>;
+            const seed = Object.keys(PROV_2023R1_TOTALS).indexOf(code);
+            out[code] = arPartialVotes(final, f, seed);
+          }
+        }
       }
       return out;
     }
@@ -2347,7 +2432,7 @@ export default function ArgentinaApp() {
       return out;
     }
     return workingDeptResults;
-  }, [activeElection, workingDeptResults, projected2027, projected2027R2]);
+  }, [activeElection, workingDeptResults, projected2027, projected2027R2, simBatchFractions]);
 
   // ── 2027 R1 projection engine — always live, drives both R1 ADVANCE badges and R2 panel ──
   const r2027Reporting = useMemo(() => {
@@ -2473,6 +2558,7 @@ export default function ArgentinaApp() {
   const stopSimulation = useCallback(() => {
     simTimersRef.current.forEach(t => clearTimeout(t));
     simTimersRef.current = [];
+    setSimBatchFractions({});
     setSimState('idle');
   }, []);
 
@@ -2480,6 +2566,7 @@ export default function ArgentinaApp() {
     simTimersRef.current.forEach(t => clearTimeout(t));
     simTimersRef.current = [];
     setSimState('idle');
+    setSimBatchFractions({});
     setProjected2027(new Set());
     setProjected2027R2(new Set());
     setOverrides(prev => ({ ...prev, '2027R1': {}, '2027R2': {} }));
@@ -2516,11 +2603,12 @@ export default function ArgentinaApp() {
     ];
 
     setOverrides(prev => ({ ...prev, '2027R1': { ...prev['2027R1'], ...r1Results } }));
+    setSimBatchFractions({});
 
+    const BATCHES = 10;
     const deptCodesR1 = Object.keys(PROV_2023R1_TOTALS);
     const shuffledR1 = [...deptCodesR1].sort(() => Math.random() - 0.5);
     const totalMs = duration * 1000;
-    const r1Times = trBellCurveTimes(deptCodesR1.length, totalMs);
 
     setSimState('r1_running');
     setSimProgress(0);
@@ -2528,18 +2616,36 @@ export default function ArgentinaApp() {
 
     const timers: ReturnType<typeof setTimeout>[] = [];
     let r1Declared = 0;
-    for (let i = 0; i < shuffledR1.length; i++) {
-      const code = shuffledR1[i];
-      timers.push(setTimeout(() => {
-        setProjected2027(prev => new Set([...prev, code]));
-        r1Declared++;
-        setSimProgress(r1Declared);
-      }, r1Times[i]));
+
+    for (let pi = 0; pi < shuffledR1.length; pi++) {
+      const code = shuffledR1[pi];
+      // Generate random batch cut-points (10 batches, random sizes)
+      const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      // Spread all 10 batch events on a bell curve scoped to this province's window
+      // Provinces themselves arrive in random order; within each province the 10 batches span its window
+      const provWindow = totalMs / shuffledR1.length;
+      const provOffset = pi * provWindow;
+      const batchTimes = trBellCurveTimes(BATCHES, provWindow).map(t => provOffset + t);
+
+      for (let b = 0; b < BATCHES; b++) {
+        const cumFrac = cuts[b + 1]; // 0..1
+        const isLast = b === BATCHES - 1;
+        timers.push(setTimeout(() => {
+          if (isLast) {
+            // Final batch: snap to exact result, mark province fully reported
+            setSimBatchFractions(prev => ({ ...prev, [code]: 1 }));
+            setProjected2027(prev => new Set([...prev, code]));
+            r1Declared++;
+            setSimProgress(r1Declared);
+          } else {
+            setSimBatchFractions(prev => ({ ...prev, [code]: cumFrac }));
+          }
+        }, batchTimes[b]));
+      }
     }
 
-    // After R1 finishes, apply Argentina's win rule: a candidate wins outright with
-    // >45% of valid votes, OR >40% with at least a 10-point lead over the runner-up.
-    // Otherwise the top two advance to a runoff (balotaje).
+    // After all provinces finish: apply Argentina's win rule.
+    // No extra delay — fires right after the last batch.
     timers.push(setTimeout(() => {
       const r1Lead = top2Pcts[0] - top2Pcts[1];
       if (top2Pcts[0] > 45 || (top2Pcts[0] > 40 && r1Lead >= 10)) {
@@ -2553,7 +2659,7 @@ export default function ArgentinaApp() {
         setSimState('r2_input');
       }
       setShowSimPanel(true);
-    }, totalMs + 2000));
+    }, totalMs + 200));
 
     simTimersRef.current = timers;
   }, []);
@@ -2965,6 +3071,7 @@ export default function ArgentinaApp() {
             selectedCodes={selectedDepts}
             onMultiSelect={handleMultiSelect}
             bubbleMapMode={bubbleMapMode}
+            simBatchFractions={activeElection === '2027R1' ? simBatchFractions : undefined}
             dark={dark}
           />
         </div>
