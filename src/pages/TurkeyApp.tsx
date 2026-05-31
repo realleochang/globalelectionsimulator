@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { MapContainer, TileLayer, GeoJSON, useMap, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
@@ -1140,12 +1141,39 @@ function trRandNormal(): number {
   return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v);
 }
 
-function trBellCurveTimes(n: number, totalMs: number): number[] {
-  const mean = totalMs / 2;
-  const std  = totalMs / 6;
-  return Array.from({ length: n }, () =>
-    Math.max(500, Math.min(totalMs - 200, Math.round(mean + std * trRandNormal())))
-  ).sort((a, b) => a - b);
+
+// Every province starts in the first 20%; 10 batches land randomly over full duration.
+function trProvBatchTimes(totalMs: number): number[] {
+  const BATCHES = 10;
+  const firstT = Math.round(Math.random() * totalMs * 0.20);
+  const rest = Array.from({ length: BATCHES - 1 }, () =>
+    firstT + Math.round(Math.random() * (totalMs - firstT))
+  );
+  return [firstT, ...rest].sort((a, b) => a - b);
+}
+
+// Noisy partial votes — drifts toward final answer as fraction approaches 1.
+function trPartialVotes(finalVotes: Record<string, number>, f: number, seed: number): Record<string, number> {
+  const ids = Object.keys(finalVotes);
+  const finalTotal = ids.reduce((s, id) => s + finalVotes[id], 0);
+  if (finalTotal === 0 || f <= 0) return Object.fromEntries(ids.map(id => [id, 0]));
+  if (f >= 1) return { ...finalVotes };
+  const counted = Math.round(finalTotal * f);
+  const noiseAmp = 0.18 * (1 - f);
+  let shareSum = 0;
+  const noisyShares: Record<string, number> = {};
+  ids.forEach((id, i) => {
+    const trueShare = finalVotes[id] / finalTotal;
+    const phase = (seed * 7919 + i * 1301) % 1;
+    const noise = noiseAmp * Math.sin(phase * Math.PI * 2 + f * Math.PI);
+    noisyShares[id] = Math.max(0.001, trueShare + noise);
+    shareSum += noisyShares[id];
+  });
+  const raw = ids.map(id => Math.round((noisyShares[id] / shareSum) * counted));
+  const diff = counted - raw.reduce((s, v) => s + v, 0);
+  const maxIdx = raw.reduce((bi, v, i) => v > raw[bi] ? i : bi, 0);
+  raw[maxIdx] = Math.max(0, raw[maxIdx] + diff);
+  return Object.fromEntries(ids.map((id, i) => [id, raw[i]]));
 }
 
 function simulateTurkeyR1(
@@ -2259,6 +2287,11 @@ export default function TurkeyApp() {
   const [simTotal, setSimTotal] = useState(0);
   const [r2AwaitCandidates, setR2AwaitCandidates] = useState<[string, string]>(['', '']);
   const [r2AwaitR1Pcts, setR2AwaitR1Pcts] = useState<[number, number]>([0, 0]);
+  const [simBatchFractions,   setSimBatchFractions]   = useState<Record<string, number>>({});
+  const [simBatchFractionsR2, setSimBatchFractionsR2] = useState<Record<string, number>>({});
+  const [simR1WinnerId, setSimR1WinnerId] = useState<string>('');
+  const [simR1Pcts, setSimR1Pcts]         = useState<[number, number]>([0, 0]);
+  const [winnerOverlayDismissed, setWinnerOverlayDismissed] = useState(false);
   const r1ResultsRef = useRef<Record<string, Partial<Record<string, number>>>>({});
   const simTimersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
   const partyFilterRef = useRef<HTMLDivElement>(null);
@@ -2431,6 +2464,8 @@ export default function TurkeyApp() {
   const stopSimulation = useCallback(() => {
     simTimersRef.current.forEach(t => clearTimeout(t));
     simTimersRef.current = [];
+    setSimBatchFractions({});
+    setSimBatchFractionsR2({});
     setSimState('idle');
   }, []);
 
@@ -2438,6 +2473,8 @@ export default function TurkeyApp() {
     simTimersRef.current.forEach(t => clearTimeout(t));
     simTimersRef.current = [];
     setSimState('idle');
+    setSimBatchFractions({});
+    setSimBatchFractionsR2({});
     setProjected2028(new Set());
     setProjected2028R2(new Set());
     setOverrides(prev => ({ ...prev, '2028R1': {}, '2028R2': {} }));
@@ -2474,31 +2511,44 @@ export default function TurkeyApp() {
     ];
 
     setOverrides(prev => ({ ...prev, '2028R1': { ...prev['2028R1'], ...r1Results } }));
+    setSimBatchFractions({});
 
+    const BATCHES = 10;
     const deptCodesR1 = Object.keys(PROV_2023R1_TOTALS);
-    const shuffledR1 = [...deptCodesR1].sort(() => Math.random() - 0.5);
     const totalMs = duration * 1000;
-    const r1Times = trBellCurveTimes(deptCodesR1.length, totalMs);
 
     setSimState('r1_running');
     setSimProgress(0);
     setSimTotal(deptCodesR1.length);
 
     const timers: ReturnType<typeof setTimeout>[] = [];
-    let r1Declared = 0;
-    for (let i = 0; i < shuffledR1.length; i++) {
-      const code = shuffledR1[i];
-      timers.push(setTimeout(() => {
-        setProjected2028(prev => new Set([...prev, code]));
-        r1Declared++;
-        setSimProgress(r1Declared);
-      }, r1Times[i]));
+    for (const code of deptCodesR1) {
+      const fullResults = r1Results[code] ?? {};
+      const seed = deptCodesR1.indexOf(code);
+      const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      const batchTimes = trProvBatchTimes(totalMs);
+      for (let b = 0; b < BATCHES; b++) {
+        const cumFrac = cuts[b + 1];
+        const isLast  = b === BATCHES - 1;
+        timers.push(setTimeout(() => {
+          if (isLast) {
+            setSimBatchFractions(prev => ({ ...prev, [code]: 1 }));
+            setProjected2028(prev => new Set([...prev, code]));
+            setSimProgress(prev => prev + 1);
+          } else {
+            const partial = trPartialVotes(fullResults as Record<string,number>, cumFrac, seed);
+            setOverrides(prev => ({ ...prev, '2028R1': { ...prev['2028R1'], [code]: partial } }));
+            setSimBatchFractions(prev => ({ ...prev, [code]: cumFrac }));
+          }
+        }, batchTimes[b]));
+      }
     }
 
-    // After R1 finishes: if the leader has an absolute majority (>50%), declare
-    // them the outright winner — no runoff. Otherwise proceed to R2 input.
     timers.push(setTimeout(() => {
       if (top2Pcts[0] > 50) {
+        setSimR1WinnerId(top2Ids[0]);
+        setSimR1Pcts([top2Pcts[0], top2Pcts[1]]);
+        setWinnerOverlayDismissed(false);
         setSimState('r1_winner');
       } else {
         setR2AwaitCandidates(top2Ids);
@@ -2506,7 +2556,7 @@ export default function TurkeyApp() {
         setSimState('r2_input');
       }
       setShowSimPanel(true);
-    }, totalMs + 2000));
+    }, totalMs + 200));
 
     simTimersRef.current = timers;
   }, []);
@@ -2519,9 +2569,9 @@ export default function TurkeyApp() {
     setOverrides(prev => ({ ...prev, '2028R2': { ...prev['2028R2'], ...r2Results } }));
 
     const deptCodesR2 = Object.keys(PROV_2023R2_TOTALS);
-    const shuffledR2 = [...deptCodesR2].sort(() => Math.random() - 0.5);
     const totalMs = duration * 1000;
-    const r2Times = trBellCurveTimes(deptCodesR2.length, totalMs);
+    const BATCHES = 10;
+    setSimBatchFractionsR2({});
 
     setActiveElection('2028R2');
     setSimState('r2_running');
@@ -2529,17 +2579,29 @@ export default function TurkeyApp() {
     setSimTotal(deptCodesR2.length);
 
     const timers: ReturnType<typeof setTimeout>[] = [];
-    let r2Declared = 0;
-    for (let i = 0; i < shuffledR2.length; i++) {
-      const code = shuffledR2[i];
-      timers.push(setTimeout(() => {
-        setProjected2028R2(prev => new Set([...prev, code]));
-        r2Declared++;
-        setSimProgress(r2Declared);
-      }, r2Times[i]));
+    for (const code of deptCodesR2) {
+      const fullResults = r2Results[code] ?? {};
+      const seed = deptCodesR2.indexOf(code);
+      const cuts = [0, ...Array.from({length: BATCHES - 1}, () => Math.random()).sort((a,b)=>a-b), 1];
+      const batchTimes = trProvBatchTimes(totalMs);
+      for (let b = 0; b < BATCHES; b++) {
+        const cumFrac = cuts[b + 1];
+        const isLast  = b === BATCHES - 1;
+        timers.push(setTimeout(() => {
+          if (isLast) {
+            setSimBatchFractionsR2(prev => ({ ...prev, [code]: 1 }));
+            setProjected2028R2(prev => new Set([...prev, code]));
+            setSimProgress(prev => prev + 1);
+          } else {
+            const partial = trPartialVotes(fullResults as Record<string,number>, cumFrac, seed);
+            setOverrides(prev => ({ ...prev, '2028R2': { ...prev['2028R2'], [code]: partial } }));
+            setSimBatchFractionsR2(prev => ({ ...prev, [code]: cumFrac }));
+          }
+        }, batchTimes[b]));
+      }
     }
 
-    timers.push(setTimeout(() => setSimState('idle'), totalMs + 2000));
+    timers.push(setTimeout(() => setSimState('idle'), totalMs + 200));
     simTimersRef.current = timers;
   }, [r2AwaitCandidates]);
 
@@ -2565,6 +2627,7 @@ export default function TurkeyApp() {
   const btnGold     = `${btnBase} bg-gold text-white hover:bg-gold-deep`;
 
   const isSimRunning = simState === 'r1_running' || simState === 'r2_running';
+  void simBatchFractions; void simBatchFractionsR2; // batch state — used by setter calls
 
   return (
     <div className="flex flex-col h-screen bg-canvas overflow-hidden" data-country="fr">
@@ -2628,6 +2691,12 @@ export default function TurkeyApp() {
               </svg>
               Simulation
             </button>
+          )}
+          {isSimRunning && (
+            <div className="flex items-center gap-1.5 px-2.5 h-7 rounded-[4px] bg-red-600 text-white select-none shrink-0">
+              <span style={{ display:'inline-block', width:7, height:7, borderRadius:'50%', background:'#fff', animation:'ar-live-blink 0.9s ease-in-out infinite' }}/>
+              <span className="text-[11px] font-mono font-bold tracking-widest uppercase">Live</span>
+            </div>
           )}
           <button
             disabled={isSimRunning}
@@ -2962,6 +3031,71 @@ export default function TurkeyApp() {
       <div className="absolute bottom-0 left-0 right-0 pointer-events-none z-30 flex items-center justify-between px-3 py-1 bg-ink/60">
         <span className="text-[10px] text-white/70 font-mono tracking-wide uppercase">Global Election Simulator — Presidential Edition</span>
         <span className="text-[10px] text-white/40 font-mono">{typeof window !== 'undefined' ? window.location.hostname : ''}</span>
+      </div>
+
+      {/* R1 winner overlay */}
+      {simState === 'r1_winner' && simR1WinnerId && !winnerOverlayDismissed && createPortal(
+        <TrWinnerOverlay
+          winnerId={simR1WinnerId}
+          winnerPct={simR1Pcts[0]}
+          runnerUpPct={simR1Pcts[1]}
+          getCandInfo={getCandInfo2028}
+          onDismiss={() => setWinnerOverlayDismissed(true)}
+        />,
+        document.body
+      )}
+    </div>
+  );
+}
+
+// ── Turkey winner overlay ──────────────────────────────────────────────────────
+function TrWinnerOverlay({ winnerId, winnerPct, runnerUpPct, getCandInfo, onDismiss }: {
+  winnerId: string; winnerPct: number; runnerUpPct: number;
+  getCandInfo: (id: string) => { name: string; color: string };
+  onDismiss: () => void;
+}) {
+  const info = getCandInfo(winnerId);
+  const margin = winnerPct - runnerUpPct;
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  useEffect(() => {
+    const party = TR_2028_PARTY_MAP[winnerId as Tr2028PartyId];
+    const cand  = party?.candidates[0] ?? winnerId;
+    const title = TR_2028_WIKI_TITLES[cand] ?? cand.replace(/ /g,'_');
+    let cancelled = false;
+    fetchWikiPhoto(title).then(url => { if (!cancelled) setPhotoUrl(url); });
+    return () => { cancelled = true; };
+  }, [winnerId]);
+  const c = info.color;
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center"
+      style={{ background:'rgba(0,0,0,0.82)', backdropFilter:'blur(10px)' }}
+      onClick={onDismiss}>
+      <div onClick={e => e.stopPropagation()}
+        className="relative flex flex-col items-center text-center px-10 py-10 rounded-[24px] max-w-[480px] w-full mx-4"
+        style={{ background:`linear-gradient(170deg,rgba(18,22,38,0.97) 0%,${c}22 100%)`, border:`2px solid ${c}55`, boxShadow:`0 0 80px ${c}44,0 24px 60px rgba(0,0,0,0.6)` }}>
+        <div className="absolute top-0 left-0 right-0 h-1 rounded-t-[22px]" style={{ background:c }}/>
+        <div className="text-[10px] font-mono font-bold uppercase tracking-[0.25em] mb-5" style={{ color:c }}>🇹🇷 Round 1 — Outright Winner</div>
+        <div className="mb-5 relative">
+          <div className="w-32 h-32 rounded-full overflow-hidden border-4 mx-auto" style={{ borderColor:c, boxShadow:`0 0 32px ${c}88` }}>
+            {photoUrl ? <img src={photoUrl} alt={info.name} className="w-full h-full object-cover object-top"/> : <div className="w-full h-full flex items-center justify-center text-[36px]" style={{ background:`${c}22` }}>🇹🇷</div>}
+          </div>
+          <div className="absolute -bottom-2 left-1/2 -translate-x-1/2 px-3 py-0.5 rounded-full text-[10px] font-mono font-bold text-white" style={{ background:c }}>✓ ELECTED</div>
+        </div>
+        <div className="text-[28px] font-black text-white leading-tight mb-1">{info.name}</div>
+        <div className="text-[12px] font-mono text-white/50 mb-6">{TR_2028_PARTY_MAP[winnerId as Tr2028PartyId]?.name ?? ''}</div>
+        <div className="flex gap-6 mb-8">
+          <div className="flex flex-col items-center">
+            <div className="text-[32px] font-black tabular-nums leading-none" style={{ color:c }}>{winnerPct.toFixed(1)}%</div>
+            <div className="text-[10px] font-mono text-white/40 mt-1 uppercase tracking-wide">National vote</div>
+          </div>
+          <div className="w-px bg-white/10"/>
+          <div className="flex flex-col items-center">
+            <div className="text-[32px] font-black tabular-nums leading-none text-white">+{margin.toFixed(1)}</div>
+            <div className="text-[10px] font-mono text-white/40 mt-1 uppercase tracking-wide">Point margin</div>
+          </div>
+        </div>
+        <div className="text-[10px] font-mono text-white/35 mb-8 leading-relaxed">Crossed 50% in Round 1 — no runoff needed.</div>
+        <button onClick={onDismiss} className="h-9 px-8 rounded-full text-[12px] font-mono font-bold uppercase tracking-wider text-white hover:opacity-80 transition-all" style={{ background:c, boxShadow:`0 4px 20px ${c}66` }}>Continue →</button>
       </div>
     </div>
   );

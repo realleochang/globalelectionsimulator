@@ -695,86 +695,29 @@ function UsaNomineePhoto({ partyId, isWinner, size = 52, nominees = USA_NOMINEES
   );
 }
 
-// ── Candidate picker (blank map) ──────────────────────────────────────────────
-function CandidateOption({ c, i, color, selected, onChange, onClose }: {
-  c: { name: string; lastName: string; photo: string };
-  i: number; color: string; selected: boolean;
-  onChange: (i: number) => void; onClose: () => void;
-}) {
-  const [ok, setOk] = useState(true);
-  return (
-    <button
-      onClick={() => { onChange(i); onClose(); }}
-      className={`flex items-center gap-2 w-full px-2.5 py-2 text-left transition-colors ${selected ? 'bg-[#f8f7f4]' : 'hover:bg-hover'}`}
-    >
-      <div className="w-6 h-6 rounded-full overflow-hidden shrink-0 flex items-center justify-center"
-        style={{ border: `1.5px solid ${color}`, background: `${color}18` }}>
-        {ok ? (
-          <img src={`${import.meta.env.BASE_URL}${c.photo}`} alt={c.lastName}
-            style={{ width: '100%', height: '100%', objectFit: 'cover', objectPosition: 'center top' }}
-            onError={() => setOk(false)} />
-        ) : (
-          <span style={{ color, fontSize: 8, fontWeight: 800 }}>{c.lastName.slice(0, 2).toUpperCase()}</span>
-        )}
-      </div>
-      <span className="text-[10px] font-mono text-ink leading-none">{c.name}</span>
-      {selected && (
-        <svg className="ml-auto shrink-0" width="8" height="8" viewBox="0 0 8 8" fill="none">
-          <path d="M1.5 4L3.2 5.8L6.5 2.5" stroke={color} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-        </svg>
-      )}
-    </button>
-  );
-}
-
-function CandidatePicker({ partyId, candidates, selectedIdx, onChange }: {
+// ── Candidate shuffle button — cycles to next candidate on click ─────────────
+function CandidateShuffle({ partyId, candidates, selectedIdx, onChange }: {
   partyId: UsaPartyId;
   candidates: Array<{ name: string; lastName: string; photo: string }>;
   selectedIdx: number;
   onChange: (idx: number) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [dropPos, setDropPos] = useState<{ top: number; left: number } | null>(null);
-  const btnRef = useRef<HTMLButtonElement>(null);
   const color = PARTY_MAP[partyId]?.color ?? '#888';
-  const current = candidates[selectedIdx];
-
-  const handleToggle = () => {
-    if (!open && btnRef.current) {
-      const r = btnRef.current.getBoundingClientRect();
-      setDropPos({ top: r.bottom + 4, left: r.left + r.width / 2 });
-    }
-    setOpen(o => !o);
-  };
-
+  const lastName = candidates[selectedIdx]?.lastName ?? '';
   return (
-    <>
-      <button
-        ref={btnRef}
-        onClick={handleToggle}
-        className="flex items-center gap-0.5 mt-1.5 leading-none hover:opacity-70 transition-opacity cursor-pointer"
-        title="Change candidate"
-      >
-        <span className="text-[11px] font-mono text-ink-3 leading-none">{current.lastName}</span>
-        <svg width="6" height="4" viewBox="0 0 6 4" fill="none" className="shrink-0 mt-px">
-          <path d="M0.5 0.5L3 3L5.5 0.5" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" strokeLinejoin="round" className="text-ink-3"/>
-        </svg>
-      </button>
-
-      {open && dropPos && (
-        <>
-          <div className="fixed inset-0 z-[1999]" onClick={() => setOpen(false)} />
-          <div
-            className="fixed z-[2000] bg-white border border-default rounded-lg shadow-xl py-1 min-w-[170px]"
-            style={{ top: dropPos.top, left: dropPos.left, transform: 'translateX(-50%)' }}
-          >
-            {candidates.map((c, i) => (
-              <CandidateOption key={i} c={c} i={i} color={color} selected={i === selectedIdx} onChange={onChange} onClose={() => setOpen(false)} />
-            ))}
-          </div>
-        </>
-      )}
-    </>
+    <button
+      onClick={() => onChange((selectedIdx + 1) % candidates.length)}
+      className="flex items-center gap-0.5 mt-1.5 leading-none hover:opacity-70 transition-opacity cursor-pointer"
+      title="Switch candidate"
+    >
+      <span className="text-[11px] font-mono leading-none" style={{ color }}>{lastName}</span>
+      <svg width="10" height="8" viewBox="0 0 14 10" fill="none" aria-hidden="true" style={{ opacity:0.65, flexShrink:0 }}>
+        <path d="M0 2.5h11" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+        <path d="M9 0.5l3 2-3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+        <path d="M14 7.5H3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+        <path d="M5 5.5l-3 2 3 2" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+      </svg>
+    </button>
   );
 }
 
@@ -858,7 +801,7 @@ function UsaScoreboard({ tally, votePcts, rawVotes, activePreset, nominees: nomi
 
                 {/* Candidate last name — clickable picker in blank mode for DEM/GOP */}
                 {activePreset === 'blank' && (p.id === 'DEM' || p.id === 'GOP') && onChangeBlankCandidate ? (
-                  <CandidatePicker
+                  <CandidateShuffle
                     partyId={p.id as UsaPartyId}
                     candidates={p.id === 'DEM' ? BLANK_DEM_CANDIDATES : BLANK_GOP_CANDIDATES}
                     selectedIdx={p.id === 'DEM' ? (blankDemIdx ?? 0) : (blankGopIdx ?? 0)}

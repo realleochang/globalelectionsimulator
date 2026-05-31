@@ -515,9 +515,9 @@ function BrMapView({
         })()}
       </MapContainer>
 
-      {/* Reporting badge */}
+      {/* Reporting badge — bottom-left like Argentina */}
       {reportingPct !== undefined && reportingPct > 0 && (
-        <div className="absolute top-3 left-3 z-[1000] rounded-[10px] overflow-hidden select-none"
+        <div className="absolute bottom-12 left-3 z-[1000] rounded-[10px] overflow-hidden select-none pointer-events-none"
           style={{
             background: dark ? 'rgba(12,18,36,0.92)' : 'rgba(255,255,255,0.96)',
             border: `1px solid ${dark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.08)'}`,
@@ -582,7 +582,6 @@ function BrMapView({
         ];
 
         const total = rows.reduce((s, [, v]) => s + v, 0);
-        const topPct = rows[0] ? (rows[0][1] / total) * 100 : 100;
         const cw = containerRef.current?.clientWidth ?? 9999;
         const TW = 240;
         const left = tooltip.x + 18 + TW > cw ? tooltip.x - TW - 10 : tooltip.x + 18;
@@ -618,7 +617,7 @@ function BrMapView({
                   ? { name: `Others (${othersIds?.length ?? 0} candidates)`, color: '#6B7280' }
                   : getCandInfo(id);
                 const pct  = total > 0 ? (votes / total) * 100 : 0;
-                const barW = topPct > 0 ? (pct / topPct) * 100 : 0;
+                const barW = pct;  // proportional to actual vote share (0-100%)
                 return (
                   <div key={id} className="mb-2">
                     <div className="flex items-center gap-1.5 mb-[3px]">
